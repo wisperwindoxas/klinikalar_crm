@@ -13,6 +13,81 @@ import { showNotification } from '../components/ToastNotification';
 
 const API_BASE_URL = 'http://localhost:5001/api/v1';
 
+// Helper: Detect doctor gender by Uzbek naming conventions
+export const isFemaleDoctor = (name?: string): boolean => {
+  if (!name) return false;
+  const clean = name.toLowerCase().trim();
+  // Check female surname endings (-ova, -yeva, -qizi)
+  if (/(ova|yeva|qizi)\b/i.test(clean)) return true;
+  // Common Uzbek female given names
+  const femaleKeywords = [
+    'malika', 'dilnoza', 'nilufar', 'gulnoza', 'umida', 'shahlo',
+    'zulayho', 'nargiza', 'madina', 'dildora', 'nodira', 'munisa',
+    'rayhon', 'feruza', 'zuhra', 'fotima', 'kamola', 'gulbahor',
+    'mohira', 'nafisa', 'aziza', 'shaxnoza', 'shahnoza', 'sevara',
+    'surayyo', 'lobar', 'yulduz', 'nozima', 'guli', 'zarnigor',
+    'barno', 'iroda', 'rano', 'saodat', 'muxlisa'
+  ];
+  return femaleKeywords.some(fn => clean.includes(fn));
+};
+
+export const renderDoctorAvatar = (name: string, avatarUrl?: string, sizeClass = "w-12 h-12") => {
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        className={`${sizeClass} rounded-2xl object-cover border-2 border-white shadow-md shadow-slate-200 flex-shrink-0`}
+      />
+    );
+  }
+
+  const female = isFemaleDoctor(name);
+
+  if (female) {
+    return (
+      <div
+        className={`${sizeClass} rounded-2xl bg-gradient-to-br from-teal-400 via-teal-600 to-emerald-700 border-2 border-white shadow-md shadow-teal-700/20 flex items-center justify-center text-white relative overflow-hidden flex-shrink-0`}
+        title={`${name} (Ayol shifokor)`}
+      >
+        <svg viewBox="0 0 64 64" className="w-[85%] h-[85%] drop-shadow-sm">
+          <circle cx="32" cy="22" r="13" fill="#FDE68A" />
+          <path d="M19 22 C19 11, 45 11, 45 22 C45 27, 43 33, 43 33 C38 26, 26 26, 21 33 Z" fill="#92400E" />
+          <path d="M19 22 C17 28, 18 36, 21 38 C23 35, 22 29, 23 25 Z" fill="#78350F" />
+          <path d="M45 22 C47 28, 46 36, 43 38 C41 35, 42 29, 41 25 Z" fill="#78350F" />
+          <circle cx="27" cy="23" r="1.6" fill="#1E293B" />
+          <circle cx="37" cy="23" r="1.6" fill="#1E293B" />
+          <path d="M28 28.5 Q32 32 36 28.5" stroke="#B45309" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+          <path d="M17 56 C17 43, 23 38, 32 38 C41 38, 47 43, 47 56 Z" fill="#FFFFFF" />
+          <path d="M28 38 L32 46 L36 38 Z" fill="#0D9488" />
+          <path d="M25 40 C25 47, 39 47, 39 40" stroke="#0284C7" strokeWidth="2" fill="none" />
+          <circle cx="32" cy="47" r="2.2" fill="#0284C7" />
+        </svg>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`${sizeClass} rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-600 to-sky-700 border-2 border-white shadow-md shadow-blue-700/20 flex items-center justify-center text-white relative overflow-hidden flex-shrink-0`}
+      title={`${name} (Erkak shifokor)`}
+    >
+      <svg viewBox="0 0 64 64" className="w-[85%] h-[85%] drop-shadow-sm">
+        <circle cx="32" cy="22" r="13" fill="#FDE68A" />
+        <path d="M19 19 C19 11, 45 11, 45 19 C42 14, 22 14, 19 19 Z" fill="#1E293B" />
+        <circle cx="27" cy="23" r="1.6" fill="#1E293B" />
+        <circle cx="37" cy="23" r="1.6" fill="#1E293B" />
+        <path d="M28 28.5 Q32 32 36 28.5" stroke="#B45309" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        <path d="M17 56 C17 43, 23 38, 32 38 C41 38, 47 43, 47 56 Z" fill="#FFFFFF" />
+        <path d="M28 38 L32 46 L36 38 Z" fill="#0284C7" />
+        <path d="M31 46 L33 46 L32.5 53 Z" fill="#0369A1" />
+        <path d="M25 40 C25 47, 39 47, 39 40" stroke="#334155" strokeWidth="2" fill="none" />
+        <circle cx="32" cy="47" r="2.2" fill="#334155" />
+      </svg>
+    </div>
+  );
+};
+
 export const DoctorView: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -424,34 +499,29 @@ export const DoctorView: React.FC = () => {
 
       {/* 2. MAIN WORKSPACE */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* TOP HEADER BAR (100% 1:1 with Shifokor.png) */}
+        {/* TOP HEADER BAR */}
         <header className="h-20 bg-white border-b border-slate-200/80 px-8 flex items-center justify-between sticky top-0 z-10 shadow-xs">
-          {/* Doctor Info & Switcher */}
+          {/* Doctor Info (Without Switcher Select) */}
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-50 border-2 border-[#1677FF] flex items-center justify-center text-2xl shadow-xs">
-              👩‍⚕️
-            </div>
+            {renderDoctorAvatar(doctorInfo.display_name, doctorInfo.avatar_url)}
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <h1 className="text-lg font-black text-[#172B4D] tracking-tight">{doctorInfo.display_name}</h1>
-                {/* Doctor Switcher Dropdown */}
-                {allDoctors.length > 0 && (
-                  <select
-                    value={doctorInfo.id}
-                    onChange={(e) => handleSwitchDoctor(e.target.value)}
-                    className="ml-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 py-1 px-2.5 rounded-lg border-0 cursor-pointer transition focus:ring-2 focus:ring-[#00897B]"
-                    title="Shifokor profilini almashtirish"
-                  >
-                    {allDoctors.map(doc => (
-                      <option key={doc.id} value={doc.id}>
-                        {doc.display_name} ({doc.specialty_name}, {doc.room_number || doc.cabinet_number}-xona)
-                      </option>
-                    ))}
-                  </select>
-                )}
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1.5 shadow-2xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Faol qabul</span>
+                </span>
               </div>
-              <p className="text-xs text-slate-500 font-semibold">
-                {doctorInfo.specialty_name} <span className="mx-1 text-slate-300">|</span> {doctorInfo.cabinet_number}-kabinet
+              <p className="text-xs text-slate-500 font-semibold mt-0.5 flex items-center gap-2">
+                <span>{doctorInfo.specialty_name}</span>
+                <span className="text-slate-300">•</span>
+                <span className="font-mono text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md font-bold">{doctorInfo.cabinet_number}-kabinet</span>
+                {doctorInfo.phone && (
+                  <>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-slate-500 font-mono text-[11px]">{doctorInfo.phone}</span>
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -951,22 +1021,23 @@ export const DoctorView: React.FC = () => {
               </div>
 
               <div className="space-y-4">
-                {/* Doctor Switcher in Settings */}
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Faol shifokor profilini tanlash
-                  </label>
-                  <select
-                    value={doctorInfo.id}
-                    onChange={(e) => handleSwitchDoctor(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#00897B]"
-                  >
-                    {allDoctors.map(doc => (
-                      <option key={doc.id} value={doc.id}>
-                        {doc.display_name} — {doc.specialty_name} ({doc.room_number || doc.cabinet_number}-kabinet)
-                      </option>
-                    ))}
-                  </select>
+                {/* Doctor Profile Card in Settings */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-50 via-teal-50/20 to-slate-50 border border-slate-200/80 flex items-center gap-4">
+                  {renderDoctorAvatar(doctorInfo.display_name, doctorInfo.avatar_url, "w-16 h-16")}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-black text-[#172B4D] truncate">{doctorInfo.display_name}</h3>
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
+                        {isFemaleDoctor(doctorInfo.display_name) ? "Ayol shifokor" : "Erkak shifokor"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 font-semibold mt-0.5">
+                      {doctorInfo.specialty_name} • {doctorInfo.cabinet_number}-kabinet
+                    </p>
+                    <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                      Shifokor ID: {doctorInfo.id}
+                    </p>
+                  </div>
                 </div>
 
                 <div>

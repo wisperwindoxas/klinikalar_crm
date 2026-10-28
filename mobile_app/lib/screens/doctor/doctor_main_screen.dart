@@ -123,6 +123,59 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
     );
   }
 
+  bool _isFemaleDoctor(String? name) {
+    if (name == null || name.isEmpty) return false;
+    final clean = name.toLowerCase().trim();
+    if (RegExp(r'(ova|yeva|qizi)\b', caseSensitive: false).hasMatch(clean)) return true;
+    const femaleKeywords = [
+      'malika', 'dilnoza', 'nilufar', 'gulnoza', 'umida', 'shahlo',
+      'zulayho', 'nargiza', 'madina', 'dildora', 'nodira', 'munisa',
+      'rayhon', 'feruza', 'zuhra', 'fotima', 'kamola', 'gulbahor',
+      'mohira', 'nafisa', 'aziza', 'shaxnoza', 'shahnoza', 'sevara',
+      'surayyo', 'lobar', 'yulduz', 'nozima', 'guli', 'zarnigor',
+      'barno', 'iroda', 'rano', 'saodat', 'muxlisa'
+    ];
+    return femaleKeywords.any((fn) => clean.contains(fn));
+  }
+
+  Widget _buildDoctorAvatar(String? name, {double radius = 19}) {
+    final isFemale = _isFemaleDoctor(name);
+    final bgGradient = isFemale
+        ? const LinearGradient(
+            colors: [Color(0xFF2DD4BF), Color(0xFF0D9488)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          )
+        : const LinearGradient(
+            colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          );
+
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: bgGradient,
+        boxShadow: [
+          BoxShadow(
+            color: (isFemale ? const Color(0xFF0D9488) : const Color(0xFF1D4ED8)).withOpacity(0.28),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Icon(
+          isFemale ? Icons.face_3_rounded : Icons.face_6_rounded,
+          color: Colors.white,
+          size: radius * 1.15,
+        ),
+      ),
+    );
+  }
+
   PreferredSizeWidget _buildAppBar(user) {
     return AppBar(
       elevation: 0,
@@ -130,11 +183,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
       automaticallyImplyLeading: false,
       title: Row(
         children: [
-          CircleAvatar(
-            radius: 19,
-            backgroundColor: AppColors.mintLight,
-            child: const Icon(Icons.person, color: AppColors.primary, size: 22),
-          ),
+          _buildDoctorAvatar(user?.fullName, radius: 19),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -756,11 +805,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
             ),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: AppColors.mintLight,
-                  child: const Icon(Icons.person, color: AppColors.primary, size: 32),
-                ),
+                _buildDoctorAvatar(user?.fullName, radius: 28),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
