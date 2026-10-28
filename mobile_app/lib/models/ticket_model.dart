@@ -1,3 +1,5 @@
+import '../core/utils/formatters.dart';
+
 class TicketModel {
   final String id;
   final String ticketNumber;
@@ -59,14 +61,14 @@ class TicketModel {
       doctorSpecialty: json['doctorSpecialty'] ?? json['specialty_name'] ?? json['doctor_specialty'] ?? json['doctor']?['specialty'],
       roomNumber: (json['cabinet_number'] ?? json['cabinetNumber'] ?? json['roomNumber'] ?? json['room_number'] ?? json['doctor']?['room_number'] ?? '1').toString(),
       serviceName: json['serviceName'] ?? json['service_name'] ?? json['service']?['name'],
-      price: (json['price'] ?? json['amount'] ?? json['service_price'] ?? 0).toDouble(),
+      price: Formatters.parseDouble(json['price'] ?? json['amount'] ?? json['service_price'] ?? 0),
       paymentStatus: json['paymentStatus'] ?? json['payment_status'] ?? 'PAID',
       paymentMethod: json['paymentMethod'] ?? json['payment_method'] ?? 'CASH',
       createdAt: json['createdAt'] ?? json['created_at'],
       calledAt: json['calledAt'] ?? json['called_at'],
       startedAt: json['startedAt'] ?? json['started_at'],
       completedAt: json['completedAt'] ?? json['completed_at'],
-      waitTimeMinutes: json['waitTimeMinutes'] ?? json['wait_time_minutes'] ?? 0,
+      waitTimeMinutes: Formatters.parseInt(json['waitTimeMinutes'] ?? json['wait_time_minutes'] ?? json['estimated_wait_minutes'] ?? 0),
     );
   }
 }

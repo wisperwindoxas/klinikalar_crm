@@ -1,3 +1,5 @@
+import '../core/utils/formatters.dart';
+
 class DoctorModel {
   final String id;
   final String fullName;
@@ -37,11 +39,11 @@ class DoctorModel {
       roomNumber: json['roomNumber'] ?? json['room_number'] ?? json['cabinetNumber'] ?? json['cabinet_number'] ?? '101',
       cabinetId: json['cabinetId'] ?? json['cabinet_id'],
       status: json['status'] ?? 'ACTIVE',
-      consultationPrice: (json['consultationPrice'] ?? json['consultation_price'] ?? 150000).toDouble(),
-      experienceYears: json['experienceYears'] ?? json['experience_years'] ?? 5,
+      consultationPrice: Formatters.parseDouble(json['consultationPrice'] ?? json['consultation_price'] ?? 150000),
+      experienceYears: Formatters.parseInt(json['experienceYears'] ?? json['experience_years'] ?? 5),
       phone: json['phone'],
-      currentQueueCount: json['currentQueueCount'] ?? json['current_queue_count'] ?? json['waiting_count'] ?? 0,
-      todayCompletedCount: json['todayCompletedCount'] ?? json['today_completed_count'] ?? 0,
+      currentQueueCount: Formatters.parseInt(json['currentQueueCount'] ?? json['current_queue_count'] ?? json['waiting_count'] ?? 0),
+      todayCompletedCount: Formatters.parseInt(json['todayCompletedCount'] ?? json['today_completed_count'] ?? 0),
       avatarUrl: json['avatarUrl'] ?? json['avatar_url'],
     );
   }

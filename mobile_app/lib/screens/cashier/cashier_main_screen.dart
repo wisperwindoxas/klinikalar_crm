@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/api_constants.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/patient_model.dart';
@@ -58,34 +59,115 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
 
   Future<void> _fetchData() async {
     setState(() => _isLoading = true);
-    final tickets = await ApiService().getTickets();
-    final payments = await ApiService().getPayments();
-    final patients = await ApiService().getPatients();
-    final shiftRes = await ApiService().getCurrentShift();
+    try {
+      final tickets = await ApiService().getTickets();
+      final payments = await ApiService().getPayments();
+      final patients = await ApiService().getPatients();
+      final shiftRes = await ApiService().getCurrentShift();
 
-    double cash = 0;
-    double card = 0;
-    for (var p in payments) {
-      final amount = (p['amount'] ?? 0).toDouble();
-      final method = (p['method'] ?? '').toString().toUpperCase();
-      if (method == 'CASH' || method == 'NAQD') {
-        cash += amount;
-      } else {
-        card += amount;
+      double cash = 0;
+      double card = 0;
+      for (var p in payments) {
+        final amount = Formatters.parseDouble(p['amount']);
+        final method = (p['method'] ?? '').toString().toUpperCase();
+        if (method == 'CASH' || method == 'NAQD') {
+          cash += amount;
+        } else {
+          card += amount;
+        }
       }
-    }
 
-    setState(() {
-      _tickets = tickets;
-      _payments = payments;
-      _patients = patients;
-      _currentShift = (shiftRes['data'] is Map<String, dynamic>)
-          ? shiftRes['data']
-          : (shiftRes.isNotEmpty ? shiftRes : null);
-      _cashTotal = cash;
-      _cardTotal = card;
-      _isLoading = false;
-    });
+      if (!mounted) return;
+      setState(() {
+        _tickets = tickets;
+        _payments = payments;
+        _patients = patients;
+        _currentShift = (shiftRes['data'] is Map<String, dynamic>)
+            ? shiftRes['data']
+            : (shiftRes.isNotEmpty ? shiftRes : null);
+        _cashTotal = cash;
+        _cardTotal = card;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ma’lumotlarni yuklashda xatolik: $e'),
+          backgroundColor: AppColors.error,
+          action: SnackBarAction(
+            label: 'Server IP',
+            textColor: Colors.white,
+            onPressed: _showServerConfigDialog,
+          ),
+        ),
+      );
+    }
+  }
+
+  void _showServerConfigDialog() {
+    final ipCtrl = TextEditingController(text: ApiConstants.baseUrl);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Server Manzili (API URL)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Agar telefoningiz Wi-Fi orqali serverga ulansa, kompyuter IP manzilini kiriting:',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: ipCtrl,
+              decoration: const InputDecoration(
+                hintText: 'http://192.168.100.20:5001/api/v1',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Bekor qilish')),
+          ElevatedButton(
+            onPressed: () async {
+              await ApiConstants.updateBaseUrl(ipCtrl.text.trim());
+              Navigator.pop(ctx);
+              _fetchData();
+            },
+            child: const Text('Saqlash va Yangilash'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _logoutConfirm() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hisobdan chiqish'),
+        content: const Text('Haqiqatan ham kassir hisobidan chiqmoqchimisiz?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Bekor qilish')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Chiqish'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await AuthService().logout();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    }
   }
 
   Future<void> _callTicket(TicketModel t) async {
@@ -231,7 +313,7 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
 
   Future<void> _closeShiftDialog() async {
     final shiftId = _currentShift?['id']?.toString() ?? '1';
-    final totalExpected = (_cashTotal + _cardTotal + ((_currentShift?['opening_balance'] ?? 0).toDouble()));
+    final totalExpected = (_cashTotal + _cardTotal + Formatters.parseDouble(_currentShift?['opening_balance']));
     final closingCtrl = TextEditingController(text: totalExpected.toInt().toString());
 
     await showModalBottomSheet(
@@ -416,7 +498,18 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.refresh_rounded, color: AppColors.textSecondary),
+                tooltip: 'Yangilash',
                 onPressed: _fetchData,
+              ),
+              IconButton(
+                icon: const Icon(Icons.settings_outlined, color: AppColors.textMuted, size: 20),
+                tooltip: 'Server IP sozlamalari',
+                onPressed: _showServerConfigDialog,
+              ),
+              IconButton(
+                icon: const Icon(Icons.logout_rounded, color: AppColors.error, size: 20),
+                tooltip: 'Chiqish',
+                onPressed: _logoutConfirm,
               ),
             ],
           ),
@@ -1137,8 +1230,8 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
     final isShiftOpen = _currentShift != null && (_currentShift!['status'] == 'OPEN' || _currentShift!['status'] == 'active');
     final shiftNumber = _currentShift?['id']?.toString() ?? '1';
     final openedAt = _currentShift?['opened_at'];
-    final openingBalance = (_currentShift?['opening_balance'] ?? 0).toDouble();
-    final totalCashShift = (_currentShift?['total_received'] ?? _cashTotal).toDouble();
+    final openingBalance = Formatters.parseDouble(_currentShift?['opening_balance']);
+    final totalCashShift = Formatters.parseDouble(_currentShift?['total_received'] ?? _cashTotal);
     final totalBalance = openingBalance + totalCashShift + _cardTotal;
 
     return SingleChildScrollView(

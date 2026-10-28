@@ -6,6 +6,23 @@ import '../constants/app_colors.dart';
 class Formatters {
   static final NumberFormat _currencyFormat = NumberFormat('#,###', 'uz_UZ');
 
+  static double parseDouble(dynamic val, [double fallback = 0.0]) {
+    if (val == null) return fallback;
+    if (val is double) return val;
+    if (val is int) return val.toDouble();
+    if (val is num) return val.toDouble();
+    final s = val.toString().replaceAll(RegExp(r'[^0-9\.\-]'), '');
+    return double.tryParse(s) ?? fallback;
+  }
+
+  static int parseInt(dynamic val, [int fallback = 0]) {
+    if (val == null) return fallback;
+    if (val is int) return val;
+    if (val is num) return val.toInt();
+    final s = val.toString().replaceAll(RegExp(r'[^0-9\-]'), '');
+    return int.tryParse(s) ?? fallback;
+  }
+
   static String cleanPhone(String? phone) {
     if (phone == null) return '';
     return phone.replaceAll(RegExp(r'\D'), '');

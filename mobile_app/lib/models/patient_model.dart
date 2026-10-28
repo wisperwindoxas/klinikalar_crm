@@ -1,3 +1,5 @@
+import '../core/utils/formatters.dart';
+
 class PatientModel {
   final String id;
   final String? patientNumber;
@@ -43,8 +45,8 @@ class PatientModel {
       address: json['address'],
       region: json['region'],
       district: json['district'],
-      totalVisits: json['totalVisits'] ?? json['total_visits'] ?? json['visits_count'] ?? 0,
-      totalSpent: (json['totalSpent'] ?? json['total_spent'] ?? 0).toDouble(),
+      totalVisits: Formatters.parseInt(json['totalVisits'] ?? json['total_visits'] ?? json['visits_count'] ?? 0),
+      totalSpent: Formatters.parseDouble(json['totalSpent'] ?? json['total_spent'] ?? json['total_paid'] ?? 0),
       lastVisitDate: json['lastVisitDate'] ?? json['last_visit_date'],
       lastDoctorName: json['lastDoctorName'] ?? json['last_doctor_name'],
       doctorsVisited: json['doctors_visited'] ?? json['doctorsVisited'] ?? [],

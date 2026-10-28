@@ -1,3 +1,5 @@
+import '../core/utils/formatters.dart';
+
 class ServiceModel {
   final String id;
   final String name;
@@ -22,8 +24,8 @@ class ServiceModel {
       id: json['id']?.toString() ?? '',
       name: json['name'] ?? '',
       code: json['code'],
-      price: (json['price'] ?? 0).toDouble(),
-      durationMinutes: json['durationMinutes'] ?? json['duration_minutes'] ?? 20,
+      price: Formatters.parseDouble(json['price'] ?? 0),
+      durationMinutes: Formatters.parseInt(json['durationMinutes'] ?? json['duration_minutes'] ?? 20),
       category: json['category'] ?? json['department'] ?? 'Umumiy',
       isActive: json['isActive'] ?? json['is_active'] ?? true,
     );
