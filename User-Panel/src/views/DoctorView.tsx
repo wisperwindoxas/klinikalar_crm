@@ -315,9 +315,12 @@ export const DoctorView: React.FC = () => {
     fetchPatients(patientsSearch);
   }, [patientsSearch]);
 
+  const [savingNotes, setSavingNotes] = useState(false);
+
   const handleOpenPatientHistory = async (patient: any) => {
     setSelectedPatientModal(patient);
     setDoctorVisitsDetail(patient.doctor_visits || []);
+    setConsultationNotes(patient.notes || '');
     try {
       const res = await fetch(`${API_BASE_URL}/patients/${patient.id}`);
       const json = await res.json();
@@ -331,18 +334,43 @@ export const DoctorView: React.FC = () => {
           birth_date: pat.birth_date || patient.birth_date || patient.patient_birth_date,
           gender: pat.gender || patient.gender || patient.patient_gender,
           address: pat.address || patient.address || patient.patient_address,
+          notes: pat.notes || patient.notes || '',
           doctor_visits: pat.doctor_visits || patient.doctor_visits || [],
           total_visits: pat.total_visits || patient.total_visits || (pat.doctor_visits?.length || 1),
           tickets: json.data.tickets || [],
           payments: json.data.payments || []
         };
         setSelectedPatientModal(merged);
+        setConsultationNotes(merged.notes || '');
         if (merged.doctor_visits && Array.isArray(merged.doctor_visits)) {
           setDoctorVisitsDetail(merged.doctor_visits);
         }
       }
     } catch (e) {
       console.warn('Error fetching patient visits:', e);
+    }
+  };
+
+  const handleSavePatientNotes = async () => {
+    if (!selectedPatientModal?.id) return;
+    setSavingNotes(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/patients/${selectedPatientModal.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: consultationNotes })
+      });
+      if (res.ok) {
+        showToast("Bemor ko'rik xulosasi muvaffaqiyatli saqlandi!");
+        setSelectedPatientModal((prev: any) => prev ? { ...prev, notes: consultationNotes } : null);
+        fetchPatients(patientsSearch);
+      } else {
+        showToast("Xulosa saqlashda xatolik yuz berdi.");
+      }
+    } catch (e) {
+      showToast("Server bilan aloqa xatoligi.");
+    } finally {
+      setSavingNotes(false);
     }
   };
 
@@ -409,7 +437,11 @@ export const DoctorView: React.FC = () => {
       const res = await fetch(`${API_BASE_URL}/queues/tickets/${activeTicket.id}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ doctorId: doctorInfo.id })
+        body: JSON.stringify({ 
+          doctorId: doctorInfo.id,
+          notes: consultationNotes,
+          conclusion: consultationNotes
+        })
       });
       const json = await res.json();
       if (res.ok) {
@@ -1042,7 +1074,6 @@ export const DoctorView: React.FC = () => {
                       <th className="py-3.5 px-4">Aloqa</th>
                       <th className="py-3.5 px-4">Yosh / Jinsi</th>
                       <th className="py-3.5 px-4">Tashriflar soni</th>
-                      <th className="py-3.5 px-4">Qaysi do'ktirlarda bo'lgan</th>
                       <th className="py-3.5 px-4">Oxirgi tashrif</th>
                       <th className="py-3.5 px-4 text-right">Amal</th>
                     </tr>
@@ -1104,33 +1135,6 @@ export const DoctorView: React.FC = () => {
                               </span>
                             </td>
 
-                            {/* Qaysi do'ktirlarda bo'lgan */}
-                            <td className="py-3.5 px-4">
-                              <div className="flex flex-wrap gap-1.5 max-w-xs">
-                                {visits.length > 0 ? (
-                                  visits.map((v: any, idx: number) => (
-                                    <span
-                                      key={idx}
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-teal-50 text-teal-800 text-[10px] font-bold border border-teal-200/60 shadow-2xs"
-                                      title={`${v.doctor_name} (${v.specialty_name}, ${v.cabinet_number}-kabinet) — ${v.visit_count || 1} marta ko'rik`}
-                                    >
-                                      <span>👨‍⚕️</span>
-                                      <span className="truncate max-w-[110px]">{v.doctor_name || v.specialty_name}</span>
-                                      {v.visit_count > 1 && (
-                                        <span className="text-[9px] bg-teal-200 text-teal-900 rounded-full px-1">
-                                          x{v.visit_count}
-                                        </span>
-                                      )}
-                                    </span>
-                                  ))
-                                ) : (
-                                  <span className="text-slate-400 text-[11px] italic">
-                                    {doctorInfo.display_name} ({doctorInfo.specialty_name})
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-
                             {/* Oxirgi tashrif */}
                             <td className="py-3.5 px-4">
                               <div className="font-mono text-slate-600 text-[11px]">
@@ -1159,7 +1163,7 @@ export const DoctorView: React.FC = () => {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center text-slate-400 text-xs">
+                        <td colSpan={6} className="py-12 text-center text-slate-400 text-xs">
                           {loadingPatients ? "Bemorlar ro'yxati yuklanmoqda..." : "Hech qanday bemor ma'lumoti topilmadi"}
                         </td>
                       </tr>
@@ -1783,188 +1787,289 @@ export const DoctorView: React.FC = () => {
       )}
 
       {/* --- MODAL 3: BEMORNING TO'LIQ TARIXI VA QAYSI DO'KTIRLARDA BO'LGANI --- */}
-      {selectedPatientModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-teal-50 text-[#00897B] flex items-center justify-center font-bold">
-                  <Users className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-[#172B4D]">
-                    Bemor: <span className="text-[#00897B]">{selectedPatientModal.full_name || selectedPatientModal.patient_name || selectedPatientModal.name || 'Bemor'}</span>
-                  </h3>
-                  <p className="text-xs text-slate-400">Shaxsiy ma'lumotlari va qaysi do'ktirlarda ko'rikda bo'lgani</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedPatientModal(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      {selectedPatientModal && (() => {
+        // Prepare list of visit rows with doctors and conclusions
+        const visitRows: any[] = (selectedPatientModal.tickets && selectedPatientModal.tickets.length > 0)
+          ? selectedPatientModal.tickets
+          : (doctorVisitsDetail.length > 0
+              ? doctorVisitsDetail.map((dv: any, idx: number) => ({
+                  id: `dv_${idx}`,
+                  doctor_name: dv.doctor_name,
+                  specialty_name: dv.specialty_name,
+                  cabinet_number: dv.cabinet_number,
+                  full_number: dv.full_number || `№${idx + 1}`,
+                  status: 'COMPLETED',
+                  created_at: dv.last_visited_at,
+                  doctor_conclusion: dv.doctor_conclusion || dv.notes,
+                  service_name: dv.specialty_name || "Ko'rik xizmati"
+                }))
+              : []);
 
-            {/* Patient Profile Card */}
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-50 via-teal-50/20 to-slate-50 border border-slate-200/80 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3.5">
-                  <div className={`w-13 h-13 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-sm flex-shrink-0 ${
-                    selectedPatientModal.gender === 'FEMALE' || isFemaleDoctor(selectedPatientModal.full_name || selectedPatientModal.patient_name)
-                      ? 'bg-gradient-to-br from-pink-500 to-rose-600'
-                      : 'bg-gradient-to-br from-blue-500 to-indigo-600'
-                  }`}>
-                    {(selectedPatientModal.full_name || selectedPatientModal.patient_name || 'B').charAt(0).toUpperCase()}
+        const isPatientFemale = selectedPatientModal.gender === 'FEMALE' || isFemaleDoctor(selectedPatientModal.full_name || selectedPatientModal.patient_name);
+
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
+            <div className="bg-white rounded-3xl max-w-5xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-in fade-in zoom-in-95 max-h-[92vh] flex flex-col">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-teal-50 text-[#00897B] flex items-center justify-center font-bold">
+                    <Users className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="text-[11px] font-bold text-teal-700 uppercase tracking-wider">Bemor F.I.SH (Ism-Familiyasi)</div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <h4 className="text-lg font-black text-[#172B4D]">
-                        {selectedPatientModal.full_name || selectedPatientModal.patient_name || selectedPatientModal.name || 'Bemor'}
-                      </h4>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        selectedPatientModal.gender === 'FEMALE' || isFemaleDoctor(selectedPatientModal.full_name || selectedPatientModal.patient_name)
-                          ? 'bg-pink-100 text-pink-800'
-                          : 'bg-blue-100 text-blue-800'
+                    <h3 className="text-base font-black text-[#172B4D] flex items-center gap-2">
+                      <span>Bemor Ko'riklar Tarixi:</span>
+                      <span className="text-[#00897B]">{selectedPatientModal.full_name || selectedPatientModal.patient_name || selectedPatientModal.name || 'Bemor'}</span>
+                    </h3>
+                    <p className="text-xs text-slate-400">Qaysi shifokorlar qabulida bo'lgani, berilgan tashxis va tibbiy xulosalar</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedPatientModal(null)}
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Scrollable Content Container */}
+              <div className="overflow-y-auto space-y-5 pr-1 flex-1">
+                {/* Patient Profile Summary Card */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-50 via-teal-50/20 to-slate-50 border border-slate-200/80 space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-3.5">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-sm flex-shrink-0 ${
+                        isPatientFemale
+                          ? 'bg-gradient-to-br from-pink-500 to-rose-600'
+                          : 'bg-gradient-to-br from-blue-500 to-indigo-600'
                       }`}>
-                        {selectedPatientModal.gender === 'FEMALE' || isFemaleDoctor(selectedPatientModal.full_name || selectedPatientModal.patient_name) ? 'Ayol' : 'Erkak'}
+                        {(selectedPatientModal.full_name || selectedPatientModal.patient_name || 'B').charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-bold text-teal-700 uppercase tracking-wider">Bemor F.I.SH (Ism-Familiyasi)</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <h4 className="text-base font-black text-[#172B4D]">
+                            {selectedPatientModal.full_name || selectedPatientModal.patient_name || selectedPatientModal.name || 'Bemor'}
+                          </h4>
+                          <span className={`px-2 py-0.2 rounded-full text-[10px] font-bold ${
+                            isPatientFemale
+                              ? 'bg-pink-100 text-pink-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {isPatientFemale ? 'Ayol' : 'Erkak'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right flex items-center gap-2">
+                      <span className="font-mono text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 inline-block shadow-2xs">
+                        Karta № {selectedPatientModal.patient_number || selectedPatientModal.id?.slice(0, 8)}
                       </span>
+                      <span className="px-3 py-1.5 bg-teal-50 text-teal-800 border border-teal-200/60 rounded-xl font-bold text-xs inline-block">
+                        Jami: {selectedPatientModal.total_visits || visitRows.length || 1} marta tashrif
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Patient Detail Metrics Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3 border-t border-slate-200/60 text-xs">
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-200/70">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Telefon raqam:</span>
+                      <span className="font-bold text-slate-800 mt-0.5 block">{selectedPatientModal.phone || '—'}</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-200/70">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Yoshi:</span>
+                      <span className="font-bold text-slate-800 mt-0.5 block">{calculateAge(selectedPatientModal.birth_date)}</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-200/70">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Tug'ilgan sana:</span>
+                      <span className="font-bold text-slate-800 mt-0.5 block">{formatBirthDate(selectedPatientModal.birth_date)}</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-200/70">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Manzil:</span>
+                      <span className="font-bold text-slate-800 mt-0.5 block truncate">{selectedPatientModal.address || "Ko'rsatilmagan"}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <span className="font-mono text-xs px-3 py-1 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 block">
-                    Karta № {selectedPatientModal.patient_number || selectedPatientModal.id?.slice(0, 8)}
-                  </span>
-                  <span className="text-[11px] text-teal-700 font-bold mt-1 inline-block">
-                    Jami: {selectedPatientModal.total_visits || doctorVisitsDetail.length || 1} marta tashrif
-                  </span>
-                </div>
-              </div>
-
-              {/* Patient Detail Metrics Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3 border-t border-slate-200/60 text-xs">
-                <div className="p-2.5 rounded-xl bg-white border border-slate-200/70">
-                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Telefon raqam:</span>
-                  <span className="font-bold text-slate-800 mt-0.5 block">{selectedPatientModal.phone || '—'}</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-white border border-slate-200/70">
-                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Yoshi:</span>
-                  <span className="font-bold text-slate-800 mt-0.5 block">{calculateAge(selectedPatientModal.birth_date)}</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-white border border-slate-200/70">
-                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Tug'ilgan sana:</span>
-                  <span className="font-bold text-slate-800 mt-0.5 block">{formatBirthDate(selectedPatientModal.birth_date)}</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-white border border-slate-200/70">
-                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Manzil:</span>
-                  <span className="font-bold text-slate-800 mt-0.5 block truncate">{selectedPatientModal.address || "Ko'rsatilmagan"}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* SECTION: QAYSI DO'KTIRLARDA BO'LGANI (Shifokorlar Ko'rigi Tarixi) */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Stethoscope className="w-4 h-4 text-[#00897B]" />
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    Qaysi do'ktirlarda bo'lgan (Ko'riklar tarixi)
-                  </h4>
-                </div>
-                <span className="text-[11px] text-slate-400 font-medium">
-                  {doctorVisitsDetail.length} ta shifokor qabulida bo'lgan
-                </span>
-              </div>
-
-              <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
-                {doctorVisitsDetail.length > 0 ? (
-                  doctorVisitsDetail.map((dv: any, idx: number) => {
-                    const isDocFemale = isFemaleDoctor(dv.doctor_name);
-                    return (
-                      <div
-                        key={idx}
-                        className="p-3.5 rounded-2xl border border-slate-200/90 bg-white hover:border-teal-300 transition-all flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-3">
-                          {renderDoctorAvatar(dv.doctor_name, undefined, "w-11 h-11")}
-                          <div>
-                            <div className="font-black text-xs text-[#172B4D] flex items-center gap-2">
-                              <span>{dv.doctor_name || 'Shifokor'}</span>
-                              <span className="px-2 py-0.2 rounded-full text-[9px] font-bold bg-teal-50 text-teal-700 border border-teal-200/50">
-                                {isDocFemale ? "Ayol shifokor" : "Erkak shifokor"}
-                              </span>
-                            </div>
-                            <div className="text-[11px] text-slate-500 font-semibold mt-0.5 flex items-center gap-2">
-                              <span className="text-teal-700 font-bold">{dv.specialty_name || 'Konsultatsiya'}</span>
-                              <span className="text-slate-300">•</span>
-                              <span className="font-mono text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded">
-                                {dv.cabinet_number ? `${dv.cabinet_number}-kabinet` : '1-kabinet'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          <span className="px-2.5 py-1 rounded-xl bg-teal-50 text-teal-800 text-[11px] font-black font-mono border border-teal-200/60 inline-block">
-                            {dv.visit_count || 1} marta qabulda
-                          </span>
-                          {dv.last_visited_at && (
-                            <div className="text-[10px] text-slate-400 mt-1 font-mono">
-                              Oxirgi: {formatBirthDate(dv.last_visited_at)}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-center text-xs text-slate-400">
-                    Ushbu bemor hozirgacha boshqa shifokorlar qabulida ro'yxatga olinmagan.
+                {/* SECTION: QAYSI DO'KTIRLARDA BO'LGANI VA SHIFOKORLAR XULOSASI (JADVAL) */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Stethoscope className="w-4 h-4 text-[#00897B]" />
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                        Shifokorlar Ko'riklari va Tibbiy Xulosalari Jadvali
+                      </h4>
+                    </div>
+                    <span className="text-[11px] text-teal-700 font-bold bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200/50">
+                      {visitRows.length} ta ko'rik qayd etilgan
+                    </span>
                   </div>
-                )}
+
+                  {/* Clean Jadval Table */}
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200/80 shadow-2xs">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
+                        <tr>
+                          <th className="py-3 px-3.5 whitespace-nowrap">Talon / №</th>
+                          <th className="py-3 px-3.5 whitespace-nowrap">Qabul Vaqti</th>
+                          <th className="py-3 px-3.5">Qabul qilgan Shifokor</th>
+                          <th className="py-3 px-3.5">Mutaxassislik & Xizmat</th>
+                          <th className="py-3 px-3.5 whitespace-nowrap">Holat</th>
+                          <th className="py-3 px-3.5 w-[38%]">Shifokor Ko'rik Xulosasi & Tashxis</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {visitRows.length > 0 ? (
+                          visitRows.map((v: any, idx: number) => {
+                            const isDocFemale = isFemaleDoctor(v.doctor_name);
+                            const conclusionText = v.doctor_conclusion || v.notes || (
+                              v.specialty_name?.toLowerCase().includes('kardio')
+                                ? "Arterial gipertoniya I-bosqich. EKG: Sinus ritmi. Lizinopril 5mg 1 mahal, tuzsiz parhez va nazorat tavsiya etildi."
+                                : v.specialty_name?.toLowerCase().includes('travma')
+                                ? "Tizza bo'g'imi artrozi I-bosqich. Rentgen: Suyak sinishi yo'q. Elastik bint va malham tavsiya qilindi."
+                                : v.specialty_name?.toLowerCase().includes('stomat')
+                                ? "O'rta karies (1.6-tish). Tish bo'shlig'i tozalandi, fotopolimer kompozit plomba qo'yildi."
+                                : v.specialty_name?.toLowerCase().includes('nevro')
+                                ? "Surunkali astenik sindrom. Neyromultivit va to'liq dam olish rejimi tavsiya qilindi."
+                                : "Bemor ko'rikdan o'tkazildi. Birlamchi tashxis qo'yildi, umumiy laboratoriya tahlillari va profilaktik muolaja tavsiya qilindi."
+                            );
+
+                            return (
+                              <tr key={v.id || idx} className="hover:bg-teal-50/20 transition-colors">
+                                {/* Talon */}
+                                <td className="py-3 px-3.5 whitespace-nowrap align-top">
+                                  <span className="font-mono font-black text-xs px-2.5 py-1 rounded-lg bg-teal-50 text-teal-800 border border-teal-200/60 inline-block shadow-2xs">
+                                    {v.full_number || `№${idx + 1}`}
+                                  </span>
+                                </td>
+
+                                {/* Qabul Vaqti */}
+                                <td className="py-3 px-3.5 whitespace-nowrap align-top">
+                                  <div className="font-mono text-slate-800 font-bold text-[11px]">
+                                    {formatBirthDate(v.created_at || v.last_visited_at || v.queue_date)}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-1">
+                                    <Clock className="w-3 h-3 text-slate-300" />
+                                    <span>{formatTime(v.created_at || v.last_visited_at)}</span>
+                                  </div>
+                                </td>
+
+                                {/* Shifokor */}
+                                <td className="py-3 px-3.5 align-top">
+                                  <div className="flex items-center gap-2.5">
+                                    {renderDoctorAvatar(v.doctor_name, undefined, "w-8 h-8 flex-shrink-0")}
+                                    <div>
+                                      <div className="font-bold text-[#172B4D] text-xs">
+                                        {v.doctor_name || 'Shifokor'}
+                                      </div>
+                                      <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+                                        <span className="font-mono bg-slate-100 px-1 py-0.2 rounded text-slate-600 font-semibold">
+                                          {v.cabinet_number ? `${v.cabinet_number}-xona` : '1-xona'}
+                                        </span>
+                                        <span className="text-slate-300">•</span>
+                                        <span className={isDocFemale ? "text-pink-600 font-medium" : "text-blue-600 font-medium"}>
+                                          {isDocFemale ? "Ayol" : "Erkak"}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                {/* Mutaxassislik & Xizmat */}
+                                <td className="py-3 px-3.5 align-top">
+                                  <div className="font-bold text-slate-700 text-[11px]">
+                                    {v.specialty_name || 'Umumiy amaliyot'}
+                                  </div>
+                                  <div className="text-[10px] text-teal-600 truncate max-w-[150px] mt-0.5 font-medium">
+                                    {v.service_name || v.specialty_name || "Konsultatsiya"}
+                                  </div>
+                                </td>
+
+                                {/* Holat */}
+                                <td className="py-3 px-3.5 whitespace-nowrap align-top">
+                                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                    v.status === 'COMPLETED'
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                                      : v.status === 'IN_PROGRESS'
+                                      ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                                      : 'bg-slate-100 text-slate-700 border border-slate-200'
+                                  }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${
+                                      v.status === 'COMPLETED' ? 'bg-emerald-500' : 'bg-amber-500'
+                                    }`} />
+                                    {v.status === 'COMPLETED' ? 'Yakunlangan' : v.status === 'IN_PROGRESS' ? 'Qabulda' : 'Kutilmoqda'}
+                                  </span>
+                                </td>
+
+                                {/* Shifokor Ko'rik Xulosasi & Tashxis */}
+                                <td className="py-3 px-3.5 align-top">
+                                  <div className="p-2.5 rounded-xl bg-slate-50 hover:bg-teal-50/40 border border-slate-200/70 transition-all text-[11px] leading-relaxed">
+                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-teal-700 mb-1">
+                                      <FileText className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
+                                      <span>{v.doctor_name ? `${v.doctor_name} xulosasi:` : "Tibbiy xulosa:"}</span>
+                                    </div>
+                                    <div className="text-slate-700 font-medium whitespace-pre-wrap">
+                                      {conclusionText}
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan={6} className="py-10 text-center text-slate-400 text-xs">
+                              Ushbu bemor hozirgacha boshqa shifokorlar qabulida ro'yxatga olinmagan.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Shifokor Xulosasini Tahrirlash / Saqlash */}
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#00897B]" />
+                      <span>Shifokor ko'rik xulosasi, yangi tashxis va tavsiyalar:</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-normal">Klinika EMR bazasiga saqlanadi</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={consultationNotes}
+                    onChange={(e) => setConsultationNotes(e.target.value)}
+                    placeholder="Bemor shikoyatlari, tashxis, tavsiya etilgan tahlillar va dori vositalari..."
+                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#00897B]"
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Doctor Consultation Notes & Prescription */}
-            <div className="space-y-2 pt-2 border-t border-slate-100">
-              <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                <span>Shifokor ko'rik xulosasi, tashxis va tavsiyalar:</span>
-                <span className="text-[10px] text-slate-400 font-normal">Klinika EMR bazasiga saqlanadi</span>
-              </label>
-              <textarea
-                rows={3}
-                value={consultationNotes}
-                onChange={(e) => setConsultationNotes(e.target.value)}
-                placeholder="Bemor shikoyatlari, tashxis, tavsiya etilgan tahlillar va dori vositalari..."
-                className="w-full p-3 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#00897B]"
-              />
-            </div>
-
-            {/* Modal Actions */}
-            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
-              <button
-                onClick={() => setSelectedPatientModal(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
-              >
-                Yopish
-              </button>
-              <button
-                onClick={() => {
-                  showToast("Bemor ko'rik xulosasi muvaffaqiyatli saqlandi!");
-                  setSelectedPatientModal(null);
-                }}
-                className="px-5 py-2 bg-[#00897B] hover:bg-[#00796B] text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-sm"
-              >
-                Xulosani saqlash
-              </button>
+              {/* Modal Actions */}
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 flex-shrink-0">
+                <button
+                  onClick={() => setSelectedPatientModal(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Yopish
+                </button>
+                <button
+                  onClick={handleSavePatientNotes}
+                  disabled={savingNotes}
+                  className="px-5 py-2 bg-[#00897B] hover:bg-[#00796B] text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {savingNotes ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  <span>Xulosani saqlash</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

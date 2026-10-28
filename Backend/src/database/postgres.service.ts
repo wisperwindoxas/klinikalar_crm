@@ -198,15 +198,19 @@ export class PostgresService {
             'specialty_name', dv.specialty_name,
             'cabinet_number', dv.cabinet_number,
             'visit_count', dv.visit_count,
-            'last_visited_at', dv.last_visited_at
-          ) ORDER BY dv.visit_count DESC), '[]'::json)
+            'last_visited_at', dv.last_visited_at,
+            'doctor_conclusion', dv.doctor_conclusion,
+            'notes', dv.notes
+          ) ORDER BY dv.last_visited_at DESC), '[]'::json)
           FROM (
             SELECT 
               qt.doctor_name,
               qt.specialty_name,
               qt.cabinet_number,
               COUNT(qt.id)::int as visit_count,
-              MAX(qt.created_at) as last_visited_at
+              MAX(qt.created_at) as last_visited_at,
+              MAX(COALESCE(qt.doctor_conclusion, qt.notes)) as doctor_conclusion,
+              MAX(qt.notes) as notes
             FROM queue_tickets qt
             WHERE qt.patient_id = pt.id
             GROUP BY qt.doctor_name, qt.specialty_name, qt.cabinet_number
@@ -259,15 +263,19 @@ export class PostgresService {
             'specialty_name', dv.specialty_name,
             'cabinet_number', dv.cabinet_number,
             'visit_count', dv.visit_count,
-            'last_visited_at', dv.last_visited_at
-          ) ORDER BY dv.visit_count DESC), '[]'::json)
+            'last_visited_at', dv.last_visited_at,
+            'doctor_conclusion', dv.doctor_conclusion,
+            'notes', dv.notes
+          ) ORDER BY dv.last_visited_at DESC), '[]'::json)
           FROM (
             SELECT 
               qt.doctor_name,
               qt.specialty_name,
               qt.cabinet_number,
               COUNT(qt.id)::int as visit_count,
-              MAX(qt.created_at) as last_visited_at
+              MAX(qt.created_at) as last_visited_at,
+              MAX(COALESCE(qt.doctor_conclusion, qt.notes)) as doctor_conclusion,
+              MAX(qt.notes) as notes
             FROM queue_tickets qt
             WHERE qt.patient_id = pt.id
             GROUP BY qt.doctor_name, qt.specialty_name, qt.cabinet_number
@@ -646,12 +654,19 @@ export class PostgresService {
     return res.rows[0];
   }
 
-  public async completeTicket(ticketId: string, doctorId: string) {
+  public async completeTicket(ticketId: string, doctorId: string, notes?: string, conclusion?: string) {
     return this.withTransaction(async (client) => {
       const now = new Date();
       const res = await client.query(`
-        UPDATE queue_tickets SET status = 'COMPLETED', completed_at = $1, updated_at = $1 WHERE id = $2 RETURNING *
-      `, [now, ticketId]);
+        UPDATE queue_tickets 
+        SET status = 'COMPLETED', 
+            completed_at = $1, 
+            updated_at = $1,
+            notes = COALESCE($3, notes),
+            doctor_conclusion = COALESCE($4, doctor_conclusion)
+        WHERE id = $2 
+        RETURNING *
+      `, [now, ticketId, notes || null, conclusion || notes || null]);
 
       await client.query(`
         UPDATE doctors SET current_ticket_id = NULL, updated_at = $1 WHERE id = $2

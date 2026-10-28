@@ -90,8 +90,16 @@ export class ClinicQueueController {
       }
       // Get patient history (visits and tickets)
       const ticketsRes = await ClinicQueueController.pg.query(`
-        SELECT t.*, s.name as service_name
+        SELECT t.*, 
+               COALESCE(t.doctor_name, d.display_name) as doctor_name,
+               COALESCE(t.specialty_name, sp.name) as specialty_name,
+               COALESCE(t.cabinet_number, c.number) as cabinet_number,
+               COALESCE(t.doctor_conclusion, t.notes) as doctor_conclusion,
+               s.name as service_name
         FROM queue_tickets t
+        LEFT JOIN doctors d ON t.doctor_id = d.id
+        LEFT JOIN specialties sp ON d.specialty_id = sp.id
+        LEFT JOIN cabinets c ON d.cabinet_id = c.id
         LEFT JOIN services s ON t.service_id = s.id
         WHERE t.patient_id = $1
         ORDER BY t.created_at DESC
@@ -291,8 +299,8 @@ export class ClinicQueueController {
   public static async completeTicket(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const id = String(req.params.id);
-      const { doctorId } = req.body;
-      const ticket = await ClinicQueueController.pg.completeTicket(id, doctorId);
+      const { doctorId, notes, conclusion } = req.body;
+      const ticket = await ClinicQueueController.pg.completeTicket(id, doctorId, notes, conclusion);
       ClinicQueueController.ws.emitTicketCompleted('tenant_sadaf_01', 'branch_sadaf_main', ticket as any);
       res.json({ success: true, message: 'Qabul muvaffaqiyatli yakunlandi.', data: ticket });
     } catch (e: any) {
