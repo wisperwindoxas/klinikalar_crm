@@ -13,7 +13,12 @@ class ApiConstants {
     final prefs = await SharedPreferences.getInstance();
     final savedUrl = prefs.getString('custom_server_url');
     if (savedUrl != null && savedUrl.isNotEmpty) {
-      baseUrl = savedUrl;
+      if (!kIsWeb && (savedUrl.contains('localhost') || savedUrl.contains('127.0.0.1'))) {
+        baseUrl = 'http://192.168.1.7:5001/api/v1';
+        await prefs.setString('custom_server_url', baseUrl);
+      } else {
+        baseUrl = savedUrl;
+      }
     }
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/constants/api_constants.dart';
@@ -31,11 +32,18 @@ class ApiService {
   // ==================== AUTH ====================
   Future<Map<String, dynamic>> login(String login, String password) async {
     try {
+      final cleanLogin = login.trim();
       final response = await http.post(
         Uri.parse(ApiConstants.login),
         headers: _headers(),
-        body: jsonEncode({'login': login, 'password': password}),
-      );
+        body: jsonEncode({
+          'login': cleanLogin,
+          'identifier': cleanLogin,
+          'username': cleanLogin,
+          'phone': cleanLogin,
+          'password': password.trim(),
+        }),
+      ).timeout(const Duration(seconds: 12));
 
       final data = jsonDecode(response.body);
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -45,8 +53,16 @@ class ApiService {
         return {'success': true, 'data': data};
       }
       return {'success': false, 'message': data['message'] ?? 'Login yoki parol xato'};
+    } on TimeoutException {
+      return {
+        'success': false,
+        'message': 'Serverdan javob kelmadi (Timeout). Wi-Fi aloqasini tekshiring: ${ApiConstants.baseUrl}',
+      };
     } catch (e) {
-      return {'success': false, 'message': 'Serverga ulanishda xatolik: $e'};
+      return {
+        'success': false,
+        'message': 'Serverga ulanishda xatolik: $e\n(Server: ${ApiConstants.baseUrl})',
+      };
     }
   }
 

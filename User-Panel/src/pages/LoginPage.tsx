@@ -25,8 +25,8 @@ export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
 
   // Input states
-  const [identifier, setIdentifier] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [inputMode, setInputMode] = useState<'smart' | 'phone' | 'username'>('smart');
@@ -162,20 +162,7 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  // Quick Role Fillers
-  const handleQuickRole = (roleLogin: string, rolePass: string) => {
-    setIdentifier(roleLogin);
-    setPassword(rolePass);
-    setInputMode(roleLogin.startsWith('+') ? 'phone' : 'username');
-    setError('');
-  };
 
-  const isCurrentRole = (roleKey: string) => {
-    if (roleKey === 'admin' && (identifier === 'admin' || identifier === 'manager')) return true;
-    if (roleKey === 'kassir' && (identifier === 'kassir' || identifier.includes('935554433'))) return true;
-    if (roleKey === 'doctor' && (identifier === 'doctor' || identifier === 'doc_kardio1' || identifier.includes('901234567'))) return true;
-    return false;
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F0FDFA] via-[#F8FAFC] to-[#EFF6FF] flex items-center justify-center p-4 sm:p-6 lg:p-8 font-sans relative overflow-hidden select-none">
@@ -305,83 +292,7 @@ export const LoginPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Quick Role Fillers (Tezkor Namunaviy Rollar) */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  Tezkor namuna (Rol bo'yicha):
-                </label>
-                <span className="text-[11px] text-teal-600 font-semibold">1 bosish bilan to'ldirish</span>
-              </div>
 
-              <div className="grid grid-cols-3 gap-2.5">
-                {/* 1. Menejer */}
-                <button
-                  type="button"
-                  onClick={() => handleQuickRole('admin', 'admin123')}
-                  className={`p-3 rounded-2xl border transition-all text-left flex flex-col justify-between relative ${
-                    isCurrentRole('admin')
-                      ? 'bg-blue-50/80 border-blue-500 ring-2 ring-blue-500/20 shadow-sm'
-                      : 'bg-slate-50/70 border-slate-200/80 hover:bg-slate-100/80 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full mb-1">
-                    <div className={`p-1.5 rounded-lg ${isCurrentRole('admin') ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                      <ShieldCheck className="w-4 h-4" />
-                    </div>
-                    {isCurrentRole('admin') && <CheckCircle2 className="w-4 h-4 text-blue-600" />}
-                  </div>
-                  <div>
-                    <div className="font-extrabold text-xs text-slate-800">Menejer</div>
-                    <div className="text-[10px] text-slate-500 font-mono">admin</div>
-                  </div>
-                </button>
-
-                {/* 2. Kassir */}
-                <button
-                  type="button"
-                  onClick={() => handleQuickRole('kassir', 'kassir123')}
-                  className={`p-3 rounded-2xl border transition-all text-left flex flex-col justify-between relative ${
-                    isCurrentRole('kassir')
-                      ? 'bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm'
-                      : 'bg-slate-50/70 border-slate-200/80 hover:bg-slate-100/80 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full mb-1">
-                    <div className={`p-1.5 rounded-lg ${isCurrentRole('kassir') ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                      <Ticket className="w-4 h-4" />
-                    </div>
-                    {isCurrentRole('kassir') && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
-                  </div>
-                  <div>
-                    <div className="font-extrabold text-xs text-slate-800">Kassir</div>
-                    <div className="text-[10px] text-slate-500 font-mono">kassir</div>
-                  </div>
-                </button>
-
-                {/* 3. Shifokor */}
-                <button
-                  type="button"
-                  onClick={() => handleQuickRole('doctor', 'doctor123')}
-                  className={`p-3 rounded-2xl border transition-all text-left flex flex-col justify-between relative ${
-                    isCurrentRole('doctor')
-                      ? 'bg-teal-50/80 border-teal-500 ring-2 ring-teal-500/20 shadow-sm'
-                      : 'bg-slate-50/70 border-slate-200/80 hover:bg-slate-100/80 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full mb-1">
-                    <div className={`p-1.5 rounded-lg ${isCurrentRole('doctor') ? 'bg-teal-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                      <Stethoscope className="w-4 h-4" />
-                    </div>
-                    {isCurrentRole('doctor') && <CheckCircle2 className="w-4 h-4 text-teal-600" />}
-                  </div>
-                  <div>
-                    <div className="font-extrabold text-xs text-slate-800">Shifokor</div>
-                    <div className="text-[10px] text-slate-500 font-mono">doctor</div>
-                  </div>
-                </button>
-              </div>
-            </div>
 
             {/* Main Form */}
             <form onSubmit={handleLogin} className="space-y-4">

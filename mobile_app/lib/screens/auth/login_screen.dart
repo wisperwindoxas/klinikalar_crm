@@ -16,27 +16,17 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController(text: '+998 (90) 123-45-67');
-  final _passwordController = TextEditingController(text: 'doctor123');
+  final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
-  bool _autoFormatPhone = true;
-  String _selectedRole = 'DOCTOR'; // DOCTOR, CASHIER, MANAGER
+  bool _autoFormatPhone = false; // Default to false so alphanumeric logins work immediately
 
-  void _selectRole(String role) {
-    setState(() {
-      _selectedRole = role;
-      if (role == 'DOCTOR') {
-        _phoneController.text = _autoFormatPhone ? '+998 (90) 123-45-67' : '998901234567';
-        _passwordController.text = 'doctor123';
-      } else if (role == 'CASHIER') {
-        _phoneController.text = _autoFormatPhone ? '+998 (93) 555-44-33' : '998935554433';
-        _passwordController.text = 'kassir123';
-      } else {
-        _phoneController.text = _autoFormatPhone ? '+998 (90) 123-45-67' : '998901234567';
-        _passwordController.text = 'admin123';
-      }
-    });
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   Future<void> _handleLogin() async {
@@ -68,14 +58,11 @@ class _LoginScreenState extends State<LoginScreen> {
         SnackBar(
           content: Text(result['message'] ?? 'Login yoki parol noto‘g‘ri'),
           backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 6),
+          duration: const Duration(seconds: 7),
           action: SnackBarAction(
-            label: 'Demo kirish',
+            label: 'Server IP',
             textColor: Colors.white,
-            onPressed: () async {
-              await AuthService().switchDemoRole(_selectedRole);
-              if (mounted) _navigateToRole();
-            },
+            onPressed: _showServerConfigDialog,
           ),
         ),
       );
@@ -207,25 +194,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 32),
-
-              // Role Selector Chips
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  children: [
-                    _buildRoleTab('DOCTOR', 'Shifokor', Icons.medical_services_outlined),
-                    _buildRoleTab('CASHIER', 'Kassir', Icons.point_of_sale_outlined),
-                    _buildRoleTab('MANAGER', 'Menejer', Icons.admin_panel_settings_outlined),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
               // Form
               Form(
@@ -295,8 +264,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       keyboardType: _autoFormatPhone ? TextInputType.phone : TextInputType.text,
                       inputFormatters: _autoFormatPhone ? [const UzbekPhoneInputFormatter()] : [],
                       decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.phone_outlined, size: 20, color: AppColors.textMuted),
-                        hintText: _autoFormatPhone ? '+998 (90) 123-45-67' : 'Telefon yoki login',
+                        prefixIcon: Icon(
+                          _autoFormatPhone ? Icons.phone_outlined : Icons.person_outline_rounded,
+                          size: 20,
+                          color: AppColors.textMuted,
+                        ),
+                        hintText: _autoFormatPhone ? '+998 (90) 123-45-67' : 'Login yoki telefon raqami',
                         suffixIcon: _phoneController.text.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.clear, size: 18, color: AppColors.textMuted),
@@ -390,76 +363,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              const SizedBox(height: 32),
-              // Direct Demo Quick Fill Info
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.mintLight,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.mint.withOpacity(0.3)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.verified_outlined, color: AppColors.primary, size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '100% Real API rejimida ishlamoqda. Yuqoridagi rollarni tanlab bemalol tizimga kiring.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.primaryDark.withOpacity(0.9),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRoleTab(String role, String title, IconData icon) {
-    final isSelected = _selectedRole == role;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => _selectRole(role),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Column(
-            children: [
-              Icon(
-                icon,
-                size: 20,
-                color: isSelected ? AppColors.primary : AppColors.textMuted,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected ? AppColors.primary : AppColors.textMuted,
-                ),
-              ),
+              const SizedBox(height: 24),
             ],
           ),
         ),
