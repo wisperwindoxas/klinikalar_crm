@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sadaf_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: sadaf_clinic_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_secret
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sadaf_clinic_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: sadaf_saas_backend
+    restart: always
+    ports:
+      - "5001:5001"
+    environment:
+      - PORT=5001
+      - NODE_ENV=production
+      - JWT_SECRET=sadaf_super_secret_jwt_key_2026_saas_production_secure_token
+      - CORS_ORIGIN=*
+      - DATABASE_PATH=/app/data/sadaf_saas.json
+      - DATABASE_URL=postgres://postgres:postgres_secret@postgres:5432/sadaf_clinic_db
+    volumes:
+      - backend_data:/app/data
+    depends_on:
+      - postgres
+
+  super-admin-panel:
+    build:
+      context: ./Super-Admin-Panel
+      dockerfile: Dockerfile
+    container_name: sadaf_super_admin_panel
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+  user-panel:
+    build:
+      context: ./User-Panel
+      dockerfile: Dockerfile
+    container_name: sadaf_user_panel
+    restart: always
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
+
+  tv-display:
+    build:
+      context: ./TV-Display
+      dockerfile: Dockerfile
+    container_name: sadaf_tv_display
+    restart: always
+    ports:
+      - "3002:80"
+    depends_on:
+      - backend
+
+volumes:
+  backend_data:
+  postgres_data:

@@ -1,0 +1,128 @@
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { LoginPage } from './pages/LoginPage';
+import { ManagerPage } from './pages/ManagerPage';
+import { DoctorPage } from './pages/DoctorPage';
+import { OperatorPage } from './pages/OperatorPage';
+import { ToastContainer } from './components/ToastNotification';
+
+// Auth Protection Helper
+const ProtectedRoute: React.FC<{ children: React.ReactElement; allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
+  const userJson = localStorage.getItem('sadaf_user');
+  if (!userJson) {
+    return <Navigate to="/login" replace />;
+  }
+
+  try {
+    const user = JSON.parse(userJson);
+    if (allowedRoles && !allowedRoles.includes(user.role)) {
+      // Redirect to their default view if they try to access an unauthorized route
+      if (user.role === 'CASHIER') return <Navigate to="/cashier" replace />;
+      if (user.role === 'DOCTOR') return <Navigate to="/doctor" replace />;
+      return <Navigate to="/manager" replace />;
+    }
+  } catch (e) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+};
+
+// Root index dispatcher based on role
+const RootDispatcher: React.FC = () => {
+  const userJson = localStorage.getItem('sadaf_user');
+  if (!userJson) {
+    return <Navigate to="/login" replace />;
+  }
+
+  try {
+    const user = JSON.parse(userJson);
+    if (user.role === 'CASHIER') return <Navigate to="/cashier" replace />;
+    if (user.role === 'DOCTOR') return <Navigate to="/doctor" replace />;
+    return <Navigate to="/manager" replace />;
+  } catch (e) {
+    return <Navigate to="/login" replace />;
+  }
+};
+
+export const App: React.FC = () => {
+  return (
+    <BrowserRouter>
+      <ToastContainer />
+      <Routes>
+        {/* Public Login Route */}
+        <Route path="/login" element={<LoginPage />} />
+
+        {/* Root Redirector */}
+        <Route path="/" element={<RootDispatcher />} />
+
+        {/* 1. Cashier & Ticket Issuing View (100% 1:1 Documentation/Kassir.png) */}
+        <Route
+          path="/cashier"
+          element={
+            <ProtectedRoute allowedRoles={['CASHIER', 'MANAGER', 'ADMIN']}>
+              <OperatorPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/operator"
+          element={
+            <ProtectedRoute allowedRoles={['CASHIER', 'MANAGER', 'ADMIN']}>
+              <OperatorPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 2. Doctor Consultation & Queue Control View (100% 1:1 Documentation/Shifokor.png) */}
+        <Route
+          path="/doctor"
+          element={
+            <ProtectedRoute allowedRoles={['DOCTOR', 'MANAGER', 'ADMIN']}>
+              <DoctorPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 3. Manager Dashboard & Analytics View (100% 1:1 Documentation/Meneger.png) */}
+        <Route
+          path="/manager"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGER', 'ADMIN']}>
+              <ManagerPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Additional alias routes mapped to Manager view tabs */}
+        <Route
+          path="/doctors"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGER', 'ADMIN']}>
+              <ManagerPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/services"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGER', 'ADMIN']}>
+              <ManagerPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/patients"
+          element={
+            <ProtectedRoute allowedRoles={['CASHIER', 'DOCTOR', 'MANAGER', 'ADMIN']}>
+              <ManagerPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+};
