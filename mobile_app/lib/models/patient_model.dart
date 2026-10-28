@@ -1,6 +1,7 @@
 class PatientModel {
   final String id;
   final String? patientNumber;
+  String? get cardNumber => patientNumber;
   final String fullName;
   final String phone;
   final String? birthDate;
@@ -12,6 +13,7 @@ class PatientModel {
   final double totalSpent;
   final String? lastVisitDate;
   final String? lastDoctorName;
+  final List<dynamic> doctorsVisited;
 
   PatientModel({
     required this.id,
@@ -27,6 +29,7 @@ class PatientModel {
     this.totalSpent = 0,
     this.lastVisitDate,
     this.lastDoctorName,
+    this.doctorsVisited = const [],
   });
 
   factory PatientModel.fromJson(Map<String, dynamic> json) {
@@ -44,6 +47,7 @@ class PatientModel {
       totalSpent: (json['totalSpent'] ?? json['total_spent'] ?? 0).toDouble(),
       lastVisitDate: json['lastVisitDate'] ?? json['last_visit_date'],
       lastDoctorName: json['lastDoctorName'] ?? json['last_doctor_name'],
+      doctorsVisited: json['doctors_visited'] ?? json['doctorsVisited'] ?? [],
     );
   }
 

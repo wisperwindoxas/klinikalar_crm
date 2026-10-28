@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/utils/formatters.dart';
 import '../../services/auth_service.dart';
 import '../doctor/doctor_main_screen.dart';
 import '../cashier/cashier_main_screen.dart';
@@ -15,23 +16,24 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController(text: '+998 90 123 45 67');
+  final _phoneController = TextEditingController(text: '+998 (90) 123-45-67');
   final _passwordController = TextEditingController(text: 'doctor123');
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _autoFormatPhone = true;
   String _selectedRole = 'DOCTOR'; // DOCTOR, CASHIER, MANAGER
 
   void _selectRole(String role) {
     setState(() {
       _selectedRole = role;
       if (role == 'DOCTOR') {
-        _phoneController.text = 'doctor';
+        _phoneController.text = _autoFormatPhone ? '+998 (90) 123-45-67' : '998901234567';
         _passwordController.text = 'doctor123';
       } else if (role == 'CASHIER') {
-        _phoneController.text = 'kassir';
+        _phoneController.text = _autoFormatPhone ? '+998 (93) 555-44-33' : '998935554433';
         _passwordController.text = 'kassir123';
       } else {
-        _phoneController.text = 'admin';
+        _phoneController.text = _autoFormatPhone ? '+998 (90) 123-45-67' : '998901234567';
         _passwordController.text = 'admin123';
       }
     });
@@ -66,7 +68,15 @@ class _LoginScreenState extends State<LoginScreen> {
         SnackBar(
           content: Text(result['message'] ?? 'Login yoki parol noto‘g‘ri'),
           backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 4),
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(
+            label: 'Demo kirish',
+            textColor: Colors.white,
+            onPressed: () async {
+              await AuthService().switchDemoRole(_selectedRole);
+              if (mounted) _navigateToRole();
+            },
+          ),
         ),
       );
     }
@@ -223,21 +233,76 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Telefon raqam yoki Login',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Telefon raqam yoki Login',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () {
+                            setState(() {
+                              _autoFormatPhone = !_autoFormatPhone;
+                              if (_autoFormatPhone) {
+                                final clean = Formatters.cleanPhone(_phoneController.text);
+                                if (clean.length >= 9) {
+                                  _phoneController.text = Formatters.formatPhone(clean);
+                                }
+                              } else {
+                                _phoneController.text = Formatters.cleanPhone(_phoneController.text);
+                              }
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: _autoFormatPhone ? AppColors.mintLight : AppColors.background,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: _autoFormatPhone ? AppColors.primary : AppColors.border),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _autoFormatPhone ? Icons.check_circle_rounded : Icons.edit_note_rounded,
+                                  size: 13,
+                                  color: _autoFormatPhone ? AppColors.primary : AppColors.textMuted,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _autoFormatPhone ? '+998 Format' : 'Oddiy matn',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: _autoFormatPhone ? AppColors.primary : AppColors.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.phone_outlined, size: 20, color: AppColors.textMuted),
-                        hintText: '+998 90 123 45 67',
+                      keyboardType: _autoFormatPhone ? TextInputType.phone : TextInputType.text,
+                      inputFormatters: _autoFormatPhone ? [const UzbekPhoneInputFormatter()] : [],
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.phone_outlined, size: 20, color: AppColors.textMuted),
+                        hintText: _autoFormatPhone ? '+998 (90) 123-45-67' : 'Telefon yoki login',
+                        suffixIcon: _phoneController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18, color: AppColors.textMuted),
+                                onPressed: () => setState(() => _phoneController.clear()),
+                              )
+                            : null,
                       ),
                     ),
                     const SizedBox(height: 18),

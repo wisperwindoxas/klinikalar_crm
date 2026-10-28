@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../models/patient_model.dart';
 import '../../models/ticket_model.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/responsive_frame.dart';
 import '../auth/login_screen.dart';
+import '../manager/manager_patient_detail_sheet.dart';
 import 'cashier_new_ticket_flow.dart';
 import 'cashier_ticket_sheet.dart';
 
@@ -22,6 +24,9 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
 
   List<TicketModel> _tickets = [];
   List<Map<String, dynamic>> _payments = [];
+  List<PatientModel> _patients = [];
+  final _patientSearchCtrl = TextEditingController();
+  int _visiblePatientsCount = 15;
 
   double _cashTotal = 0;
   double _cardTotal = 0;
@@ -32,10 +37,17 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
     _fetchData();
   }
 
+  @override
+  void dispose() {
+    _patientSearchCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchData() async {
     setState(() => _isLoading = true);
     final tickets = await ApiService().getTickets();
     final payments = await ApiService().getPayments();
+    final patients = await ApiService().getPatients();
 
     double cash = 0;
     double card = 0;
@@ -51,6 +63,7 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
     setState(() {
       _tickets = tickets;
       _payments = payments;
+      _patients = patients;
       _cashTotal = cash;
       _cardTotal = card;
       _isLoading = false;
@@ -121,8 +134,10 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
       case 1:
         return _buildTicketsTab();
       case 2:
-        return _buildPaymentsTab();
+        return _buildPatientsTab();
       case 3:
+        return _buildPaymentsTab();
+      case 4:
         return _buildShiftTab();
       default:
         return _buildHomeTab();
@@ -495,6 +510,261 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
     );
   }
 
+  // ==================== TAB 2: BEMORLAR BAZASI ====================
+  Widget _buildPatientsTab() {
+    final query = _patientSearchCtrl.text.toLowerCase().trim();
+    final filtered = _patients.where((p) {
+      if (query.isEmpty) return true;
+      final nameMatches = p.fullName.toLowerCase().contains(query);
+      final phoneMatches = p.phone.contains(query) || Formatters.cleanPhone(p.phone).contains(query);
+      final cardMatches = (p.cardNumber ?? '').toLowerCase().contains(query);
+      return nameMatches || phoneMatches || cardMatches;
+    }).toList();
+
+    final visibleCount = _visiblePatientsCount.clamp(0, filtered.length);
+    final displayed = filtered.take(visibleCount).toList();
+
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          color: Colors.white,
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _patientSearchCtrl,
+                      onChanged: (val) {
+                        setState(() {
+                          _visiblePatientsCount = 15;
+                        });
+                      },
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted),
+                        hintText: 'Bemor F.I.Sh yoki telefon raqami...',
+                        suffixIcon: _patientSearchCtrl.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  _patientSearchCtrl.clear();
+                                  setState(() {});
+                                },
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      CashierNewTicketFlow.show(context, onFinished: _fetchData);
+                    },
+                    icon: const Icon(Icons.person_add_rounded, size: 16),
+                    label: const Text('Yangi'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Bemorlar: ${displayed.length} / ${filtered.length} ta',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textMuted),
+                  ),
+                  const Text(
+                    '15 tadan yuklanadi (Scroll)',
+                    style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1, color: AppColors.border),
+        Expanded(
+          child: displayed.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.people_outline_rounded, size: 48, color: AppColors.textMuted),
+                      const SizedBox(height: 8),
+                      const Text('Bemorlar topilmadi', style: TextStyle(color: AppColors.textMuted)),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: () {
+                          CashierNewTicketFlow.show(context, onFinished: _fetchData);
+                        },
+                        child: const Text('Yangi bemor ro‘yxatga olish'),
+                      ),
+                    ],
+                  ),
+                )
+              : NotificationListener<ScrollNotification>(
+                  onNotification: (scrollInfo) {
+                    if (scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 100) {
+                      if (_visiblePatientsCount < filtered.length) {
+                        setState(() {
+                          _visiblePatientsCount += 15;
+                        });
+                      }
+                    }
+                    return false;
+                  },
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: displayed.length + (_visiblePatientsCount < filtered.length ? 1 : 0),
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      if (index >= displayed.length) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _visiblePatientsCount += 15;
+                                });
+                              },
+                              icon: const Icon(Icons.arrow_downward_rounded, size: 16),
+                              label: const Text('Yana 15 ta yuklash'),
+                            ),
+                          ),
+                        );
+                      }
+
+                      final p = displayed[index];
+                      final isFemale = (p.gender ?? '').toLowerCase() == 'female';
+
+                      return Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.border),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.02),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 20,
+                                  backgroundColor: isFemale ? const Color(0xFFFCE7F3) : const Color(0xFFEFF6FF),
+                                  child: Icon(
+                                    isFemale ? Icons.face_3_rounded : Icons.face_6_rounded,
+                                    color: isFemale ? const Color(0xFFDB2777) : const Color(0xFF2563EB),
+                                    size: 22,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        p.fullName,
+                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.phone_outlined, size: 12, color: AppColors.textMuted),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            Formatters.formatPhone(p.phone),
+                                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.mintLight,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '${p.totalVisits} ta tashrif',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (p.address != null && p.address!.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  const Icon(Icons.location_on_outlined, size: 12, color: AppColors.textMuted),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      p.address!,
+                                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                            const SizedBox(height: 12),
+                            const Divider(height: 1, color: AppColors.border),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                TextButton.icon(
+                                  onPressed: () {
+                                    ManagerPatientDetailSheet.show(context, patient: p, onUpdated: _fetchData);
+                                  },
+                                  icon: const Icon(Icons.history_edu_rounded, size: 16),
+                                  label: const Text('Tarix & Xulosalar'),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: AppColors.primary,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    CashierNewTicketFlow.show(context, initialPatient: p, onFinished: _fetchData);
+                                  },
+                                  icon: const Icon(Icons.confirmation_number_outlined, size: 16),
+                                  label: const Text('Qabulga yo‘naltirish'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildBottomNav() {
     return Container(
       decoration: const BoxDecoration(
@@ -509,11 +779,14 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
         unselectedItemColor: AppColors.textMuted,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 11),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Bosh sahifa'),
           BottomNavigationBarItem(icon: Icon(Icons.receipt_long_rounded), label: 'Talonlar'),
+          BottomNavigationBarItem(icon: Icon(Icons.people_alt_rounded), label: 'Bemorlar'),
           BottomNavigationBarItem(icon: Icon(Icons.payment_rounded), label: 'To‘lovlar'),
-          BottomNavigationBarItem(icon: Icon(Icons.point_of_sale_rounded), label: 'Kassa'),
+          BottomNavigationBarItem(icon: Icon(Icons.point_of_sale_rounded), label: 'Smena'),
         ],
       ),
     );

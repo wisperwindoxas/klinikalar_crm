@@ -30,11 +30,18 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
   Map<String, dynamic> _dashboardStats = {};
 
   final _patientSearchController = TextEditingController();
+  int _visiblePatientsCount = 15;
 
   @override
   void initState() {
     super.initState();
     _fetchData();
+  }
+
+  @override
+  void dispose() {
+    _patientSearchController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchData() async {
@@ -143,7 +150,13 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
               const SizedBox(width: 8),
               _buildKpiCard('Kutmoqda', '$waitingTickets', Icons.hourglass_top_rounded, AppColors.warning, AppColors.warningLight),
               const SizedBox(width: 8),
-              _buildKpiCard('Tushum', '18.4M', Icons.payments_rounded, AppColors.success, AppColors.successLight),
+              _buildKpiCard(
+                'Xizmatlar',
+                '${_services.length}',
+                Icons.medical_information_rounded,
+                AppColors.primary,
+                AppColors.mintLight,
+              ),
             ],
           ),
           const SizedBox(height: 18),
@@ -172,7 +185,10 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(10)),
-                      child: const Text('Normal (68%)', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        'Normal (${_dashboardStats['occupancy'] ?? '68%'})',
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
@@ -377,73 +393,171 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
 
   // ==================== TAB 3: BEMORLAR BAZASI ====================
   Widget _buildPatientsTab() {
+    final query = _patientSearchController.text.toLowerCase().trim();
+    final filtered = _patients.where((p) {
+      if (query.isEmpty) return true;
+      final nameMatches = p.fullName.toLowerCase().contains(query);
+      final phoneMatches = p.phone.contains(query) || Formatters.cleanPhone(p.phone).contains(query);
+      final cardMatches = (p.cardNumber ?? '').toLowerCase().contains(query);
+      return nameMatches || phoneMatches || cardMatches;
+    }).toList();
+
+    final visibleCount = _visiblePatientsCount.clamp(0, filtered.length);
+    final displayed = filtered.take(visibleCount).toList();
+
     return Column(
       children: [
-        Padding(
+        Container(
           padding: const EdgeInsets.all(16),
-          child: TextFormField(
-            controller: _patientSearchController,
-            onChanged: (q) async {
-              final res = await ApiService().getPatients(search: q);
-              setState(() => _patients = res);
-            },
-            decoration: InputDecoration(
-              prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted),
-              hintText: 'Bemor F.I.Sh yoki telefon raqami...',
-              suffixIcon: _patientSearchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, size: 18),
-                      onPressed: () {
-                        _patientSearchController.clear();
-                        _fetchData();
-                      },
-                    )
-                  : null,
-            ),
+          color: Colors.white,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _patientSearchController,
+                onChanged: (q) async {
+                  setState(() {
+                    _visiblePatientsCount = 15;
+                  });
+                },
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted),
+                  hintText: 'Bemor F.I.Sh yoki telefon raqami...',
+                  suffixIcon: _patientSearchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            _patientSearchController.clear();
+                            setState(() {});
+                          },
+                        )
+                      : null,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Bemorlar: ${displayed.length} / ${filtered.length} ta',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textMuted),
+                  ),
+                  const Text(
+                    '15 tadan yuklanadi (Scroll)',
+                    style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
+        const Divider(height: 1, color: AppColors.border),
         Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _patients.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              final p = _patients[index];
-              return Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
+          child: displayed.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.people_outline_rounded, size: 48, color: AppColors.textMuted),
+                      const SizedBox(height: 8),
+                      const Text('Bemorlar topilmadi', style: TextStyle(color: AppColors.textMuted)),
+                    ],
+                  ),
+                )
+              : NotificationListener<ScrollNotification>(
+                  onNotification: (scrollInfo) {
+                    if (scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 100) {
+                      if (_visiblePatientsCount < filtered.length) {
+                        setState(() {
+                          _visiblePatientsCount += 15;
+                        });
+                      }
+                    }
+                    return false;
+                  },
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: displayed.length + (_visiblePatientsCount < filtered.length ? 1 : 0),
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      if (index >= displayed.length) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _visiblePatientsCount += 15;
+                                });
+                              },
+                              icon: const Icon(Icons.arrow_downward_rounded, size: 16),
+                              label: const Text('Yana 15 ta yuklash'),
+                            ),
+                          ),
+                        );
+                      }
+
+                      final p = displayed[index];
+                      final isFemale = (p.gender ?? '').toLowerCase() == 'female';
+
+                      return InkWell(
+                        onTap: () {
+                          ManagerPatientDetailSheet.show(context, patient: p, onUpdated: _fetchData);
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 20,
+                                backgroundColor: isFemale ? const Color(0xFFFCE7F3) : const Color(0xFFEFF6FF),
+                                child: Icon(
+                                  isFemale ? Icons.face_3_rounded : Icons.face_6_rounded,
+                                  color: isFemale ? const Color(0xFFDB2777) : const Color(0xFF2563EB),
+                                  size: 22,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      p.fullName,
+                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.phone_outlined, size: 12, color: AppColors.textMuted),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          Formatters.formatPhone(p.phone),
+                                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Tashriflar: ${p.totalVisits} marta • ${Formatters.formatCurrency(p.totalSpent)}',
+                                      style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: AppColors.mintLight,
-                      child: Text(p.fullName.isNotEmpty ? p.fullName[0] : 'B', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(p.fullName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                          Text(Formatters.formatPhone(p.phone), style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                          Text('Tashriflar: ${p.totalVisits} marta • ${Formatters.formatCurrency(p.totalSpent)}', style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
-                      onPressed: () {
-                        ManagerPatientDetailSheet.show(context, patient: p, onUpdated: _fetchData);
-                      },
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
         ),
       ],
     );

@@ -9,15 +9,16 @@ import 'cashier_ticket_sheet.dart';
 
 class CashierNewTicketFlow extends StatefulWidget {
   final VoidCallback onFinished;
+  final PatientModel? initialPatient;
 
-  const CashierNewTicketFlow({Key? key, required this.onFinished}) : super(key: key);
+  const CashierNewTicketFlow({Key? key, required this.onFinished, this.initialPatient}) : super(key: key);
 
-  static void show(BuildContext context, {required VoidCallback onFinished}) {
+  static void show(BuildContext context, {required VoidCallback onFinished, PatientModel? initialPatient}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => CashierNewTicketFlow(onFinished: onFinished),
+      builder: (_) => CashierNewTicketFlow(onFinished: onFinished, initialPatient: initialPatient),
     );
   }
 
@@ -36,8 +37,11 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
 
   // New patient form fields
   bool _isNewPatientForm = false;
+  bool _phoneFormattingEnabled = true;
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController(text: '+998 ');
+  final _districtController = TextEditingController();
+  final _neighborhoodController = TextEditingController();
   final _addressController = TextEditingController();
   String _selectedGender = 'male';
   String _selectedRegion = 'Toshkent shahri';
@@ -72,7 +76,23 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialPatient != null) {
+      _selectedPatient = widget.initialPatient;
+      _currentStep = 1;
+    }
     _loadInitialData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
+    _districtController.dispose();
+    _neighborhoodController.dispose();
+    _addressController.dispose();
+    _receivedCashController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadInitialData() async {
@@ -116,12 +136,19 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
 
     // If new patient, create in database first
     if (patientId == null || _isNewPatientForm) {
-      final cleanPhone = _phoneController.text.replaceAll(' ', '');
+      final cleanPhone = Formatters.cleanPhone(_phoneController.text);
+      final addressParts = <String>[];
+      if (_selectedRegion.isNotEmpty) addressParts.add(_selectedRegion);
+      if (_districtController.text.trim().isNotEmpty) addressParts.add(_districtController.text.trim());
+      if (_neighborhoodController.text.trim().isNotEmpty) addressParts.add(_neighborhoodController.text.trim());
+      if (_addressController.text.trim().isNotEmpty) addressParts.add(_addressController.text.trim());
+      final fullAddress = addressParts.join(', ');
+
       final pRes = await ApiService().createPatient({
         'fullName': _nameController.text.trim(),
         'phone': cleanPhone,
         'gender': _selectedGender,
-        'address': _addressController.text.trim(),
+        'address': fullAddress,
         'region': _selectedRegion,
       });
 
@@ -474,12 +501,51 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
               decoration: const InputDecoration(hintText: 'Masalan: Olimov Sanjar Rustamovich'),
             ),
             const SizedBox(height: 12),
-            const Text('Telefon raqami', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Telefon raqami', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _phoneFormattingEnabled = !_phoneFormattingEnabled;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _phoneFormattingEnabled ? Icons.check_circle : Icons.radio_button_unchecked,
+                          size: 13,
+                          color: _phoneFormattingEnabled ? AppColors.primary : AppColors.textMuted,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _phoneFormattingEnabled ? '+998 Format' : 'Oddiy matn',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: _phoneFormattingEnabled ? AppColors.primary : AppColors.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 6),
             TextFormField(
               controller: _phoneController,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(hintText: '+998 90 123 45 67'),
+              inputFormatters: _phoneFormattingEnabled ? [const UzbekPhoneInputFormatter()] : [],
+              decoration: InputDecoration(
+                hintText: _phoneFormattingEnabled ? '+998 (90) 123-45-67' : '901234567',
+                prefixIcon: const Icon(Icons.phone_rounded, color: AppColors.primary, size: 20),
+              ),
             ),
             const SizedBox(height: 12),
             Row(
@@ -545,11 +611,43 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
               ],
             ),
             const SizedBox(height: 12),
-            const Text('Manzil / Tuman', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Tuman / Shahar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _districtController,
+                        decoration: const InputDecoration(hintText: 'Yunusobod tumani'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Mahalla / Ko‘cha', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _neighborhoodController,
+                        decoration: const InputDecoration(hintText: 'Bog‘ishamol MFY'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text('Qo‘shimcha manzil (Uy, kvartira)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
             const SizedBox(height: 6),
             TextFormField(
               controller: _addressController,
-              decoration: const InputDecoration(hintText: 'Chilonzor tumani, 9-mavze, 12-uy'),
+              decoration: const InputDecoration(hintText: '15-uy, 42-xonadon'),
             ),
           ],
         ],

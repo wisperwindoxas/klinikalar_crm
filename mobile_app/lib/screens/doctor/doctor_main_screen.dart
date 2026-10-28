@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/ticket_model.dart';
+import '../../models/patient_model.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/responsive_frame.dart';
 import '../auth/login_screen.dart';
+import '../manager/manager_patient_detail_sheet.dart';
 import 'doctor_offline_sheet.dart';
 import 'doctor_patient_sheet.dart';
 
@@ -22,6 +24,9 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
   bool _isLoading = true;
   bool _isDoctorActive = true;
   List<TicketModel> _tickets = [];
+  List<PatientModel> _patients = [];
+  final _patientSearchCtrl = TextEditingController();
+  int _visiblePatientsCount = 15;
   TicketModel? _currentInServiceTicket;
   TicketModel? _nextWaitingTicket;
 
@@ -66,8 +71,11 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
     final doctorId = user?.doctorId;
 
     final tickets = await ApiService().getTickets(doctorId: doctorId);
+    final patients = await ApiService().getPatients();
+
     setState(() {
       _tickets = tickets;
+      _patients = patients;
       _currentInServiceTicket = tickets.cast<TicketModel?>().firstWhere(
             (t) => t?.isInService == true,
             orElse: () => null,
@@ -257,7 +265,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
       case 0:
         return _buildHomeTab();
       case 1:
-        return _buildQueueTab();
+        return _buildPatientsTab();
       case 2:
         return _buildStatsTab();
       case 3:
@@ -575,7 +583,157 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
     );
   }
 
-  // ==================== TAB 2: MENING NAVBATIM ====================
+  // ==================== TAB 1: BEMORLAR MALUMOTLARI (EMR) ====================
+  Widget _buildPatientsTab() {
+    final query = _patientSearchCtrl.text.toLowerCase().trim();
+    final filtered = _patients.where((p) {
+      if (query.isEmpty) return true;
+      return p.fullName.toLowerCase().contains(query) ||
+          p.phone.contains(query) ||
+          (p.patientNumber != null && p.patientNumber!.contains(query));
+    }).toList();
+
+    return Column(
+      children: [
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Bemorlar Malumotlari (EMR)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(color: AppColors.mintLight, borderRadius: BorderRadius.circular(10)),
+                    child: Text('Jami: ${_patients.length}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _patientSearchCtrl,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
+                  hintText: 'Bemor F.I.Sh yoki telefon raqami...',
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  suffixIcon: _patientSearchCtrl.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            _patientSearchCtrl.clear();
+                            setState(() {});
+                          },
+                        )
+                      : null,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1, color: AppColors.border),
+        Expanded(
+          child: filtered.isEmpty
+              ? const Center(child: Text('Mos keluvchi bemorlar topilmadi', style: TextStyle(color: AppColors.textMuted)))
+              : NotificationListener<ScrollNotification>(
+                  onNotification: (scrollInfo) {
+                    if (scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 60) {
+                      if (_visiblePatientsCount < filtered.length) {
+                        setState(() {
+                          _visiblePatientsCount += 15;
+                        });
+                      }
+                    }
+                    return false;
+                  },
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: (filtered.length > _visiblePatientsCount ? _visiblePatientsCount + 1 : filtered.length),
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      if (index == _visiblePatientsCount && filtered.length > _visiblePatientsCount) {
+                        return Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Center(
+                            child: OutlinedButton(
+                              onPressed: () => setState(() => _visiblePatientsCount += 15),
+                              child: Text('Yana 15 ta bemor yuklash (${_visiblePatientsCount}/${filtered.length}) ↓'),
+                            ),
+                          ),
+                        );
+                      }
+                      final patient = filtered[index];
+                      return InkWell(
+                        onTap: () {
+                          ManagerPatientDetailSheet.show(
+                            context,
+                            patient: patient,
+                            onUpdated: _fetchData,
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 20,
+                                backgroundColor: AppColors.mintLight,
+                                child: Text(
+                                  patient.fullName.isNotEmpty ? patient.fullName[0].toUpperCase() : 'B',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      patient.fullName,
+                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        Text(Formatters.formatPhone(patient.phone), style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                                        const Text(' • ', style: TextStyle(color: AppColors.textMuted)),
+                                        Text('${patient.totalVisits} ta qabul', style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                    if (patient.lastDoctorName != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2),
+                                        child: Text(
+                                          'Oxirgi ko\'rik: ${patient.lastDoctorName}',
+                                          style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.textMuted),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  // ==================== TAB 2: NAVBATLAR RO'YXATI ====================
   Widget _buildQueueTab() {
     List<TicketModel> filtered = _tickets;
     if (_queueFilter == 'WAITING') {
@@ -948,9 +1106,9 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
         type: BottomNavigationBarType.fixed,
         elevation: 0,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Bosh sahifa'),
-          BottomNavigationBarItem(icon: Icon(Icons.list_alt_rounded), label: 'Navbatim'),
-          BottomNavigationBarItem(icon: Icon(Icons.analytics_rounded), label: 'Tahlil'),
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Navbatim'),
+          BottomNavigationBarItem(icon: Icon(Icons.people_alt_rounded), label: 'Bemorlar'),
+          BottomNavigationBarItem(icon: Icon(Icons.history_edu_rounded), label: 'Tarix'),
           BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profil'),
         ],
       ),

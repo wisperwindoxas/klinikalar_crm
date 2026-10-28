@@ -151,26 +151,73 @@ class _DoctorPatientSheetState extends State<DoctorPatientSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Shifokor Tashxisi (Diagnoz)',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Shifokor Xulosasi / Diagnoz',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() => _diagnosisController.text = 'Xulosa berilmadi');
+                        },
+                        style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                        child: const Text('Xulosa berilmadi', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _diagnosisController,
                     decoration: const InputDecoration(
-                      hintText: 'Masalan: O‘tkir rinit, kataral faza...',
+                      hintText: 'Xulosa yoki tashxis kiriting (bo\'sh qolsa: Xulosa berilmadi)',
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Quick diagnosis templates
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      'Salomatligi qoniqarli',
+                      'Profilaktika tavsiya etildi',
+                      'EKG normada, barqaror',
+                      'Statsionar davolanish',
+                      'Dorilar retsepti berildi',
+                      'Xulosa berilmadi',
+                    ].map((tmpl) => InkWell(
+                      onTap: () {
+                        setState(() => _diagnosisController.text = tmpl);
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _diagnosisController.text == tmpl ? AppColors.mintLight : AppColors.background,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: _diagnosisController.text == tmpl ? AppColors.primary : AppColors.border),
+                        ),
+                        child: Text(
+                          tmpl,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: _diagnosisController.text == tmpl ? AppColors.primary : AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    )).toList(),
                   ),
                   const SizedBox(height: 14),
                   const Text(
-                    'Davolash Rejasi & Retsept',
+                    'Davolash Rejasi & Retsept (Izoh)',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _notesController,
-                    maxLines: 4,
+                    maxLines: 3,
                     decoration: const InputDecoration(
                       hintText: 'Dori vositalari, qabul qilish tartibi va tavsiyalar...',
                     ),
@@ -192,14 +239,15 @@ class _DoctorPatientSheetState extends State<DoctorPatientSheet> {
                             Icon(Icons.history_edu_rounded, size: 16, color: AppColors.primary),
                             SizedBox(width: 6),
                             Text(
-                              'Oldingi Tashriflar Tarixi',
+                              'Oldingi Qabullar Tarixi & Shifokor Xulosalari',
                               style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                             ),
                           ],
                         ),
                         const SizedBox(height: 8),
-                        _buildHistoryItem('14.09.2026', 'LOR ko‘rigi', 'Dr. Rahimov', 'Tugatilgan'),
-                        _buildHistoryItem('02.08.2026', 'Umumiy qon tahlili', 'Laboratoriya', 'Norma'),
+                        _buildHistoryItem('Bugun', widget.ticket.serviceName ?? 'Birlamchi ko‘rik', widget.ticket.doctorName ?? 'Shifokor', 'Qabulda'),
+                        _buildHistoryItem('14.09.2026', 'Kardiolog ko‘rigi', 'Dr. Aliyev J.', 'EKG normada, profilaktika tavsiya etildi'),
+                        _buildHistoryItem('02.08.2026', 'Nevropatolog ko‘rigi', 'Dr. Rashidov A.', 'Salomatligi qoniqarli'),
                       ],
                     ),
                   ),
@@ -241,16 +289,21 @@ class _DoctorPatientSheetState extends State<DoctorPatientSheet> {
                       ? null
                       : () async {
                           setState(() => _isSaving = true);
+                          final diag = _diagnosisController.text.trim();
+                          final notes = _notesController.text.trim();
+                          final conclusion = diag.isNotEmpty ? diag : (notes.isNotEmpty ? notes : 'Xulosa berilmadi');
+                          final combinedNotes = notes.isNotEmpty && notes != conclusion ? '$conclusion\n$notes' : conclusion;
+
                           await ApiService().completeTicket(
                             widget.ticket.id,
-                            notes: '${_diagnosisController.text}\n${_notesController.text}',
+                            notes: combinedNotes,
                           );
                           setState(() => _isSaving = false);
                           if (!mounted) return;
                           Navigator.pop(context);
                           widget.onUpdated();
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Qabul muvaffaqiyatli yakunlandi!'), backgroundColor: AppColors.success),
+                            SnackBar(content: Text('Qabul yakunlandi! Xulosa: $conclusion'), backgroundColor: AppColors.success),
                           );
                         },
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
