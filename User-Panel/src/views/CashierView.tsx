@@ -4,11 +4,12 @@ import {
   Search, Calendar, Plus, Trash2, Printer, CreditCard,
   Banknote, Smartphone, Clock, CheckCircle2, User, Phone,
   LogOut, ChevronDown, HeartPulse, UserPlus, FileText, Settings,
-  Users, BarChart3, Ticket, AlertCircle, RefreshCw, Check, ArrowRight, X,
-  ShieldCheck, Volume2, Ban, RotateCcw
+  Users, BarChart3, Ticket, AlertCircle, RefreshCw, Check, ArrowRight, ArrowLeft, X,
+  ShieldCheck, Volume2, Ban, RotateCcw, MapPin, Building2, Home, Sparkles
 } from 'lucide-react';
 import { TicketIssuedModal } from '../components/TicketIssuedModal';
 import { NewPatientModal } from '../components/NewPatientModal';
+import { UzbekistanAddressSelect } from '../components/UzbekistanAddressSelect';
 import { showNotification } from '../components/ToastNotification';
 import { formatUzbekPhone } from '../utils/phone';
 
@@ -23,11 +24,15 @@ export const CashierView: React.FC = () => {
   const [time, setTime] = useState('14:25');
   const [dateStr, setDateStr] = useState('10-iyun 2025, Seshanba');
 
+  // Wizard Step: 1 = Bemor ma'lumotlari, 2 = Shifokor tanlash, 3 = To'lov oynasi
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+
   // Step 1: Patient form state
   const [fullName, setFullName] = useState('');
   const [birthDate, setBirthDate] = useState('1990-01-01');
   const [phone, setPhone] = useState('+998 ');
   const [gender, setGender] = useState<'MALE' | 'FEMALE'>('MALE');
+  const [address, setAddress] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
 
   // Step 2: Doctor and Specialty selection (100% Real PostgreSQL)
@@ -191,9 +196,33 @@ export const CashierView: React.FC = () => {
     setPhone('+998 ');
     setBirthDate('1990-01-01');
     setGender('MALE');
+    setAddress('');
     setSelectedPatientId('');
     setSelectedItems([]);
     setReceivedAmount('0');
+    setCurrentStep(1);
+  };
+
+  // Step navigation validations
+  const handleGoToStep2 = () => {
+    if (!fullName.trim()) {
+      showNotification('Ma\'lumot to\'liq emas', 'Iltimos, bemor F.I.Sh. kiriting!', 'warning');
+      return;
+    }
+    if (phone.replace(/\D/g, '').length < 9) {
+      showNotification('Ma\'lumot to\'liq emas', 'Iltimos, to\'g\'ri telefon raqamini kiriting (+998 ...)!', 'warning');
+      return;
+    }
+    setCurrentStep(2);
+  };
+
+  const handleGoToStep3 = () => {
+    if (selectedItems.length === 0) {
+      showNotification('Xizmat tanlanmadi', 'Iltimos, kamida bitta shifokor yoki xizmat tanlang!', 'warning');
+      return;
+    }
+    setReceivedAmount(totalAmount.toLocaleString());
+    setCurrentStep(3);
   };
 
   // Submit and Issue Multi-tickets (100% Real PostgreSQL multi-register)
@@ -219,7 +248,8 @@ export const CashierView: React.FC = () => {
             fullName,
             phone,
             birthDate: birthDate || undefined,
-            gender
+            gender,
+            address: address || undefined
           })
         });
         const pJson = await pRes.json();
@@ -326,9 +356,11 @@ export const CashierView: React.FC = () => {
     setPhone(p.phone || '');
     setBirthDate(p.birth_date ? p.birth_date.substring(0, 10) : '1990-01-01');
     setGender(p.gender === 'FEMALE' ? 'FEMALE' : 'MALE');
+    setAddress(p.address || '');
     setSelectedPatientId(p.id);
     setIsSearchPatientModalOpen(false);
     setSearchParams({}); // Switch to 'yangi-bemor'
+    setCurrentStep(1);
     showNotification('Bemor tanlandi', `${p.full_name || p.fullName} anketasi yuklandi.`, 'info');
   };
 
@@ -490,420 +522,661 @@ export const CashierView: React.FC = () => {
 
         {/* TAB 1: YANGI BEMOR (100% 1:1 WITH Kassir.png, 100% REAL POSTGRESQL DATA) */}
         {currentTab === 'yangi-bemor' && (
-          <main className="p-8 grid grid-cols-12 gap-6 flex-1">
-            {/* LEFT 2 COLUMNS (Col 1-8): STEP 1, STEP 2, STEP 3, STEP 4 */}
+          <main className="p-8 grid grid-cols-12 gap-6 flex-1">            {/* LEFT 2 COLUMNS (Col 1-8): STEP-BY-STEP SEQUENTIAL WIZARD */}
             <div className="col-span-12 xl:col-span-8 space-y-6">
-              {/* CARD 1: BEMOR MA'LUMOTLARI */}
-              <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-[#1677FF] text-white flex items-center justify-center font-black text-xs">
-                      1
+
+              {/* STEP PROGRESS NAVIGATION BAR */}
+              <div className="bg-white p-3.5 rounded-3xl border border-slate-200/80 shadow-xs">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  {/* Step 1 Pill */}
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep(1)}
+                    className={`p-3 rounded-2xl flex items-center gap-3 transition-all cursor-pointer text-left ${
+                      currentStep === 1
+                        ? 'bg-blue-50/90 border-2 border-[#1677FF] text-[#1677FF] shadow-xs'
+                        : currentStep > 1
+                        ? 'bg-emerald-50/70 border border-emerald-200 text-emerald-800 hover:bg-emerald-100/60'
+                        : 'bg-slate-50 border border-slate-200 text-slate-400'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs flex-shrink-0 ${
+                      currentStep === 1
+                        ? 'bg-[#1677FF] text-white shadow-xs'
+                        : currentStep > 1
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-200 text-slate-500'
+                    }`}>
+                      {currentStep > 1 ? <Check className="w-4 h-4 stroke-[3]" /> : '1'}
                     </div>
-                    <div>
-                      <h2 className="text-base font-black text-[#172B4D]">Bemor ma'lumotlari</h2>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold uppercase tracking-wider opacity-70">1-QADAM</div>
+                      <div className="text-xs font-black truncate">Bemor ma'lumotlari</div>
+                    </div>
+                  </button>
+
+                  {/* Step 2 Pill */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!fullName.trim()) {
+                        showNotification('Diqqat', 'Oldin bemor F.I.Sh. kiritilishi kerak', 'warning');
+                        return;
+                      }
+                      setCurrentStep(2);
+                    }}
+                    className={`p-3 rounded-2xl flex items-center gap-3 transition-all cursor-pointer text-left ${
+                      currentStep === 2
+                        ? 'bg-teal-50/90 border-2 border-[#00B96B] text-[#00B96B] shadow-xs'
+                        : currentStep > 2
+                        ? 'bg-emerald-50/70 border border-emerald-200 text-emerald-800 hover:bg-emerald-100/60'
+                        : 'bg-slate-50 border border-slate-200 text-slate-400'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs flex-shrink-0 ${
+                      currentStep === 2
+                        ? 'bg-[#00B96B] text-white shadow-xs'
+                        : currentStep > 2
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-200 text-slate-500'
+                    }`}>
+                      {currentStep > 2 ? <Check className="w-4 h-4 stroke-[3]" /> : '2'}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold uppercase tracking-wider opacity-70">2-QADAM</div>
+                      <div className="text-xs font-black truncate">Shifokor tanlash</div>
+                    </div>
+                  </button>
+
+                  {/* Step 3 Pill */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!fullName.trim()) {
+                        showNotification('Diqqat', 'Oldin bemor F.I.Sh. kiritilishi kerak', 'warning');
+                        return;
+                      }
+                      if (selectedItems.length === 0) {
+                        showNotification('Diqqat', 'Oldin shifokor yoki xizmat tanlang', 'warning');
+                        return;
+                      }
+                      setCurrentStep(3);
+                    }}
+                    className={`p-3 rounded-2xl flex items-center gap-3 transition-all cursor-pointer text-left ${
+                      currentStep === 3
+                        ? 'bg-amber-50/90 border-2 border-[#FA8C16] text-[#FA8C16] shadow-xs'
+                        : 'bg-slate-50 border border-slate-200 text-slate-400'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs flex-shrink-0 ${
+                      currentStep === 3
+                        ? 'bg-[#FA8C16] text-white shadow-xs'
+                        : 'bg-slate-200 text-slate-500'
+                    }`}>
+                      3
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold uppercase tracking-wider opacity-70">3-QADAM</div>
+                      <div className="text-xs font-black truncate">To'lov & Talon</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* ===== STEP 1: BEMOR MA'LUMOTLARI VA MANZILI ===== */}
+              {currentStep === 1 && (
+                <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-6 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 flex-wrap gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-2xl bg-[#1677FF] text-white flex items-center justify-center font-black text-xs shadow-xs">
+                        1
+                      </div>
+                      <div>
+                        <h2 className="text-base font-black text-[#172B4D]">Bemor shaxsiy ma'lumotlari</h2>
+                        <p className="text-xs text-slate-400">Bemor F.I.Sh, telefoni, jinsi va to'liq yashash manzilini kiriting</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
                       {selectedPatientId && (
-                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                          Mavjud bemor tanlandi (ID: #{selectedPatientId})
-                        </span>
+                        <button
+                          type="button"
+                          onClick={handleResetForm}
+                          className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-xl transition cursor-pointer"
+                        >
+                          Tozalash
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setIsSearchPatientModalOpen(true)}
+                        className="px-4 py-2 bg-[#1677FF] hover:bg-[#0958D9] text-white text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-xs cursor-pointer"
+                      >
+                        <Search className="w-3.5 h-3.5" />
+                        <span>Mavjud bemorni qidirish</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Asosiy ma'lumotlar formasi */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-[#172B4D] flex items-center gap-1">
+                        <span>F.I.Sh (Familiya Ism Sharif)</span>
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                          <User className="w-4 h-4 text-[#1677FF]" />
+                        </div>
+                        <input
+                          type="text"
+                          value={fullName}
+                          onChange={e => setFullName(e.target.value)}
+                          placeholder="Familiya Ism Sharif"
+                          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-[#172B4D] focus:outline-none focus:ring-2 focus:ring-[#1677FF]/20 focus:border-[#1677FF]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-[#172B4D] flex items-center gap-1">
+                        <span>Telefon raqami</span>
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                          <Phone className="w-4 h-4 text-[#1677FF]" />
+                        </div>
+                        <input
+                          type="tel"
+                          value={phone}
+                          onChange={e => setPhone(formatUzbekPhone(e.target.value))}
+                          onKeyDown={e => {
+                            if ((phone === '+998 ' || phone === '+998' || phone.length <= 5) && e.key === 'Backspace') {
+                              e.preventDefault();
+                              setPhone('+998 ');
+                            }
+                          }}
+                          placeholder="+998 (90) 123-45-67"
+                          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold font-mono text-[#172B4D] focus:outline-none focus:ring-2 focus:ring-[#1677FF]/20 focus:border-[#1677FF]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-[#172B4D]">Tug'ilgan sana</label>
+                      <div className="relative">
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                          <Calendar className="w-4 h-4 text-[#1677FF]" />
+                        </div>
+                        <input
+                          type="date"
+                          value={birthDate}
+                          onChange={e => setBirthDate(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-[#172B4D] focus:outline-none focus:ring-2 focus:ring-[#1677FF]/20 focus:border-[#1677FF]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-[#172B4D]">Jinsi</label>
+                      <div className="grid grid-cols-2 gap-2 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setGender('MALE')}
+                          className={`py-2 px-3 text-xs font-bold rounded-xl border transition flex items-center justify-center gap-2 cursor-pointer ${
+                            gender === 'MALE'
+                              ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-2xs'
+                              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span>👨 Erkak</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setGender('FEMALE')}
+                          className={`py-2 px-3 text-xs font-bold rounded-xl border transition flex items-center justify-center gap-2 cursor-pointer ${
+                            gender === 'FEMALE'
+                              ? 'bg-pink-50 border-pink-500 text-pink-700 shadow-2xs'
+                              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span>👩 Ayol</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Yashash Manzili (Viloyat, Tuman, Mahalla, Ko'cha va uy) */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <UzbekistanAddressSelect
+                      value={address}
+                      onChange={setAddress}
+                      label="Bemor Yashash Manzili (Viloyat, Tuman, Mahalla va Ko'cha)"
+                      showStreetInput={true}
+                    />
+                  </div>
+
+                  {/* Step 1 Actions */}
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                    <div className="text-xs text-slate-400">
+                      Bemor ma'lumotlarini to'ldirgach keyingi qadamga o'ting
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleGoToStep2}
+                      className="px-6 py-3 rounded-2xl bg-[#1677FF] hover:bg-[#0958D9] text-white text-xs font-black transition flex items-center gap-2 shadow-md shadow-[#1677FF]/20 cursor-pointer"
+                    >
+                      <span>Keyingisi: Shifokor tanlash</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ===== STEP 2: SHIFOKOR VA XIZMAT TANLASH ===== */}
+              {currentStep === 2 && (
+                <div className="space-y-6 animate-in fade-in duration-200">
+                  {/* Bemor mini-recap paneli */}
+                  <div className="p-4 bg-gradient-to-r from-blue-50/80 via-teal-50/40 to-slate-50 border border-blue-200/70 rounded-3xl flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-11 h-11 rounded-2xl bg-[#1677FF] text-white font-black flex items-center justify-center text-sm shadow-xs flex-shrink-0">
+                        {fullName.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-black text-[#172B4D]">{fullName}</span>
+                          <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-white text-slate-700 border border-slate-200">
+                            {gender === 'FEMALE' ? 'Ayol' : 'Erkak'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                          <span className="font-mono">{phone}</span>
+                          {address && (
+                            <>
+                              <span>•</span>
+                              <span className="text-teal-700 font-semibold truncate max-w-xs">{address}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(1)}
+                      className="text-xs font-bold text-[#1677FF] hover:underline px-3.5 py-1.5 bg-white rounded-xl border border-blue-200 shadow-2xs cursor-pointer"
+                    >
+                      Bemor ma'lumotlarini o'zgartirish
+                    </button>
+                  </div>
+
+                  {/* Shifokor tanlash kartasi */}
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-[#00B96B] text-white flex items-center justify-center font-black text-xs">
+                          2
+                        </div>
+                        <h2 className="text-base font-black text-[#172B4D]">Shifokor va xizmat tanlash</h2>
+                      </div>
+                      <span className="text-xs text-slate-400 font-bold">
+                        Jami {doctors.length} nafar shifokor faol
+                      </span>
+                    </div>
+
+                    {/* Search */}
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                      <input
+                        type="text"
+                        value={doctorSearch}
+                        onChange={e => setDoctorSearch(e.target.value)}
+                        placeholder="Shifokor ismi yoki mutaxassislikni qidirish..."
+                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#1677FF]/20 focus:border-[#1677FF]"
+                      />
+                    </div>
+
+                    {/* Specialty chips */}
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                      <button
+                        type="button"
+                        onClick={() => setSpecialtyFilter('Barchasi')}
+                        className={`px-3 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
+                          specialtyFilter === 'Barchasi'
+                            ? 'bg-[#1677FF] text-white shadow-xs'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+                        }`}
+                      >
+                        Barchasi
+                      </button>
+                      {specialties.map((spec) => (
+                        <button
+                          key={spec.id}
+                          type="button"
+                          onClick={() => setSpecialtyFilter(spec.name)}
+                          className={`px-3 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
+                            specialtyFilter === spec.name
+                              ? 'bg-[#1677FF] text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+                          }`}
+                        >
+                          {spec.name}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Doctors List */}
+                    <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
+                      {displayDoctors.length === 0 ? (
+                        <div className="text-center py-8 text-xs text-slate-400">
+                          Shifokor topilmadi
+                        </div>
+                      ) : (
+                        displayDoctors.map((doc) => {
+                          const isSelected = selectedItems.some(i => i.doctorId === doc.id);
+                          const matchingService = services.find(s => s.specialty_id === doc.specialty_id) || services[0];
+                          const price = matchingService ? Number(matchingService.price) : 100000;
+                          const duration = matchingService?.duration_minutes ? `${matchingService.duration_minutes} daqiqa` : '15-20 daqiqa';
+
+                          return (
+                            <div
+                              key={doc.id}
+                              className={`p-3 rounded-2xl border transition flex items-center justify-between ${
+                                isSelected
+                                  ? 'bg-blue-50/60 border-[#1677FF] shadow-xs'
+                                  : 'bg-white border-slate-200/80 hover:border-slate-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black shadow-xs ${
+                                  isSelected ? 'bg-[#1677FF] text-white' : 'bg-blue-100 text-[#1677FF]'
+                                }`}>
+                                  {doc.specialty_prefix || 'DR'}
+                                </div>
+                                <div>
+                                  <div className="text-xs font-bold text-[#172B4D]">{doc.display_name}</div>
+                                  <div className="text-[11px] text-slate-500">
+                                    {doc.specialty_name} • <span className="font-bold text-[#0084FF]">{doc.room_number || doc.cabinet_number}-xona</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                  <div className="text-xs font-black text-[#172B4D] font-mono">
+                                    {price.toLocaleString()} so‘m
+                                  </div>
+                                  <div className="text-[10px] text-slate-400">{duration}</div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddDoctor(doc)}
+                                  className={`w-8 h-8 rounded-xl flex items-center justify-center transition shadow-xs cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-rose-500 hover:bg-rose-600 text-white'
+                                      : 'bg-[#1677FF] hover:bg-[#0958D9] text-white'
+                                  }`}
+                                  title={isSelected ? "O'chirish" : "Qo'shish"}
+                                >
+                                  {isSelected ? <Check className="w-4 h-4 stroke-[2.5]" /> : <Plus className="w-4 h-4 stroke-[2.5]" />}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {selectedPatientId && (
-                      <button
-                        type="button"
-                        onClick={handleResetForm}
-                        className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-xl transition"
-                      >
-                        Tozalash
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setIsSearchPatientModalOpen(true)}
-                      className="px-4 py-2 bg-[#1677FF] hover:bg-[#0958D9] text-white text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-sm"
-                    >
-                      <Search className="w-3.5 h-3.5" />
-                      <span>Mavjud bemorni qidirish</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Form inputs */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-[#172B4D]">
-                      F.I.Sh <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={fullName}
-                      onChange={e => setFullName(e.target.value)}
-                      placeholder="Familiya Ism Sharif"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-[#172B4D] focus:outline-none focus:ring-2 focus:ring-[#1677FF]/20 focus:border-[#1677FF]"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-[#172B4D]">Tug'ilgan sana</label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={birthDate}
-                        onChange={e => setBirthDate(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-[#172B4D] focus:outline-none focus:ring-2 focus:ring-[#1677FF]/20 focus:border-[#1677FF]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-[#172B4D]">
-                      Telefon <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={e => setPhone(formatUzbekPhone(e.target.value))}
-                      onKeyDown={e => {
-                        if ((phone === '+998 ' || phone === '+998' || phone.length <= 5) && e.key === 'Backspace') {
-                          e.preventDefault();
-                          setPhone('+998 ');
-                        }
-                      }}
-                      placeholder="+998 (90) 123-45-67"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold font-mono text-[#172B4D] focus:outline-none focus:ring-2 focus:ring-[#1677FF]/20 focus:border-[#1677FF]"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-[#172B4D]">Jinsi</label>
-                    <div className="flex items-center gap-6 pt-2">
-                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[#172B4D]">
-                        <input
-                          type="radio"
-                          name="gender"
-                          checked={gender === 'MALE'}
-                          onChange={() => setGender('MALE')}
-                          className="w-4 h-4 text-[#1677FF] focus:ring-0"
-                        />
-                        <span>Erkak</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[#172B4D]">
-                        <input
-                          type="radio"
-                          name="gender"
-                          checked={gender === 'FEMALE'}
-                          onChange={() => setGender('FEMALE')}
-                          className="w-4 h-4 text-[#1677FF] focus:ring-0"
-                        />
-                        <span>Ayol</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* CARD 2: SHIFOKOR VA XIZMAT TANLASH (100% REAL POSTGRESQL DOCTORS & SERVICES) */}
-              <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-[#00B96B] text-white flex items-center justify-center font-black text-xs">
-                      2
-                    </div>
-                    <h2 className="text-base font-black text-[#172B4D]">Shifokor va xizmat tanlash</h2>
-                  </div>
-                  <span className="text-xs text-slate-400 font-bold">
-                    Jami {doctors.length} nafar shifokor faol
-                  </span>
-                </div>
-
-                {/* Search */}
-                <div className="relative">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                  <input
-                    type="text"
-                    value={doctorSearch}
-                    onChange={e => setDoctorSearch(e.target.value)}
-                    placeholder="Shifokor ismi yoki mutaxassislikni qidirish..."
-                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#1677FF]/20 focus:border-[#1677FF]"
-                  />
-                </div>
-
-                {/* Specialty chips */}
-                <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                  <button
-                    type="button"
-                    onClick={() => setSpecialtyFilter('Barchasi')}
-                    className={`px-3 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap transition ${
-                      specialtyFilter === 'Barchasi'
-                        ? 'bg-[#1677FF] text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
-                    }`}
-                  >
-                    Barchasi
-                  </button>
-                  {specialties.map((spec) => (
-                    <button
-                      key={spec.id}
-                      type="button"
-                      onClick={() => setSpecialtyFilter(spec.name)}
-                      className={`px-3 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap transition ${
-                        specialtyFilter === spec.name
-                          ? 'bg-[#1677FF] text-white shadow-xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
-                      }`}
-                    >
-                      {spec.name}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Doctors List from PostgreSQL */}
-                <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
-                  {displayDoctors.length === 0 ? (
-                    <div className="text-center py-8 text-xs text-slate-400">
-                      Shifokor topilmadi
-                    </div>
-                  ) : (
-                    displayDoctors.map((doc) => {
-                      const isSelected = selectedItems.some(i => i.doctorId === doc.id);
-                      const matchingService = services.find(s => s.specialty_id === doc.specialty_id) || services[0];
-                      const price = matchingService ? Number(matchingService.price) : 100000;
-                      const duration = matchingService?.duration_minutes ? `${matchingService.duration_minutes} daqiqa` : '15-20 daqiqa';
-
-                      return (
-                        <div
-                          key={doc.id}
-                          className={`p-3 rounded-2xl border transition flex items-center justify-between ${
-                            isSelected
-                              ? 'bg-blue-50/60 border-[#1677FF] shadow-xs'
-                              : 'bg-white border-slate-200/80 hover:border-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black shadow-xs ${
-                              isSelected ? 'bg-[#1677FF] text-white' : 'bg-blue-100 text-[#1677FF]'
-                            }`}>
-                              {doc.specialty_prefix || 'DR'}
-                            </div>
-                            <div>
-                              <div className="text-xs font-bold text-[#172B4D]">{doc.display_name}</div>
-                              <div className="text-[11px] text-slate-500">
-                                {doc.specialty_name} • <span className="font-bold text-[#0084FF]">{doc.room_number || doc.cabinet_number}-xona</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-4">
-                            <div className="text-right">
-                              <div className="text-xs font-black text-[#172B4D] font-mono">
-                                {price.toLocaleString()} so‘m
-                              </div>
-                              <div className="text-[10px] text-slate-400">{duration}</div>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleAddDoctor(doc)}
-                              className={`w-8 h-8 rounded-xl flex items-center justify-center transition shadow-xs ${
-                                isSelected
-                                  ? 'bg-rose-500 hover:bg-rose-600 text-white'
-                                  : 'bg-[#1677FF] hover:bg-[#0958D9] text-white'
-                              }`}
-                              title={isSelected ? "O'chirish" : "Qo'shish"}
-                            >
-                              {isSelected ? <Check className="w-4 h-4 stroke-[2.5]" /> : <Plus className="w-4 h-4 stroke-[2.5]" />}
-                            </button>
-                          </div>
+                  {/* Tanlangan xizmatlar kartasi */}
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-[#722ED1] text-white flex items-center justify-center font-black text-xs">
+                          {selectedItems.length}
                         </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* CARD 3: TANLANGAN XIZMATLAR */}
-              <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-[#722ED1] text-white flex items-center justify-center font-black text-xs">
-                      3
-                    </div>
-                    <h2 className="text-base font-black text-[#172B4D]">
-                      Tanlangan xizmatlar ({selectedItems.length})
-                    </h2>
-                  </div>
-                  {selectedItems.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedItems([]);
-                        setReceivedAmount('0');
-                      }}
-                      className="text-xs font-bold text-rose-500 hover:underline"
-                    >
-                      Barchasini tozalash
-                    </button>
-                  )}
-                </div>
-
-                {selectedItems.length === 0 ? (
-                  <div className="text-center py-6 border border-dashed border-slate-200 rounded-2xl text-xs text-slate-400">
-                    Hozircha xizmat yoki shifokor tanlanmadi. Yuqoridagi ro'yxatdan "+" tugmasini bosing.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {selectedItems.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center justify-between"
-                      >
-                        <div>
-                          <div className="text-xs font-bold text-[#172B4D]">
-                            {item.doctorName} <span className="text-slate-400 font-normal">({item.cabinetNumber}-xona)</span>
-                          </div>
-                          <div className="text-[11px] text-slate-500">{item.serviceName}</div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-black text-[#172B4D] font-mono">
-                            {item.price.toLocaleString()} so‘m
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(idx)}
-                            className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition"
-                            title="O'chirish"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        <h2 className="text-base font-black text-[#172B4D]">
+                          Tanlangan shifokor va xizmatlar ({selectedItems.length})
+                        </h2>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      {selectedItems.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedItems([]);
+                            setReceivedAmount('0');
+                          }}
+                          className="text-xs font-bold text-rose-500 hover:underline cursor-pointer"
+                        >
+                          Barchasini tozalash
+                        </button>
+                      )}
+                    </div>
 
-                <div className="pt-2 flex items-center justify-between border-t border-slate-100">
-                  <span className="text-xs font-bold text-slate-500">Jami to'lov summasi:</span>
-                  <span className="text-xl font-black text-[#172B4D] font-mono">
-                    {totalAmount.toLocaleString()} so‘m
-                  </span>
-                </div>
-              </div>
+                    {selectedItems.length === 0 ? (
+                      <div className="text-center py-6 border border-dashed border-slate-200 rounded-2xl text-xs text-slate-400">
+                        Hozircha xizmat yoki shifokor tanlanmadi. Yuqoridagi ro'yxatdan "+" tugmasini bosing.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {selectedItems.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center justify-between"
+                          >
+                            <div>
+                              <div className="text-xs font-bold text-[#172B4D]">
+                                {item.doctorName} <span className="text-slate-400 font-normal">({item.cabinetNumber}-xona)</span>
+                              </div>
+                              <div className="text-[11px] text-slate-500">{item.serviceName}</div>
+                            </div>
 
-              {/* CARD 4: TO'LOV */}
-              <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-full bg-[#FA8C16] text-white flex items-center justify-center font-black text-xs">
-                    4
-                  </div>
-                  <h2 className="text-base font-black text-[#172B4D]">To'lov</h2>
-                </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs font-black text-[#172B4D] font-mono">
+                                {item.price.toLocaleString()} so‘m
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItem(idx)}
+                                className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                                title="O'chirish"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
-                {/* Payment methods */}
-                <div>
-                  <label className="text-xs font-bold text-[#172B4D] block mb-2">To'lov usuli:</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('CASH')}
-                      className={`p-3 rounded-2xl border font-bold text-xs flex items-center justify-center gap-2 transition ${
-                        paymentMethod === 'CASH'
-                          ? 'border-[#00B96B] bg-emerald-50/50 text-[#00B96B] shadow-xs'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Banknote className="w-4 h-4" />
-                      <span>Naqd pul</span>
-                    </button>
+                    <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                      <span className="text-xs font-bold text-slate-500">Jami to'lov summasi:</span>
+                      <span className="text-xl font-black text-[#172B4D] font-mono">
+                        {totalAmount.toLocaleString()} so‘m
+                      </span>
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('CARD')}
-                      className={`p-3 rounded-2xl border font-bold text-xs flex items-center justify-center gap-2 transition ${
-                        paymentMethod === 'CARD'
-                          ? 'border-[#1677FF] bg-blue-50/50 text-[#1677FF] shadow-xs'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <CreditCard className="w-4 h-4" />
-                      <span>Karta (Terminal)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('ONLINE')}
-                      className={`p-3 rounded-2xl border font-bold text-xs flex items-center justify-center gap-2 transition ${
-                        paymentMethod === 'ONLINE'
-                          ? 'border-[#722ED1] bg-purple-50/50 text-[#722ED1] shadow-xs'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Smartphone className="w-4 h-4" />
-                      <span>Onlayn (Click/Payme)</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Received & Change inputs */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-bold text-[#172B4D]">
-                        Qabul qilingan summa:
-                      </label>
+                    {/* Step 2 Actions */}
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                       <button
                         type="button"
-                        onClick={() => setReceivedAmount(totalAmount.toLocaleString())}
-                        className="text-[11px] font-bold text-[#1677FF] hover:underline"
+                        onClick={() => setCurrentStep(1)}
+                        className="px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition flex items-center gap-2 cursor-pointer"
                       >
-                        Aniq summa
+                        <ArrowLeft className="w-4 h-4" />
+                        <span>Orqaga: Bemor ma'lumotlari</span>
                       </button>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={receivedAmount}
-                        onChange={e => setReceivedAmount(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-[#172B4D] font-mono pr-12 focus:outline-none focus:ring-2 focus:ring-[#1677FF]/20 focus:border-[#1677FF]"
-                      />
-                      <span className="absolute right-3.5 top-3 text-xs text-slate-400 font-bold">
-                        so‘m
-                      </span>
-                    </div>
-                  </div>
 
-                  <div>
-                    <label className="text-xs font-bold text-[#172B4D] block mb-1">Qaytim:</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        readOnly
-                        value={changeAmount.toLocaleString()}
-                        className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-slate-600 font-mono pr-12"
-                      />
-                      <span className="absolute right-3.5 top-3 text-xs text-slate-400 font-bold">
-                        so‘m
-                      </span>
+                      <button
+                        type="button"
+                        disabled={selectedItems.length === 0}
+                        onClick={handleGoToStep3}
+                        className="px-6 py-3 rounded-2xl bg-[#00B96B] hover:bg-[#009A59] text-white text-xs font-black transition flex items-center gap-2 shadow-md shadow-[#00B96B]/20 disabled:opacity-50 cursor-pointer"
+                      >
+                        <span>Keyingisi: To'lovga o'tish ({totalAmount.toLocaleString()} so'm)</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 </div>
+              )}
 
-                {/* Big Green CTA Button matching Kassir.png */}
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={handleIssueTicket}
-                  className="w-full py-4 bg-[#00B96B] hover:bg-[#009A59] text-white rounded-2xl font-black text-sm tracking-wide shadow-lg shadow-[#00B96B]/25 transition flex items-center justify-center gap-2.5 mt-2 disabled:opacity-50"
-                >
-                  <Printer className="w-5 h-5" />
-                  <span>
-                    {loading ? 'Rasmiylashtirilmoqda...' : 'Talon berish va chek chiqarish'}
-                  </span>
-                </button>
-              </div>
+              {/* ===== STEP 3: TO'LOV VA TALON BERISH ===== */}
+              {currentStep === 3 && (
+                <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-6 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-7 h-7 rounded-full bg-[#FA8C16] text-white flex items-center justify-center font-black text-xs">
+                        3
+                      </div>
+                      <div>
+                        <h2 className="text-base font-black text-[#172B4D]">To'lov va talon berish</h2>
+                        <p className="text-xs text-slate-400">To'lov turini belgilang va talon chop eting</p>
+                      </div>
+                    </div>
+                    <span className="font-mono font-black text-lg text-[#1677FF] bg-blue-50 px-3.5 py-1 rounded-xl border border-blue-200/60">
+                      {totalAmount.toLocaleString()} so'm
+                    </span>
+                  </div>
+
+                  {/* Buyurtma va bemor qisqacha xulosasi */}
+                  <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-200/60">
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-slate-400" />
+                        <span className="font-bold text-slate-800">{fullName}</span>
+                        <span className="text-slate-400 font-mono">({phone})</span>
+                      </div>
+                      <span className="text-teal-700 font-bold">{selectedItems.length} ta yo'nalish</span>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs">
+                      {selectedItems.map((item, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-slate-600">
+                          <span>{item.doctorName} ({item.specialtyName}, {item.cabinetNumber}-xona)</span>
+                          <span className="font-mono font-bold text-slate-800">{item.price.toLocaleString()} so'm</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Payment methods */}
+                  <div>
+                    <label className="text-xs font-bold text-[#172B4D] block mb-2">To'lov usuli:</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('CASH')}
+                        className={`p-3.5 rounded-2xl border font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer ${
+                          paymentMethod === 'CASH'
+                            ? 'border-[#00B96B] bg-emerald-50/70 text-[#00B96B] shadow-xs'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Banknote className="w-4 h-4" />
+                        <span>Naqd pul</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('CARD')}
+                        className={`p-3.5 rounded-2xl border font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer ${
+                          paymentMethod === 'CARD'
+                            ? 'border-[#1677FF] bg-blue-50/70 text-[#1677FF] shadow-xs'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        <span>Karta (Terminal)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('ONLINE')}
+                        className={`p-3.5 rounded-2xl border font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer ${
+                          paymentMethod === 'ONLINE'
+                            ? 'border-[#722ED1] bg-purple-50/70 text-[#722ED1] shadow-xs'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Smartphone className="w-4 h-4" />
+                        <span>Onlayn (Click/Payme)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Received & Change inputs */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold text-[#172B4D]">
+                          Qabul qilingan summa:
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setReceivedAmount(totalAmount.toLocaleString())}
+                          className="text-[11px] font-bold text-[#1677FF] hover:underline cursor-pointer"
+                        >
+                          Aniq summa
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={receivedAmount}
+                          onChange={e => setReceivedAmount(e.target.value)}
+                          className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-[#172B4D] font-mono pr-12 focus:outline-none focus:ring-2 focus:ring-[#1677FF]/20 focus:border-[#1677FF]"
+                        />
+                        <span className="absolute right-3.5 top-3 text-xs text-slate-400 font-bold">
+                          so‘m
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-[#172B4D] block mb-1">Qaytim:</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          readOnly
+                          value={changeAmount.toLocaleString()}
+                          className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-slate-600 font-mono pr-12"
+                        />
+                        <span className="absolute right-3.5 top-3 text-xs text-slate-400 font-bold">
+                          so‘m
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Big Green CTA Button & Back to Step 2 */}
+                  <div className="space-y-2 pt-2">
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={handleIssueTicket}
+                      className="w-full py-4 bg-[#00B96B] hover:bg-[#009A59] text-white rounded-2xl font-black text-sm tracking-wide shadow-lg shadow-[#00B96B]/25 transition flex items-center justify-center gap-2.5 disabled:opacity-50 cursor-pointer"
+                    >
+                      <Printer className="w-5 h-5" />
+                      <span>
+                        {loading ? 'Rasmiylashtirilmoqda...' : 'Talon berish va chek chiqarish'}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(2)}
+                      className="w-full py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>Shifokor tanlashga qaytish</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* RIGHT COLUMN (Col 9-12): SO'NGGI TALONLAR (100% REAL FROM POSTGRESQL) */}
