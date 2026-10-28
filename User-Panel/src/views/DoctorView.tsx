@@ -91,20 +91,99 @@ export const renderDoctorAvatar = (name: string, avatarUrl?: string, sizeClass =
   );
 };
 
+// Isolate digital clock & date state updates to prevent re-rendering entire DoctorView every second
+const HeaderLiveClock: React.FC = React.memo(() => {
+  const [timeState, setTimeState] = useState(() => {
+    const now = new Date();
+    const w = now.toLocaleDateString('uz-UZ', { weekday: 'long' });
+    return {
+      day: String(now.getDate()).padStart(2, '0'),
+      month: String(now.getMonth() + 1).padStart(2, '0'),
+      year: String(now.getFullYear()),
+      weekday: w.charAt(0).toUpperCase() + w.slice(1),
+      hours: String(now.getHours()).padStart(2, '0'),
+      minutes: String(now.getMinutes()).padStart(2, '0'),
+      seconds: String(now.getSeconds()).padStart(2, '0'),
+    };
+  });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      const w = now.toLocaleDateString('uz-UZ', { weekday: 'long' });
+      setTimeState({
+        day: String(now.getDate()).padStart(2, '0'),
+        month: String(now.getMonth() + 1).padStart(2, '0'),
+        year: String(now.getFullYear()),
+        weekday: w.charAt(0).toUpperCase() + w.slice(1),
+        hours: String(now.getHours()).padStart(2, '0'),
+        minutes: String(now.getMinutes()).padStart(2, '0'),
+        seconds: String(now.getSeconds()).padStart(2, '0'),
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-4">
+      {/* Animated Live Date Widget with Big Green Chislo */}
+      <div className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-emerald-50/90 via-white to-emerald-50/40 border border-emerald-200/80 rounded-2xl shadow-xs transition-all hover:border-emerald-300">
+        <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center flex-shrink-0 relative">
+          <Calendar className="w-5 h-5 text-emerald-600" />
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+        </div>
+        <div className="flex flex-col">
+          <div className="flex items-baseline font-mono leading-none">
+            <span className="text-2xl font-black text-emerald-600 tracking-tight drop-shadow-2xs inline-block animate-pulse">
+              {timeState.day}
+            </span>
+            <span className="text-sm font-extrabold text-slate-700 tracking-wider">
+              .{timeState.month}.{timeState.year}
+            </span>
+          </div>
+          <span className="text-[10px] text-slate-400 font-semibold mt-0.5">{timeState.weekday}</span>
+        </div>
+      </div>
+
+      {/* Animated Live Clock Widget */}
+      <div className="flex items-center gap-3 px-4 py-2 bg-white border border-slate-200/90 rounded-2xl shadow-xs transition-all hover:border-blue-200">
+        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+          <Clock className="w-5 h-5 animate-[spin_10s_linear_infinite]" />
+        </div>
+        <div className="flex items-baseline font-mono leading-none">
+          <span className="text-2xl font-black text-[#172B4D] tracking-tight">{timeState.hours}</span>
+          <span className="text-2xl font-black text-emerald-500 animate-pulse mx-0.5">:</span>
+          <span className="text-2xl font-black text-[#172B4D] tracking-tight">{timeState.minutes}</span>
+          <span className="text-xs font-bold text-slate-400 ml-1.5 self-end mb-0.5">:{timeState.seconds}</span>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export const DoctorView: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const currentTab = searchParams.get('tab') || 'mening-navbatim';
+  // Synchronous local state for 0ms instant tab switching
+  const [currentTab, setCurrentTab] = useState<string>(() => searchParams.get('tab') || 'mening-navbatim');
 
-  // Digital clock & date with separated components for animations
-  const [dayNumber, setDayNumber] = useState('28');
-  const [monthNumber, setMonthNumber] = useState('10');
-  const [yearNumber, setYearNumber] = useState('2026');
-  const [weekdayStr, setWeekdayStr] = useState('Chorshanba');
-  const [hours, setHours] = useState('11');
-  const [minutes, setMinutes] = useState('25');
-  const [seconds, setSeconds] = useState('00');
-  const [dateStr, setDateStr] = useState('');
+  // Keep state in sync with URL if browser back/forward buttons are pressed
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab') || 'mening-navbatim';
+    if (tabFromUrl !== currentTab) {
+      setCurrentTab(tabFromUrl);
+    }
+  }, [searchParams]);
+
+  // Instant zero-lag tab switch handler
+  const handleTabChange = (newTabId: string) => {
+    setCurrentTab(newTabId);
+    if (newTabId === 'mening-navbatim') {
+      setSearchParams({}, { replace: true });
+    } else {
+      setSearchParams({ tab: newTabId }, { replace: true });
+    }
+  };
 
   // Doctor session & all clinic doctors for switcher
   const [allDoctors, setAllDoctors] = useState<any[]>([]);
@@ -122,12 +201,18 @@ export const DoctorView: React.FC = () => {
   const [completedTickets, setCompletedTickets] = useState<any[]>([]);
   const [activeTicket, setActiveTicket] = useState<any | null>(null);
 
-  // Patients Catalog & EMR history
+  // Patients Catalog & EMR history with 15-item scroll pagination
   const [patientsList, setPatientsList] = useState<any[]>([]);
   const [patientsSearch, setPatientsSearch] = useState('');
   const [selectedPatientModal, setSelectedPatientModal] = useState<any | null>(null);
   const [loadingPatients, setLoadingPatients] = useState(false);
+  const [loadingMorePatients, setLoadingMorePatients] = useState(false);
+  const [hasMorePatients, setHasMorePatients] = useState(true);
   const [doctorVisitsDetail, setDoctorVisitsDetail] = useState<any[]>([]);
+
+  // History & Daily pagination (15 items batch)
+  const [visibleHistoryCount, setVisibleHistoryCount] = useState(15);
+  const [visibleDailyCount, setVisibleDailyCount] = useState(15);
 
   // States
   const [loading, setLoading] = useState(false);
@@ -161,27 +246,7 @@ export const DoctorView: React.FC = () => {
     showNotification(title, message, type);
   };
 
-  // 1. Clock timer - updates each second with animated parts
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setDayNumber(String(now.getDate()).padStart(2, '0'));
-      setMonthNumber(String(now.getMonth() + 1).padStart(2, '0'));
-      setYearNumber(String(now.getFullYear()));
-      const w = now.toLocaleDateString('uz-UZ', { weekday: 'long' });
-      setWeekdayStr(w.charAt(0).toUpperCase() + w.slice(1));
-      setHours(String(now.getHours()).padStart(2, '0'));
-      setMinutes(String(now.getMinutes()).padStart(2, '0'));
-      setSeconds(String(now.getSeconds()).padStart(2, '0'));
-      const d = now.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' }).replace(' г.', '');
-      setDateStr(`${d}, ${w.charAt(0).toUpperCase() + w.slice(1)}`);
-    };
-    updateTime();
-    const timer = setInterval(updateTime, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // 2. Fetch doctors catalog & initialize session
+  // 1. Fetch doctors catalog & initialize session
   useEffect(() => {
     fetchDoctorsCatalog();
   }, []);
@@ -298,25 +363,43 @@ export const DoctorView: React.FC = () => {
     }
   };
 
-  // Fetch real patients catalog from PostgreSQL
-  const fetchPatients = async (query = '') => {
-    setLoadingPatients(true);
+  // Fetch real patients catalog from PostgreSQL (15 items per batch pagination)
+  const fetchPatients = async (query = '', isAppend = false) => {
+    if (isAppend) {
+      setLoadingMorePatients(true);
+    } else {
+      setLoadingPatients(true);
+    }
     try {
-      const res = await fetch(`${API_BASE_URL}/patients${query ? `?search=${encodeURIComponent(query)}` : ''}`);
+      const currentOffset = isAppend ? patientsList.length : 0;
+      const res = await fetch(`${API_BASE_URL}/patients?limit=15&offset=${currentOffset}${query ? `&search=${encodeURIComponent(query)}` : ''}`);
       const json = await res.json();
       if (json.data && Array.isArray(json.data)) {
-        setPatientsList(json.data);
+        if (isAppend) {
+          setPatientsList(prev => [...prev, ...json.data]);
+        } else {
+          setPatientsList(json.data);
+        }
+        setHasMorePatients(json.data.length === 15);
       }
     } catch (e) {
       console.warn('Error fetching patients:', e);
     } finally {
       setLoadingPatients(false);
+      setLoadingMorePatients(false);
     }
   };
 
   useEffect(() => {
-    fetchPatients(patientsSearch);
+    fetchPatients(patientsSearch, false);
   }, [patientsSearch]);
+
+  const handlePatientsScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop - clientHeight < 80 && hasMorePatients && !loadingMorePatients && !loadingPatients) {
+      fetchPatients(patientsSearch, true);
+    }
+  };
 
   const [savingNotes, setSavingNotes] = useState(false);
 
@@ -598,13 +681,7 @@ export const DoctorView: React.FC = () => {
               return (
                 <button
                   key={item.id}
-                  onClick={() => {
-                    if (item.id === 'mening-navbatim') {
-                      setSearchParams({});
-                    } else {
-                      setSearchParams({ tab: item.id });
-                    }
-                  }}
+                  onClick={() => handleTabChange(item.id)}
                   className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-[13px] font-semibold transition text-left cursor-pointer ${
                     isActive
                       ? 'bg-[#00897B] text-white shadow-lg shadow-[#00897B]/25 font-bold'
@@ -666,37 +743,7 @@ export const DoctorView: React.FC = () => {
 
           {/* Right Badges & Exit Button */}
           <div className="flex items-center gap-4">
-            {/* Animated Live Date Widget with Big Green Chislo */}
-            <div className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-emerald-50/90 via-white to-emerald-50/40 border border-emerald-200/80 rounded-2xl shadow-xs transition-all hover:border-emerald-300">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center flex-shrink-0 relative">
-                <Calendar className="w-5 h-5 text-emerald-600" />
-                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-              </div>
-              <div className="flex flex-col">
-                <div className="flex items-baseline font-mono leading-none">
-                  <span className="text-2xl font-black text-emerald-600 tracking-tight drop-shadow-2xs inline-block animate-pulse">
-                    {dayNumber}
-                  </span>
-                  <span className="text-sm font-extrabold text-slate-700 tracking-wider">
-                    .{monthNumber}.{yearNumber}
-                  </span>
-                </div>
-                <span className="text-[10px] text-slate-400 font-semibold mt-0.5">{weekdayStr}</span>
-              </div>
-            </div>
-
-            {/* Animated Live Clock Widget */}
-            <div className="flex items-center gap-3 px-4 py-2 bg-white border border-slate-200/90 rounded-2xl shadow-xs transition-all hover:border-blue-200">
-              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
-                <Clock className="w-5 h-5 animate-[spin_10s_linear_infinite]" />
-              </div>
-              <div className="flex items-baseline font-mono leading-none">
-                <span className="text-2xl font-black text-[#172B4D] tracking-tight">{hours}</span>
-                <span className="text-2xl font-black text-emerald-500 animate-pulse mx-0.5">:</span>
-                <span className="text-2xl font-black text-[#172B4D] tracking-tight">{minutes}</span>
-                <span className="text-xs font-bold text-slate-400 ml-1.5 self-end mb-0.5">:{seconds}</span>
-              </div>
-            </div>
+            <HeaderLiveClock />
 
             {/* Chiqish (Logout) button */}
             <button
@@ -892,7 +939,7 @@ export const DoctorView: React.FC = () => {
                       </button>
                     )}
                     <button
-                      onClick={() => setSearchParams({ tab: 'bemorlar' })}
+                      onClick={() => handleTabChange('bemorlar')}
                       className="px-3 py-1.5 bg-teal-50 text-teal-700 hover:bg-teal-100 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-teal-200/60"
                       title="Barcha bemorlar ro'yxati va qaysi do'ktirlarda bo'lgani tarixini ko'rish"
                     >
@@ -954,7 +1001,7 @@ export const DoctorView: React.FC = () => {
                   <div className="text-xs text-slate-400 py-6 text-center space-y-2.5">
                     <div>Hozircha qabulga bemor chaqirilmagan.</div>
                     <button
-                      onClick={() => setSearchParams({ tab: 'bemorlar' })}
+                      onClick={() => handleTabChange('bemorlar')}
                       className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
                     >
                       <Users className="w-4 h-4 text-slate-500" />
@@ -1081,17 +1128,20 @@ export const DoctorView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Patient Table */}
-              <div className="overflow-x-auto rounded-2xl border border-slate-200/80">
+              {/* Patient Table with 15-item infinite scroll */}
+              <div 
+                className="overflow-x-auto max-h-[600px] overflow-y-auto rounded-2xl border border-slate-200/80 scroll-smooth relative"
+                onScroll={handlePatientsScroll}
+              >
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                  <thead className="bg-slate-50 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider text-[11px] sticky top-0 z-10 shadow-2xs">
                     <tr>
-                      <th className="py-3.5 px-4">Bemor</th>
-                      <th className="py-3.5 px-4">Aloqa</th>
-                      <th className="py-3.5 px-4">Yosh / Jinsi</th>
-                      <th className="py-3.5 px-4">Tashriflar soni</th>
-                      <th className="py-3.5 px-4">Oxirgi tashrif</th>
-                      <th className="py-3.5 px-4 text-right">Amal</th>
+                      <th className="py-3.5 px-4 bg-slate-50">Bemor</th>
+                      <th className="py-3.5 px-4 bg-slate-50">Aloqa</th>
+                      <th className="py-3.5 px-4 bg-slate-50">Yosh / Jinsi</th>
+                      <th className="py-3.5 px-4 bg-slate-50">Tashriflar soni</th>
+                      <th className="py-3.5 px-4 bg-slate-50">Oxirgi tashrif</th>
+                      <th className="py-3.5 px-4 bg-slate-50 text-right">Amal</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1187,18 +1237,36 @@ export const DoctorView: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+
+              {/* Scroll / Load More Status for Patients */}
+              {loadingMorePatients && (
+                <div className="py-3 bg-teal-50/50 border border-teal-200/60 rounded-2xl text-center text-xs text-teal-800 font-bold flex items-center justify-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-[#00897B]" />
+                  <span>Keyingi 15 ta bemor ma'lumotlari serverdan yuklanmoqda...</span>
+                </div>
+              )}
+              {!loadingMorePatients && hasMorePatients && patientsList.length >= 15 && (
+                <div className="text-center pt-1">
+                  <button
+                    onClick={() => fetchPatients(patientsSearch, true)}
+                    className="px-5 py-2 text-xs font-bold text-[#00897B] bg-teal-50 hover:bg-teal-100 border border-teal-200/80 rounded-xl transition cursor-pointer shadow-2xs flex items-center gap-2 mx-auto"
+                  >
+                    <span>Scroll qiling yoki bosing: Yana 15 ta bemor yuklash ↓</span>
+                  </button>
+                </div>
+              )}
             </div>
           </main>
         )}
 
-        {/* TAB 3: CHAQUIRUVLAR TARIXI (100% Real from PostgreSQL) */}
+        {/* TAB 3: CHAQIRUVLAR TARIXI (100% Real from PostgreSQL, 15 items per batch) */}
         {currentTab === 'tarix' && (
           <main className="p-8 flex-1 space-y-6">
             <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-black text-[#172B4D]">Chaqiruvlar va Qabullar Tarixi</h2>
-                  <p className="text-xs text-slate-500">Bugungi qabul qilingan barcha bemorlar ro'yxati</p>
+                  <p className="text-xs text-slate-500">Bugungi qabul qilingan barcha bemorlar ro'yxati (15 tadan scroll bilan)</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="relative">
@@ -1212,22 +1280,30 @@ export const DoctorView: React.FC = () => {
                     />
                   </div>
                   <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold">
-                    Jami: {completedTickets.length} ta bemor
+                    Ko'rsatilmoqda: {Math.min(visibleHistoryCount, completedTickets.length)} / {completedTickets.length} ta
                   </span>
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
+              <div 
+                className="overflow-x-auto max-h-[600px] overflow-y-auto scroll-smooth rounded-2xl border border-slate-200/70"
+                onScroll={(e) => {
+                  const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+                  if (scrollHeight - scrollTop - clientHeight < 60 && visibleHistoryCount < completedTickets.length) {
+                    setVisibleHistoryCount(prev => prev + 15);
+                  }
+                }}
+              >
                 <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider">
-                      <th className="py-3 px-3">Talon №</th>
-                      <th className="py-3 px-3">Bemor F.I.Sh.</th>
-                      <th className="py-3 px-3">Xizmat</th>
-                      <th className="py-3 px-3">Yakunlangan vaqt</th>
-                      <th className="py-3 px-3">To'lov</th>
-                      <th className="py-3 px-3 text-right">Holat</th>
-                      <th className="py-3 px-3 text-right">Amal</th>
+                  <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3 px-3 bg-slate-50">Talon №</th>
+                      <th className="py-3 px-3 bg-slate-50">Bemor F.I.Sh.</th>
+                      <th className="py-3 px-3 bg-slate-50">Xizmat</th>
+                      <th className="py-3 px-3 bg-slate-50">Yakunlangan vaqt</th>
+                      <th className="py-3 px-3 bg-slate-50">To'lov</th>
+                      <th className="py-3 px-3 text-right bg-slate-50">Holat</th>
+                      <th className="py-3 px-3 text-right bg-slate-50">Amal</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1241,6 +1317,7 @@ export const DoctorView: React.FC = () => {
                           t.patient_phone?.includes(s)
                         );
                       })
+                      .slice(0, visibleHistoryCount)
                       .map((t: any, idx: number) => (
                         <tr key={t.id || idx} className="hover:bg-slate-50">
                           <td className="py-3.5 px-3">
@@ -1283,17 +1360,28 @@ export const DoctorView: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+
+              {visibleHistoryCount < completedTickets.length && (
+                <div className="text-center pt-1">
+                  <button
+                    onClick={() => setVisibleHistoryCount(prev => prev + 15)}
+                    className="px-5 py-2 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition cursor-pointer shadow-2xs"
+                  >
+                    Scroll qiling yoki bosing: Yana 15 ta talon yuklash ({visibleHistoryCount}/{completedTickets.length}) ↓
+                  </button>
+                </div>
+              )}
             </div>
           </main>
         )}
 
-        {/* TAB 3: KUNDALIK QABUL (100% Real from PostgreSQL) */}
+        {/* TAB 4: KUNDALIK QABUL (100% Real from PostgreSQL, 15 items per batch) */}
         {currentTab === 'kundalik-qabul' && (
           <main className="p-8 flex-1 space-y-6">
             <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-6 max-w-4xl">
               <div>
                 <h2 className="text-lg font-black text-[#172B4D]">Kundalik Qabul Jurnali</h2>
-                <p className="text-xs text-slate-500">Bugungi smenada qabul kutilayotgan bemorlar grafigi</p>
+                <p className="text-xs text-slate-500">Bugungi smenada qabul kutilayotgan bemorlar grafigi (15 tadan scroll bilan)</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1315,10 +1403,24 @@ export const DoctorView: React.FC = () => {
 
               {/* Today's appointments log */}
               <div className="pt-2">
-                <h3 className="text-sm font-bold text-slate-700 mb-3">Bugungi qabullar ketma-ketligi</h3>
-                <div className="space-y-2">
-                  {tickets.concat(completedTickets).slice(0, 8).map((t, i) => (
-                    <div key={i} className="p-3 bg-slate-50 rounded-xl flex items-center justify-between text-xs">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-slate-700">Bugungi qabullar ketma-ketligi</h3>
+                  <span className="text-xs text-slate-400 font-semibold">
+                    Ko'rsatilmoqda: {Math.min(visibleDailyCount, tickets.concat(completedTickets).length)} / {tickets.concat(completedTickets).length} ta
+                  </span>
+                </div>
+
+                <div 
+                  className="space-y-2 max-h-[500px] overflow-y-auto scroll-smooth pr-1"
+                  onScroll={(e) => {
+                    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+                    if (scrollHeight - scrollTop - clientHeight < 60 && visibleDailyCount < tickets.concat(completedTickets).length) {
+                      setVisibleDailyCount(prev => prev + 15);
+                    }
+                  }}
+                >
+                  {tickets.concat(completedTickets).slice(0, visibleDailyCount).map((t, i) => (
+                    <div key={i} className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl flex items-center justify-between text-xs transition">
                       <div className="flex items-center gap-3">
                         <span className="font-mono font-bold px-2 py-0.5 bg-white border border-slate-200 rounded-md">
                           {t.full_number}
@@ -1335,6 +1437,17 @@ export const DoctorView: React.FC = () => {
                     </div>
                   ))}
                 </div>
+
+                {visibleDailyCount < tickets.concat(completedTickets).length && (
+                  <div className="text-center pt-2">
+                    <button
+                      onClick={() => setVisibleDailyCount(prev => prev + 15)}
+                      className="px-4 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition cursor-pointer"
+                    >
+                      Scroll qiling yoki bosing: Yana 15 ta yuklash ↓
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </main>

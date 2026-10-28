@@ -41,6 +41,9 @@ export const ManagerView: React.FC = () => {
   const [paymentsList, setPaymentsList] = useState<any[]>([]);
   const [allTicketsList, setAllTicketsList] = useState<any[]>([]);
   const [patientsList, setPatientsList] = useState<any[]>([]);
+  const [visibleManagerTicketsCount, setVisibleManagerTicketsCount] = useState(15);
+  const [visibleManagerPatientsCount, setVisibleManagerPatientsCount] = useState(15);
+  const [visibleManagerPaymentsCount, setVisibleManagerPaymentsCount] = useState(15);
   const [liveQueueList, setLiveQueueList] = useState<any[]>([]);
   const [currentShift, setCurrentShift] = useState<any>(null);
   const [clinicSettings, setClinicSettings] = useState<any>(null);
@@ -2332,10 +2335,20 @@ export const ManagerView: React.FC = () => {
                   </div>
 
                   {/* Modern Table with Large Ticket Numbers */}
-                  <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                  <div 
+                    className="overflow-x-auto rounded-2xl border border-slate-100 max-h-[620px] overflow-y-auto"
+                    onScroll={(e) => {
+                      const target = e.currentTarget;
+                      if (target.scrollTop + target.clientHeight >= target.scrollHeight - 60) {
+                        if (visibleManagerTicketsCount < filteredTickets.length) {
+                          setVisibleManagerTicketsCount(prev => prev + 15);
+                        }
+                      }
+                    }}
+                  >
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[11px]">
+                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[11px] sticky top-0 z-10">
                           <th className="py-3.5 px-4">Talon №</th>
                           <th className="py-3.5 px-4">Bemor</th>
                           <th className="py-3.5 px-4">Shifokor / Xizmat</th>
@@ -2358,7 +2371,7 @@ export const ManagerView: React.FC = () => {
                             </td>
                           </tr>
                         ) : (
-                          filteredTickets.map((t: any) => (
+                          filteredTickets.slice(0, visibleManagerTicketsCount).map((t: any) => (
                             <tr key={t.id} className="hover:bg-blue-50/40 transition">
                               {/* TALON RAQAMI: KATTA, ZAMONAVIY VA YORQIN */}
                               <td className="py-4 px-4 whitespace-nowrap">
@@ -2376,7 +2389,7 @@ export const ManagerView: React.FC = () => {
                                   <div>
                                     <div className="font-bold text-slate-800 text-xs sm:text-sm">{t.patient_name || 'Nomaʼlum bemor'}</div>
                                     <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
-                                      <Phone className="w-3 h-3 text-slate-400" />
+                                      <Phone className="w-3.5 h-3.5 text-slate-400" />
                                       {t.patient_phone ? formatUzbekPhone(t.patient_phone) : "Telefon kiritilmagan"}
                                     </div>
                                   </div>
@@ -2476,6 +2489,16 @@ export const ManagerView: React.FC = () => {
                         )}
                       </tbody>
                     </table>
+                    {visibleManagerTicketsCount < filteredTickets.length && (
+                      <div className="p-3 text-center border-t border-slate-100 bg-slate-50">
+                        <button
+                          onClick={() => setVisibleManagerTicketsCount(prev => prev + 15)}
+                          className="px-4 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-xs font-semibold text-slate-600 transition shadow-sm"
+                        >
+                          Qolgan talonlarni yuklash ({visibleManagerTicketsCount} / {filteredTickets.length})
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2589,10 +2612,18 @@ export const ManagerView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                <div 
+                  className="overflow-x-auto rounded-2xl border border-slate-100 max-h-[620px] overflow-y-auto"
+                  onScroll={(e) => {
+                    const target = e.currentTarget;
+                    if (target.scrollTop + target.clientHeight >= target.scrollHeight - 60) {
+                      setVisibleManagerPatientsCount(prev => prev + 15);
+                    }
+                  }}
+                >
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50/75 text-slate-500 font-bold uppercase tracking-wider">
+                      <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold uppercase tracking-wider sticky top-0 z-10">
                         <th className="py-3 px-3.5">Karta №</th>
                         <th className="py-3 px-3.5">Bemor F.I.Sh.</th>
                         <th className="py-3 px-3.5">Telefon</th>
@@ -2611,6 +2642,7 @@ export const ManagerView: React.FC = () => {
                           p.phone?.includes(patientSearch) ||
                           p.patient_number?.includes(patientSearch)
                         )
+                        .slice(0, visibleManagerPatientsCount)
                         .map((p: any) => {
                           const lastDoc = p.last_visit;
                           const visitCount = Number(p.total_visits || 0);
@@ -2719,6 +2751,16 @@ export const ManagerView: React.FC = () => {
                         })}
                     </tbody>
                   </table>
+                  {visibleManagerPatientsCount < patientsList.length && (
+                    <div className="p-3 text-center border-t border-slate-100 bg-slate-50">
+                      <button
+                        onClick={() => setVisibleManagerPatientsCount(prev => prev + 15)}
+                        className="px-4 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-xs font-semibold text-slate-600 transition shadow-sm"
+                      >
+                        Qolgan bemorlarni yuklash ({visibleManagerPatientsCount} / {patientsList.length})
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -3469,10 +3511,18 @@ export const ManagerView: React.FC = () => {
 
                 {/* Payments Table */}
                 <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
-                  <div className="overflow-x-auto">
+                  <div 
+                    className="overflow-x-auto max-h-[620px] overflow-y-auto"
+                    onScroll={(e) => {
+                      const target = e.currentTarget;
+                      if (target.scrollTop + target.clientHeight >= target.scrollHeight - 60) {
+                        setVisibleManagerPaymentsCount(prev => prev + 15);
+                      }
+                    }}
+                  >
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[11px]">
+                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[11px] sticky top-0 z-10">
                           <th className="py-3.5 px-4">Chek №</th>
                           <th className="py-3.5 px-4">Sana va Vaqt</th>
                           <th className="py-3.5 px-4">Bemor (To'lov qilgan)</th>
@@ -3494,7 +3544,7 @@ export const ManagerView: React.FC = () => {
                             </td>
                           </tr>
                         ) : (
-                          filteredPayments.map((p: any) => {
+                          filteredPayments.slice(0, visibleManagerPaymentsCount).map((p: any) => {
                             const relatedTickets = Array.isArray(p.related_tickets) ? p.related_tickets : [];
                             return (
                               <tr
@@ -3604,6 +3654,16 @@ export const ManagerView: React.FC = () => {
                         )}
                       </tbody>
                     </table>
+                    {visibleManagerPaymentsCount < filteredPayments.length && (
+                      <div className="p-3 text-center border-t border-slate-100 bg-slate-50">
+                        <button
+                          onClick={() => setVisibleManagerPaymentsCount(prev => prev + 15)}
+                          className="px-4 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-xs font-semibold text-slate-600 transition shadow-sm"
+                        >
+                          Qolgan to'lovlarni yuklash ({visibleManagerPaymentsCount} / {filteredPayments.length})
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

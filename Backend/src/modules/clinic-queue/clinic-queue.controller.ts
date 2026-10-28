@@ -73,7 +73,9 @@ export class ClinicQueueController {
   public static async getPatients(req: Request, res: Response): Promise<void> {
     try {
       const search = req.query.search as string | undefined;
-      const data = await ClinicQueueController.pg.getPatients(search);
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
+      const data = await ClinicQueueController.pg.getPatients(search, limit, offset);
       res.json({ success: true, data });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -213,12 +215,14 @@ export class ClinicQueueController {
   // --- 7. QUEUE TICKETS QUERY ---
   public static async getTickets(req: Request, res: Response): Promise<void> {
     try {
-      const { doctorId, status, date, search } = req.query as any;
+      const { doctorId, status, date, search, limit, offset } = req.query as any;
       const data = await ClinicQueueController.pg.getTickets({
         doctorId,
         status,
         date,
-        search
+        search,
+        limit: limit ? parseInt(limit as string) : undefined,
+        offset: offset ? parseInt(offset as string) : undefined
       });
       res.json({ success: true, data });
     } catch (e: any) {

@@ -59,6 +59,11 @@ export const CashierView: React.FC = () => {
 
   // Right column: Recent tickets (100% Real from PostgreSQL queue_tickets)
   const [recentTickets, setRecentTickets] = useState<any[]>([]);
+  const [visibleRecentCount, setVisibleRecentCount] = useState(15);
+  const [visibleAllTicketsCount, setVisibleAllTicketsCount] = useState(15);
+  const [visiblePaymentsCount, setVisiblePaymentsCount] = useState(15);
+  const [visibleSearchPatientCount, setVisibleSearchPatientCount] = useState(15);
+  const [visiblePatientsTabCount, setVisiblePatientsTabCount] = useState(15);
 
   // Other Tabs Data (100% Real from PostgreSQL)
   const [allTickets, setAllTickets] = useState<any[]>([]);
@@ -135,7 +140,7 @@ export const CashierView: React.FC = () => {
       if (specRes.data) setSpecialties(specRes.data);
       if (tckRes.data) {
         setAllTickets(tckRes.data);
-        setRecentTickets(tckRes.data.slice(0, 10));
+        setRecentTickets(tckRes.data);
       }
       if (payRes.data) setAllPayments(payRes.data);
       if (patRes.data) setAllPatients(patRes.data);
@@ -1195,14 +1200,22 @@ export const CashierView: React.FC = () => {
                 </button>
               </div>
 
-              {/* Compact Ticket items list with prominent larger numbers */}
-              <div className="space-y-1.5 max-h-[580px] overflow-y-auto pr-1">
+              {/* Compact Ticket items list with 15-item scroll pagination */}
+              <div 
+                className="space-y-1.5 max-h-[580px] overflow-y-auto pr-1 scroll-smooth"
+                onScroll={(e) => {
+                  const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+                  if (scrollHeight - scrollTop - clientHeight < 60 && visibleRecentCount < recentTickets.length) {
+                    setVisibleRecentCount(prev => prev + 15);
+                  }
+                }}
+              >
                 {recentTickets.length === 0 ? (
                   <div className="text-center py-8 bg-white rounded-xl border border-slate-200 text-xs text-slate-400">
                     Bugun hali talon rasmiylashtirilmadi
                   </div>
                 ) : (
-                  recentTickets.map((t, idx) => (
+                  recentTickets.slice(0, visibleRecentCount).map((t, idx) => (
                     <div
                       key={idx}
                       className="py-2 px-3 bg-white border border-slate-200/90 rounded-xl flex items-center justify-between hover:border-blue-300 hover:shadow-xs transition"
@@ -1237,6 +1250,16 @@ export const CashierView: React.FC = () => {
                       </div>
                     </div>
                   ))
+                )}
+                {visibleRecentCount < recentTickets.length && (
+                  <div className="text-center pt-1">
+                    <button
+                      onClick={() => setVisibleRecentCount(prev => prev + 15)}
+                      className="w-full py-1.5 text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition cursor-pointer"
+                    >
+                      Yana 15 ta talon yuklash ({visibleRecentCount}/{recentTickets.length}) ↓
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -1297,19 +1320,27 @@ export const CashierView: React.FC = () => {
                 ))}
               </div>
 
-              {/* Tickets Table */}
-              <div className="overflow-x-auto">
+              {/* Tickets Table with 15-item scroll pagination */}
+              <div 
+                className="overflow-x-auto max-h-[600px] overflow-y-auto scroll-smooth rounded-2xl border border-slate-200/80"
+                onScroll={(e) => {
+                  const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+                  if (scrollHeight - scrollTop - clientHeight < 60 && visibleAllTicketsCount < allTickets.length) {
+                    setVisibleAllTicketsCount(prev => prev + 15);
+                  }
+                }}
+              >
                 <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider">
-                      <th className="py-3 px-3">Talon №</th>
-                      <th className="py-3 px-3">Bemor</th>
-                      <th className="py-3 px-3">Shifokor</th>
-                      <th className="py-3 px-3">Kabinet</th>
-                      <th className="py-3 px-3">Berilgan vaqt</th>
-                      <th className="py-3 px-3">To'lov</th>
-                      <th className="py-3 px-3">Holat</th>
-                      <th className="py-3 px-3 text-right">Amallar</th>
+                  <thead className="sticky top-0 bg-slate-50 z-10 border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3 px-3 bg-slate-50">Talon №</th>
+                      <th className="py-3 px-3 bg-slate-50">Bemor</th>
+                      <th className="py-3 px-3 bg-slate-50">Shifokor</th>
+                      <th className="py-3 px-3 bg-slate-50">Kabinet</th>
+                      <th className="py-3 px-3 bg-slate-50">Berilgan vaqt</th>
+                      <th className="py-3 px-3 bg-slate-50">To'lov</th>
+                      <th className="py-3 px-3 bg-slate-50">Holat</th>
+                      <th className="py-3 px-3 text-right bg-slate-50">Amallar</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1324,6 +1355,7 @@ export const CashierView: React.FC = () => {
                           t.doctor_name?.toLowerCase().includes(q)
                         );
                       })
+                      .slice(0, visibleAllTicketsCount)
                       .map((t: any) => (
                         <tr key={t.id} className="hover:bg-slate-50">
                           <td className="py-3 px-3">
@@ -1430,10 +1462,20 @@ export const CashierView: React.FC = () => {
               </div>
 
               {/* Payments Table */}
-              <div className="overflow-x-auto">
+              <div 
+                className="overflow-x-auto max-h-[580px] overflow-y-auto"
+                onScroll={(e) => {
+                  const target = e.currentTarget;
+                  if (target.scrollTop + target.clientHeight >= target.scrollHeight - 60) {
+                    if (visiblePaymentsCount < allPayments.length) {
+                      setVisiblePaymentsCount(prev => prev + 15);
+                    }
+                  }
+                }}
+              >
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider">
+                    <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider sticky top-0 bg-white">
                       <th className="py-3 px-3">Chek №</th>
                       <th className="py-3 px-3">Vaqt</th>
                       <th className="py-3 px-3">Bemor</th>
@@ -1444,7 +1486,7 @@ export const CashierView: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {allPayments.map((p: any) => (
+                    {allPayments.slice(0, visiblePaymentsCount).map((p: any) => (
                       <tr key={p.id} className="hover:bg-slate-50">
                         <td className="py-3 px-3 font-mono font-bold text-slate-700">{p.receipt_number || p.id}</td>
                         <td className="py-3 px-3 font-mono text-slate-500">
@@ -1472,6 +1514,16 @@ export const CashierView: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+                {visiblePaymentsCount < allPayments.length && (
+                  <div className="p-3 text-center border-t border-slate-100 bg-slate-50">
+                    <button
+                      onClick={() => setVisiblePaymentsCount(prev => prev + 15)}
+                      className="px-4 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-xs font-semibold text-slate-600 transition shadow-sm"
+                    >
+                      Qolgan to'lovlarni yuklash ({visiblePaymentsCount} / {allPayments.length})
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </main>
@@ -1509,52 +1561,77 @@ export const CashierView: React.FC = () => {
               </div>
 
               {/* Patients Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider">
-                      <th className="py-3 px-3">Karta №</th>
-                      <th className="py-3 px-3">F.I.Sh.</th>
-                      <th className="py-3 px-3">Telefon</th>
-                      <th className="py-3 px-3">Tug'ilgan sana</th>
-                      <th className="py-3 px-3">Jinsi</th>
-                      <th className="py-3 px-3">Manzil</th>
-                      <th className="py-3 px-3 text-right">Amal</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {allPatients
-                      .filter(p => !patientSearch || p.full_name?.toLowerCase().includes(patientSearch.toLowerCase()) || p.phone?.includes(patientSearch))
-                      .map((p: any) => (
-                        <tr key={p.id} className="hover:bg-slate-50">
-                          <td className="py-3 px-3 font-mono font-bold text-slate-700">
-                            #{p.patient_number || p.id?.substring(0, 6)}
-                          </td>
-                          <td className="py-3 px-3 font-bold text-slate-800">{p.full_name}</td>
-                          <td className="py-3 px-3 font-mono text-slate-600">{p.phone}</td>
-                          <td className="py-3 px-3 text-slate-500">
-                            {p.birth_date ? p.birth_date.substring(0, 10) : '-'}
-                          </td>
-                          <td className="py-3 px-3">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
-                              {p.gender === 'FEMALE' ? 'Ayol' : 'Erkak'}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-slate-500 max-w-xs truncate">{p.address || '-'}</td>
-                          <td className="py-3 px-3 text-right">
-                            <button
-                              onClick={() => handleSelectPatientForAdmission(p)}
-                              className="px-3 py-1 bg-[#1677FF] hover:bg-[#0958D9] text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 ml-auto"
-                            >
-                              <span>Qabulga yo'naltirish</span>
-                              <ArrowRight className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
+              {(() => {
+                const filteredPatients = allPatients.filter(
+                  p => !patientSearch || p.full_name?.toLowerCase().includes(patientSearch.toLowerCase()) || p.phone?.includes(patientSearch)
+                );
+                return (
+                  <div 
+                    className="overflow-x-auto max-h-[580px] overflow-y-auto"
+                    onScroll={(e) => {
+                      const target = e.currentTarget;
+                      if (target.scrollTop + target.clientHeight >= target.scrollHeight - 60) {
+                        if (visiblePatientsTabCount < filteredPatients.length) {
+                          setVisiblePatientsTabCount(prev => prev + 15);
+                        }
+                      }
+                    }}
+                  >
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider sticky top-0 bg-white">
+                          <th className="py-3 px-3">Karta №</th>
+                          <th className="py-3 px-3">F.I.Sh.</th>
+                          <th className="py-3 px-3">Telefon</th>
+                          <th className="py-3 px-3">Tug'ilgan sana</th>
+                          <th className="py-3 px-3">Jinsi</th>
+                          <th className="py-3 px-3">Manzil</th>
+                          <th className="py-3 px-3 text-right">Amal</th>
                         </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredPatients.slice(0, visiblePatientsTabCount).map((p: any) => (
+                          <tr key={p.id} className="hover:bg-slate-50">
+                            <td className="py-3 px-3 font-mono font-bold text-slate-700">
+                              #{p.patient_number || p.id?.substring(0, 6)}
+                            </td>
+                            <td className="py-3 px-3 font-bold text-slate-800">{p.full_name}</td>
+                            <td className="py-3 px-3 font-mono text-slate-600">{p.phone}</td>
+                            <td className="py-3 px-3 text-slate-500">
+                              {p.birth_date ? p.birth_date.substring(0, 10) : '-'}
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                                {p.gender === 'FEMALE' ? 'Ayol' : 'Erkak'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-slate-500 max-w-xs truncate">{p.address || '-'}</td>
+                            <td className="py-3 px-3 text-right">
+                              <button
+                                onClick={() => handleSelectPatientForAdmission(p)}
+                                className="px-3 py-1 bg-[#1677FF] hover:bg-[#0958D9] text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 ml-auto"
+                              >
+                                <span>Qabulga yo'naltirish</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {visiblePatientsTabCount < filteredPatients.length && (
+                      <div className="p-3 text-center border-t border-slate-100 bg-slate-50">
+                        <button
+                          onClick={() => setVisiblePatientsTabCount(prev => prev + 15)}
+                          className="px-4 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-xs font-semibold text-slate-600 transition shadow-sm"
+                        >
+                          Qolgan bemorlarni yuklash ({visiblePatientsTabCount} / {filteredPatients.length})
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </main>
         )}
@@ -1729,7 +1806,15 @@ export const CashierView: React.FC = () => {
               />
             </div>
 
-            <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+            <div 
+              className="max-h-72 overflow-y-auto space-y-2 pr-1"
+              onScroll={(e) => {
+                const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+                if (scrollHeight - scrollTop - clientHeight < 50 && visibleSearchPatientCount < allPatients.length) {
+                  setVisibleSearchPatientCount(prev => prev + 15);
+                }
+              }}
+            >
               {allPatients
                 .filter(p => {
                   if (!patientModalSearch) return true;
@@ -1740,7 +1825,7 @@ export const CashierView: React.FC = () => {
                     p.patient_number?.includes(q)
                   );
                 })
-                .slice(0, 10)
+                .slice(0, visibleSearchPatientCount)
                 .map((p) => (
                   <div
                     key={p.id}

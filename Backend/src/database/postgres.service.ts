@@ -164,7 +164,7 @@ export class PostgresService {
   }
 
   // --- PATIENTS ---
-  public async getPatients(search?: string) {
+  public async getPatients(search?: string, limit?: number, offset?: number) {
     let sql = `
       SELECT 
         pt.*,
@@ -220,11 +220,22 @@ export class PostgresService {
       WHERE pt.archived_at IS NULL
     `;
     const params: any[] = [];
+    let idx = 1;
     if (search && search.trim()) {
       params.push(`%${search.trim().toLowerCase()}%`);
-      sql += ` AND (LOWER(pt.full_name) LIKE $1 OR pt.phone LIKE $1 OR pt.patient_number LIKE $1)`;
+      sql += ` AND (LOWER(pt.full_name) LIKE $${idx} OR pt.phone LIKE $${idx} OR pt.patient_number LIKE $${idx++})`;
     }
-    sql += ` ORDER BY pt.created_at DESC LIMIT 100`;
+    sql += ` ORDER BY pt.created_at DESC`;
+    if (limit !== undefined && Number(limit) > 0) {
+      params.push(Number(limit));
+      sql += ` LIMIT $${idx++}`;
+      if (offset !== undefined && Number(offset) > 0) {
+        params.push(Number(offset));
+        sql += ` OFFSET $${idx++}`;
+      }
+    } else {
+      sql += ` LIMIT 100`;
+    }
     const res = await this.query(sql, params);
     return res.rows;
   }
@@ -721,6 +732,8 @@ export class PostgresService {
     status?: string;
     date?: string;
     search?: string;
+    limit?: number;
+    offset?: number;
   }) {
     let sql = `
       SELECT t.*, s.name as service_name, s.price as service_price,
@@ -758,6 +771,14 @@ export class PostgresService {
     }
 
     sql += ` ORDER BY t.created_at DESC`;
+    if (filter.limit !== undefined && Number(filter.limit) > 0) {
+      params.push(Number(filter.limit));
+      sql += ` LIMIT $${idx++}`;
+      if (filter.offset !== undefined && Number(filter.offset) > 0) {
+        params.push(Number(filter.offset));
+        sql += ` OFFSET $${idx++}`;
+      }
+    }
     const res = await this.query(sql, params);
     return res.rows;
   }
