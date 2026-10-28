@@ -291,110 +291,140 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
 
   Future<void> _submitRegistration() async {
     setState(() => _isLoading = true);
+    try {
+      String? patientId = _selectedPatient?.id;
 
-    String? patientId = _selectedPatient?.id;
-
-    // Validate name
-    final fullName = _nameController.text.trim();
-    if (fullName.isEmpty) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bemorning to‘liq ismini kiriting'), backgroundColor: AppColors.error),
-      );
-      return;
-    }
-
-    // Validate phone (9 digits)
-    final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
-    if (digits.length != 9) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Iltimos, telefon raqamini to‘liq kiriting (9 ta raqam)'), backgroundColor: AppColors.error),
-      );
-      return;
-    }
-    final cleanPhone = '+998$digits';
-
-    final fullAddress = '$_selectedRegion, $_selectedDistrict${_addressController.text.trim().isNotEmpty ? ", " + _addressController.text.trim() : ""}';
-
-    // If no existing patient selected, create new patient in database
-    if (patientId == null) {
-      final pRes = await ApiService().createPatient({
-        'fullName': fullName,
-        'phone': cleanPhone,
-        'gender': _selectedGender,
-        'address': fullAddress,
-        'region': _selectedRegion,
-      });
-
-      if (pRes['success'] == false && pRes['patient'] == null) {
+      // Validate name
+      final fullName = _nameController.text.trim();
+      if (fullName.isEmpty) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(pRes['message'] ?? 'Bemor qo‘shishda xatolik'), backgroundColor: AppColors.error),
+          const SnackBar(content: Text('Bemorning to‘liq ismini kiriting'), backgroundColor: AppColors.error),
         );
         return;
       }
-      patientId = pRes['patient']?['id']?.toString() ?? pRes['id']?.toString();
-    }
 
-    if (patientId == null) {
+      // Validate phone (9 digits)
+      final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+      if (digits.length != 9) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Iltimos, telefon raqamini to‘liq kiriting (9 ta raqam)'), backgroundColor: AppColors.error),
+        );
+        return;
+      }
+      final cleanPhone = '+998$digits';
+
+      final fullAddress = '$_selectedRegion, $_selectedDistrict${_addressController.text.trim().isNotEmpty ? ", " + _addressController.text.trim() : ""}';
+
+      // If no existing patient selected, create or find patient in database
+      if (patientId == null || patientId.isEmpty) {
+        final pRes = await ApiService().createPatient({
+          'fullName': fullName,
+          'phone': cleanPhone,
+          'gender': _selectedGender,
+          'address': fullAddress,
+          'region': _selectedRegion,
+        });
+
+        if (pRes['success'] == false && pRes['data'] == null && pRes['patient'] == null) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(pRes['message'] ?? 'Bemor qo‘shishda xatolik'), backgroundColor: AppColors.error),
+          );
+          return;
+        }
+
+        final patientData = pRes['data'] is Map<String, dynamic>
+            ? pRes['data']
+            : (pRes['patient'] is Map<String, dynamic> ? pRes['patient'] : pRes);
+
+        patientId = (patientData['id'] ?? patientData['patient_id'])?.toString();
+      }
+
+      if (patientId == null || patientId.isEmpty) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bemor ID aniqlanmadi'), backgroundColor: AppColors.error),
+        );
+        return;
+      }
+
+      // Build items payload
+      final items = <Map<String, dynamic>>[];
+      if (_selectedDoctor != null) {
+        items.add({
+          'doctorId': _selectedDoctor!.id,
+          if (_cart.isNotEmpty) 'serviceId': _cart.first.id,
+          'price': _selectedDoctor!.consultationPrice,
+          'paymentMethod': _paymentMethod,
+          'serviceName': 'Konsultatsiya: ${_selectedDoctor!.specialty}',
+        });
+      }
+
+      for (var s in _cart) {
+        items.add({
+          'doctorId': _selectedDoctor?.id ?? (_doctors.isNotEmpty ? _doctors.first.id : 'doc-1'),
+          'serviceId': s.id,
+          'price': s.price,
+          'paymentMethod': _paymentMethod,
+          'serviceName': s.name,
+        });
+      }
+
+      if (items.isEmpty) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Kamida bitta shifokor yoki xizmat tanlang'), backgroundColor: AppColors.error),
+        );
+        return;
+      }
+
+      final receivedText = _receivedCashController.text.replaceAll(RegExp(r'\D'), '');
+      final double receivedAmount = double.tryParse(receivedText) ?? _totalPrice;
+      final double paidAmount = receivedAmount > 0 ? receivedAmount : _totalPrice;
+
+      final regRes = await ApiService().multiRegister(
+        patientId: patientId,
+        items: items,
+        payment: {
+          'method': _paymentMethod == 'ONLINE' ? 'TRANSFER' : _paymentMethod,
+          'amountPaid': paidAmount,
+        },
+      );
+
+      setState(() => _isLoading = false);
+
+      if (!mounted) return;
+
+      if (regRes['success'] != false) {
+        Navigator.pop(context);
+        final dynamic rawTickets = regRes['data']?['tickets'] ?? regRes['tickets'];
+        final tickets = (rawTickets is List) ? rawTickets : [];
+        final firstTicket = tickets.isNotEmpty && tickets.first is Map ? tickets.first : {};
+
+        CashierTicketSheet.show(
+          context,
+          ticketData: {
+            'ticketNumber': firstTicket['full_number'] ?? firstTicket['ticketNumber'] ?? firstTicket['number'] ?? 'T-001',
+            'patientName': firstTicket['patient_name'] ?? fullName,
+            'doctorName': firstTicket['doctor_name'] ?? _selectedDoctor?.fullName ?? 'Shifokor',
+            'roomNumber': firstTicket['cabinet_number'] ?? _selectedDoctor?.roomNumber ?? '104',
+            'serviceName': _cart.isNotEmpty ? _cart.first.name : 'Konsultatsiya',
+            'amount': _totalPrice,
+          },
+          onDone: widget.onFinished,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(regRes['message'] ?? 'Talon chiqarishda xatolik'), backgroundColor: AppColors.error),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bemor ID aniqlanmadi'), backgroundColor: AppColors.error),
-      );
-      return;
-    }
-
-    // Build items payload
-    final items = <Map<String, dynamic>>[];
-    if (_selectedDoctor != null) {
-      items.add({
-        'doctorId': _selectedDoctor!.id,
-        'price': _selectedDoctor!.consultationPrice,
-        'paymentMethod': _paymentMethod,
-        'serviceName': 'Konsultatsiya: ${_selectedDoctor!.specialty}',
-      });
-    }
-
-    for (var s in _cart) {
-      items.add({
-        'doctorId': _selectedDoctor?.id ?? 'doc-1',
-        'serviceId': s.id,
-        'price': s.price,
-        'paymentMethod': _paymentMethod,
-        'serviceName': s.name,
-      });
-    }
-
-    final regRes = await ApiService().multiRegister(
-      patientId: patientId,
-      items: items,
-    );
-
-    setState(() => _isLoading = false);
-
-    if (!mounted) return;
-
-    if (regRes['success'] != false) {
-      Navigator.pop(context);
-      final tickets = regRes['tickets'] as List? ?? [];
-      final firstTicket = tickets.isNotEmpty ? tickets.first : {};
-
-      CashierTicketSheet.show(
-        context,
-        ticketData: {
-          'ticketNumber': firstTicket['ticketNumber'] ?? firstTicket['number'] ?? 'K-020',
-          'patientName': fullName,
-          'doctorName': _selectedDoctor?.fullName ?? 'Shifokor',
-          'roomNumber': _selectedDoctor?.roomNumber ?? '104',
-          'serviceName': _cart.isNotEmpty ? _cart.first.name : 'Konsultatsiya',
-          'amount': _totalPrice,
-        },
-        onDone: widget.onFinished,
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(regRes['message'] ?? 'Talon chiqarishda xatolik'), backgroundColor: AppColors.error),
+        SnackBar(content: Text('Kutilmagan xatolik: $e'), backgroundColor: AppColors.error),
       );
     }
   }

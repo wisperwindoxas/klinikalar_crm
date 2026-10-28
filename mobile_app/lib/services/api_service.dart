@@ -168,17 +168,24 @@ class ApiService {
   Future<Map<String, dynamic>> multiRegister({
     required String patientId,
     required List<Map<String, dynamic>> items,
+    Map<String, dynamic>? payment,
   }) async {
     try {
+      final body = {
+        'patientId': patientId,
+        'items': items,
+        if (payment != null) 'payment': payment,
+      };
       final response = await http.post(
         Uri.parse(ApiConstants.multiRegister),
         headers: _headers(),
-        body: jsonEncode({
-          'patientId': patientId,
-          'items': items,
-        }),
+        body: jsonEncode(body),
       );
-      return jsonDecode(response.body);
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      return {'success': false, 'message': 'Noma’lum server javobi'};
     } catch (e) {
       return {'success': false, 'message': '$e'};
     }

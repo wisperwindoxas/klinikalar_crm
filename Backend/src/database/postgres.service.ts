@@ -446,7 +446,7 @@ export class PostgresService {
       service?.id || null,
       doctor.resolved_cabinet_id || null,
       data.paymentStatus || (service?.payment_policy === 'FREE_OR_EXEMPT' ? 'EXEMPT' : 'UNPAID'),
-      service?.price || 0,
+      service?.price || (data as any).price || doctor.consultation_price || 0,
       data.createdBy || null
     ]);
 
@@ -508,9 +508,11 @@ export class PostgresService {
 
       for (const item of data.items) {
         // Check service price and payment policy
-        const srvRes = await client.query(`SELECT * FROM services WHERE id = $1`, [item.serviceId]);
+        const srvRes = item.serviceId ? await client.query(`SELECT * FROM services WHERE id = $1`, [item.serviceId]) : { rows: [] };
         const srv = srvRes.rows[0];
-        const price = Number(srv?.price || 0);
+        const docRes = await client.query(`SELECT * FROM doctors WHERE id = $1`, [item.doctorId]);
+        const doc = docRes.rows[0];
+        const price = Number(srv?.price || (item as any).price || doc?.consultation_price || 0);
         totalCost += price;
 
         let paymentStatus = 'UNPAID';
@@ -527,8 +529,9 @@ export class PostgresService {
           doctorId: item.doctorId,
           serviceId: item.serviceId,
           createdBy: data.cashierId,
-          paymentStatus
-        });
+          paymentStatus,
+          price
+        } as any);
         createdTickets.push(ticket);
       }
 
