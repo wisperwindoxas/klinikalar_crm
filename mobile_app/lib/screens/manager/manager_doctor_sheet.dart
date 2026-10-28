@@ -28,6 +28,8 @@ class _ManagerDoctorSheetState extends State<ManagerDoctorSheet> {
   final _roomController = TextEditingController();
   final _priceController = TextEditingController(text: '150000');
   final _phoneController = TextEditingController(text: '+998 ');
+  final _loginController = TextEditingController();
+  final _passwordController = TextEditingController(text: 'doctor123');
   bool _isSaving = false;
 
   @override
@@ -48,10 +50,15 @@ class _ManagerDoctorSheetState extends State<ManagerDoctorSheet> {
 
     final data = {
       'fullName': _nameController.text.trim(),
+      'displayName': _nameController.text.trim(),
       'specialty': _specialtyController.text.trim(),
       'roomNumber': _roomController.text.trim(),
+      'cabinetNumber': _roomController.text.trim(),
       'consultationPrice': double.tryParse(_priceController.text) ?? 150000,
       'phone': _phoneController.text.replaceAll(' ', ''),
+      'username': _loginController.text.trim().isNotEmpty ? _loginController.text.trim().toLowerCase() : null,
+      'login': _loginController.text.trim().isNotEmpty ? _loginController.text.trim().toLowerCase() : null,
+      'password': _passwordController.text.trim().isNotEmpty ? _passwordController.text.trim() : 'doctor123',
     };
 
     if (widget.doctor != null) {
@@ -145,6 +152,32 @@ class _ManagerDoctorSheetState extends State<ManagerDoctorSheet> {
                     const Text('Telefon', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
                     const SizedBox(height: 6),
                     TextFormField(controller: _phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(hintText: '+998 90 ...')),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Tizim Logini', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+                    const SizedBox(height: 6),
+                    TextFormField(controller: _loginController, decoration: const InputDecoration(hintText: 'doc_karimov')),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Tizim Paroli', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+                    const SizedBox(height: 6),
+                    TextFormField(controller: _passwordController, decoration: const InputDecoration(hintText: 'doctor123')),
                   ],
                 ),
               ),

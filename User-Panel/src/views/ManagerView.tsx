@@ -89,8 +89,10 @@ export const ManagerView: React.FC = () => {
     displayName: '',
     specialtyId: '',
     cabinetNumber: '',
-    phone: '+998 90 000 00 00',
-    address: ''
+    phone: '+998 ',
+    address: '',
+    username: '',
+    password: ''
   });
 
   // Service Edit / Create Modal & Detail State
@@ -354,7 +356,9 @@ export const ManagerView: React.FC = () => {
         specialtyId: doctorForm.specialtyId || specialtiesList[0]?.id || 'spec_kardio',
         cabinetNumber: doctorForm.cabinetNumber,
         phone: doctorForm.phone,
-        address: doctorForm.address || null
+        address: doctorForm.address || null,
+        username: doctorForm.username ? doctorForm.username.trim() : undefined,
+        password: doctorForm.password ? doctorForm.password.trim() : undefined
       };
 
       if (editingDoctorId) {
@@ -2113,7 +2117,7 @@ export const ManagerView: React.FC = () => {
                   <button
                     onClick={() => {
                       setEditingDoctorId(null);
-                      setDoctorForm({ displayName: '', specialtyId: '', cabinetNumber: '', phone: '+998 90 000 00 00', address: '' });
+                      setDoctorForm({ displayName: '', specialtyId: '', cabinetNumber: '', phone: '+998 ', address: '', username: '', password: 'doctor123' });
                       setIsDoctorModalOpen(true);
                     }}
                     className="bg-[#8B5CF6] hover:bg-purple-600 text-white rounded-2xl p-4 flex flex-col items-center justify-center gap-2.5 transition shadow-sm hover:shadow-md cursor-pointer group"
@@ -2742,7 +2746,7 @@ export const ManagerView: React.FC = () => {
                   <button
                     onClick={() => {
                       setEditingDoctorId(null);
-                      setDoctorForm({ displayName: '', specialtyId: '', cabinetNumber: '', phone: '+998 90 000 00 00', address: '' });
+                      setDoctorForm({ displayName: '', specialtyId: specialtiesList[0]?.id || '', cabinetNumber: '', phone: '+998 ', address: '', username: '', password: 'doctor123' });
                       setIsDoctorModalOpen(true);
                     }}
                     className="px-4 py-2 bg-[#0084FF] text-white text-xs font-bold rounded-xl flex items-center gap-2 hover:bg-blue-600 transition cursor-pointer"
@@ -2757,7 +2761,7 @@ export const ManagerView: React.FC = () => {
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider">
-                      <th className="py-3 px-3">Shifokor ismi & Manzili</th>
+                      <th className="py-3 px-3">Shifokor ismi & Logini</th>
                       <th className="py-3 px-3">Mutaxassislik</th>
                       <th className="py-3 px-3">Kabinet</th>
                       <th className="py-3 px-3">Kutayotganlar</th>
@@ -2771,7 +2775,12 @@ export const ManagerView: React.FC = () => {
                       .map((doc: any) => (
                         <tr key={doc.id} className="hover:bg-slate-50">
                           <td className="py-3 px-3">
-                            <div className="font-bold text-slate-800">{doc.display_name}</div>
+                            <div className="font-bold text-slate-800 flex items-center gap-2 flex-wrap">
+                              <span>{doc.display_name}</span>
+                              <span className="text-[10px] bg-blue-50 text-blue-700 font-mono font-bold px-1.5 py-0.5 rounded border border-blue-200">
+                                @{doc.login || doc.username || (doc.phone ? doc.phone : 'biriktirilmagan')}
+                              </span>
+                            </div>
                             {doc.address ? (
                               <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5 max-w-xs truncate" title={doc.address}>
                                 <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
@@ -2799,7 +2808,9 @@ export const ManagerView: React.FC = () => {
                                     specialtyId: doc.specialty_id || '',
                                     cabinetNumber: doc.room_number || doc.cabinet_number || '',
                                     phone: doc.phone || '',
-                                    address: doc.address || ''
+                                    address: doc.address || '',
+                                    username: doc.login || doc.username || '',
+                                    password: ''
                                   });
                                   setIsDoctorModalOpen(true);
                                 }}
@@ -5875,6 +5886,56 @@ export const ManagerView: React.FC = () => {
                     placeholder="+998 (90) 123-45-67"
                     className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 font-mono placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
                   />
+                </div>
+              </div>
+
+              {/* Login and Password for Doctor Portal */}
+              <div className="p-3.5 bg-blue-50/60 border border-blue-200/80 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-blue-900">
+                  <ShieldCheck className="w-4 h-4 text-blue-600" />
+                  <span>Shifokor Tizimga Kirish Ma'lumotlari (Login & Parol)</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Foydalanuvchi Logini <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                        <User className="w-3.5 h-3.5 text-blue-600" />
+                      </div>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Masalan: doc_karimova"
+                        value={doctorForm.username}
+                        onChange={e => setDoctorForm({ ...doctorForm, username: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+                        className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 font-mono placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">Shifokor ushbu login orqali kiradi</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      {editingDoctorId ? 'Parolni yangilash' : 'Tizim Paroli'} <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                        <Lock className="w-3.5 h-3.5 text-blue-600" />
+                      </div>
+                      <input
+                        type="text"
+                        required={!editingDoctorId}
+                        placeholder={editingDoctorId ? "O'zgarishsiz qoldirish" : "Masalan: doctor123"}
+                        value={doctorForm.password}
+                        onChange={e => setDoctorForm({ ...doctorForm, password: e.target.value })}
+                        className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 font-mono placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">Standart: <b>doctor123</b></span>
+                  </div>
                 </div>
               </div>
 

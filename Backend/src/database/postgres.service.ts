@@ -1,5 +1,6 @@
 import { Pool, PoolClient } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
+import bcrypt from 'bcryptjs';
 import { config } from '../config';
 
 export class PostgresService {
@@ -78,10 +79,14 @@ export class PostgresService {
     let sql = `
       SELECT d.*, s.name as specialty_name, s.prefix as specialty_prefix,
              COALESCE(c.name, d.room_number || '-kabinet') as cabinet_name,
-             COALESCE(c.number, d.room_number) as cabinet_number
+             COALESCE(c.number, d.room_number) as cabinet_number,
+             u.username as login,
+             u.username,
+             u.phone as user_phone
       FROM doctors d
       LEFT JOIN specialties s ON d.specialty_id = s.id
       LEFT JOIN cabinets c ON (d.cabinet_id = c.id OR d.room_number = c.number)
+      LEFT JOIN users u ON d.user_id = u.id
       WHERE d.is_active = true
     `;
     const params: any[] = [];
@@ -887,7 +892,16 @@ export class PostgresService {
   }
 
   // --- DOCTOR CRUD ---
-  public async createDoctor(data: { displayName: string; specialtyId: string; cabinetNumber: string; phone?: string; address?: string }) {
+  public async createDoctor(data: {
+    displayName: string;
+    specialtyId: string;
+    cabinetNumber: string;
+    phone?: string;
+    address?: string;
+    username?: string;
+    login?: string;
+    password?: string;
+  }) {
     const id = `doc_${Date.now()}`;
     let cabinetId: string | null = null;
     if (data.cabinetNumber) {
@@ -906,15 +920,56 @@ export class PostgresService {
       }
     }
 
+    // 1. Determine username
+    let rawUsername = (data.username || data.login || '').trim().toLowerCase();
+    if (!rawUsername) {
+      const cleanName = data.displayName.toLowerCase().replace(/dr\.?\s*/i, '').replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_');
+      rawUsername = `doc_${cleanName.slice(0, 15)}_${Date.now().toString().slice(-4)}`;
+    }
+
+    // Check unique username in users table
+    let username = rawUsername;
+    const existingUser = await this.query('SELECT id FROM users WHERE username = $1', [username]);
+    if (existingUser.rows.length > 0) {
+      username = `${rawUsername}_${Math.floor(100 + Math.random() * 900)}`;
+    }
+
+    // 2. Hash password (default: doctor123)
+    const rawPassword = (data.password && data.password.trim()) ? data.password.trim() : 'doctor123';
+    const passwordHash = bcrypt.hashSync(rawPassword, 10);
+
+    // 3. Create user record in users table
+    const userId = `usr_${id}`;
+    await this.query(`
+      INSERT INTO users (id, full_name, username, password_hash, role_id, phone, is_active)
+      VALUES ($1, $2, $3, $4, 'role_doctor', $5, true)
+    `, [userId, data.displayName, username, passwordHash, data.phone || null]);
+
+    // 4. Create doctor record linked to user_id
     const res = await this.query(`
-      INSERT INTO doctors (id, specialty_id, cabinet_id, display_name, room_number, phone, address, is_active)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+      INSERT INTO doctors (id, user_id, specialty_id, cabinet_id, display_name, room_number, phone, address, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
       RETURNING *
-    `, [id, data.specialtyId, cabinetId, data.displayName, data.cabinetNumber, data.phone || '+998 90 000 00 00', data.address || null]);
-    return res.rows[0];
+    `, [id, userId, data.specialtyId, cabinetId, data.displayName, data.cabinetNumber, data.phone || '+998 90 000 00 00', data.address || null]);
+
+    return {
+      ...res.rows[0],
+      login: username,
+      username
+    };
   }
 
-  public async updateDoctor(id: string, data: { displayName?: string; specialtyId?: string; cabinetNumber?: string; phone?: string; address?: string; isActive?: boolean }) {
+  public async updateDoctor(id: string, data: {
+    displayName?: string;
+    specialtyId?: string;
+    cabinetNumber?: string;
+    phone?: string;
+    address?: string;
+    isActive?: boolean;
+    username?: string;
+    login?: string;
+    password?: string;
+  }) {
     let cabinetId: string | null = null;
     if (data.cabinetNumber) {
       const cabRes = await this.query('SELECT id FROM cabinets WHERE number = $1', [data.cabinetNumber]);
@@ -932,6 +987,62 @@ export class PostgresService {
       }
     }
 
+    // Check doctor's current user_id
+    const currentDoc = await this.query('SELECT user_id, display_name, phone FROM doctors WHERE id = $1', [id]);
+    const docRow = currentDoc.rows[0];
+
+    let userId = docRow?.user_id;
+    if (!userId) {
+      // Create user if missing
+      userId = `usr_${id}`;
+      let username = (data.username || data.login || '').trim().toLowerCase();
+      if (!username) {
+        const cleanName = (data.displayName || docRow?.display_name || 'doctor').toLowerCase().replace(/dr\.?\s*/i, '').replace(/[^a-z0-9]/gi, '_');
+        username = `doc_${cleanName.slice(0, 15)}_${Date.now().toString().slice(-4)}`;
+      }
+      const rawPassword = (data.password && data.password.trim()) ? data.password.trim() : 'doctor123';
+      const passwordHash = bcrypt.hashSync(rawPassword, 10);
+
+      await this.query(`
+        INSERT INTO users (id, full_name, username, password_hash, role_id, phone, is_active)
+        VALUES ($1, $2, $3, $4, 'role_doctor', $5, true)
+        ON CONFLICT (username) DO UPDATE 
+        SET full_name = EXCLUDED.full_name, password_hash = EXCLUDED.password_hash, phone = EXCLUDED.phone
+      `, [userId, data.displayName || docRow?.display_name, username, passwordHash, data.phone || docRow?.phone]);
+    } else {
+      // Update existing user
+      let userUpdateSql = 'UPDATE users SET updated_at = CURRENT_TIMESTAMP';
+      const userParams: any[] = [];
+      let pIdx = 1;
+
+      if (data.displayName) {
+        userUpdateSql += `, full_name = $${pIdx++}`;
+        userParams.push(data.displayName);
+      }
+      if (data.phone) {
+        userUpdateSql += `, phone = $${pIdx++}`;
+        userParams.push(data.phone);
+      }
+      if (data.username || data.login) {
+        const u = (data.username || data.login)!.trim().toLowerCase();
+        userUpdateSql += `, username = $${pIdx++}`;
+        userParams.push(u);
+      }
+      if (data.password && data.password.trim()) {
+        const pHash = bcrypt.hashSync(data.password.trim(), 10);
+        userUpdateSql += `, password_hash = $${pIdx++}`;
+        userParams.push(pHash);
+      }
+      if (data.isActive !== undefined) {
+        userUpdateSql += `, is_active = $${pIdx++}`;
+        userParams.push(data.isActive);
+      }
+      userUpdateSql += ` WHERE id = $${pIdx++}`;
+      userParams.push(userId);
+
+      await this.query(userUpdateSql, userParams);
+    }
+
     const res = await this.query(`
       UPDATE doctors
       SET display_name = COALESCE($1, display_name),
@@ -941,10 +1052,12 @@ export class PostgresService {
           phone = COALESCE($5, phone),
           address = COALESCE($6, address),
           is_active = COALESCE($7, is_active),
+          user_id = COALESCE($8, user_id),
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = $8
+      WHERE id = $9
       RETURNING *
-    `, [data.displayName, data.specialtyId, data.cabinetNumber, cabinetId, data.phone, data.address, data.isActive, id]);
+    `, [data.displayName, data.specialtyId, data.cabinetNumber, cabinetId, data.phone, data.address, data.isActive, userId, id]);
+
     return res.rows[0];
   }
 
