@@ -134,13 +134,22 @@ class Uzbek9DigitPhoneFormatter extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    final text = newValue.text;
-    if (text.isEmpty) {
+    if (newValue.text.isEmpty) {
       return const TextEditingValue(text: '', selection: TextSelection.collapsed(offset: 0));
     }
 
-    // Faqat raqamlarni ajratish
-    String digits = text.replaceAll(RegExp(r'\D'), '');
+    final oldDigits = oldValue.text.replaceAll(RegExp(r'\D'), '');
+    var digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+
+    // Agar foydalanuvchi backspace bosgan bo'lsa
+    if (newValue.text.length < oldValue.text.length) {
+      // Agar o'chirilgan belgi qavs yoki probel yoki tire bo'lsa (raqam bo'lmasa),
+      // foydalanuvchi orqaga o'chirishni davom ettirishi uchun oldingi raqamni ham olib tashlaymiz
+      if (oldDigits.length == digits.length && digits.isNotEmpty) {
+        digits = digits.substring(0, digits.length - 1);
+      }
+    }
+
     if (digits.startsWith('998') && digits.length > 9) {
       digits = digits.substring(3);
     }
@@ -153,28 +162,27 @@ class Uzbek9DigitPhoneFormatter extends TextInputFormatter {
     }
 
     final buffer = StringBuffer();
-    // (XX
-    if (digits.isNotEmpty) {
+    if (digits.length == 1) {
+      // Yagona 1 ta raqam bo'lganda qavssiz erkin ko'rsatamiz: masalan '9'
+      // Shunda foydalanuvchi keyingi backspace bilan kodni ham 100% tozalay oladi
+      buffer.write(digits);
+    } else {
       buffer.write('(');
       final codeEnd = digits.length >= 2 ? 2 : digits.length;
       buffer.write(digits.substring(0, codeEnd));
-      if (digits.length >= 2) {
-        buffer.write(') ');
+      buffer.write(') ');
+
+      if (digits.length > 2) {
+        final p1End = digits.length >= 5 ? 5 : digits.length;
+        buffer.write(digits.substring(2, p1End));
       }
-    }
-    // XXX
-    if (digits.length > 2) {
-      final p1End = digits.length >= 5 ? 5 : digits.length;
-      buffer.write(digits.substring(2, p1End));
-    }
-    // -XX
-    if (digits.length > 5) {
-      final p2End = digits.length >= 7 ? 7 : digits.length;
-      buffer.write('-${digits.substring(5, p2End)}');
-    }
-    // -XX
-    if (digits.length > 7) {
-      buffer.write('-${digits.substring(7, digits.length)}');
+      if (digits.length > 5) {
+        final p2End = digits.length >= 7 ? 7 : digits.length;
+        buffer.write('-${digits.substring(5, p2End)}');
+      }
+      if (digits.length > 7) {
+        buffer.write('-${digits.substring(7, digits.length)}');
+      }
     }
 
     final formatted = buffer.toString();

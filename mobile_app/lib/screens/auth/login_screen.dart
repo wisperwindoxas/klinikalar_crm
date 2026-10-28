@@ -272,6 +272,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       controller: _phoneController,
                       keyboardType: _autoFormatPhone ? TextInputType.phone : TextInputType.text,
                       inputFormatters: _autoFormatPhone ? [const Uzbek9DigitPhoneFormatter()] : [],
+                      onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
                         prefixIcon: _autoFormatPhone
                             ? Container(
