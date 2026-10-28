@@ -50,6 +50,20 @@ class Formatters {
     return DateFormat('dd.MM.yyyy').format(dt);
   }
 
+  static String formatDateTime(dynamic dateTime) {
+    if (dateTime == null) return '--.--.---- --:--';
+    DateTime? dt;
+    if (dateTime is DateTime) {
+      dt = dateTime;
+    } else {
+      dt = DateTime.tryParse(dateTime.toString());
+    }
+    if (dt == null) return '--.--.---- --:--';
+    return DateFormat('dd.MM.yyyy HH:mm').format(dt);
+  }
+
+  static String formatStatus(String? status) => statusLabel(status);
+
   static String statusLabel(String? status) {
     switch (status?.toUpperCase()) {
       case 'WAITING':
@@ -109,7 +123,69 @@ class Formatters {
   }
 }
 
-/// Avtomatik O'zbekiston telefon raqamini formatlovchi TextInputFormatter (+998 (XX) XXX-XX-XX)
+/// 9 xonali O'zbekiston raqamini formatlovchi TextInputFormatter: (90) 123-45-67
+/// Prefixda alohida "+998" va bayroq bo'lgan maydonlar uchun eng qulay formatter.
+/// O'chirish (backspace) paytida qotib qolmaydi va bemalol bo'shatish mumkin.
+class Uzbek9DigitPhoneFormatter extends TextInputFormatter {
+  const Uzbek9DigitPhoneFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+    if (text.isEmpty) {
+      return const TextEditingValue(text: '', selection: TextSelection.collapsed(offset: 0));
+    }
+
+    // Faqat raqamlarni ajratish
+    String digits = text.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('998') && digits.length > 9) {
+      digits = digits.substring(3);
+    }
+    if (digits.length > 9) {
+      digits = digits.substring(0, 9);
+    }
+
+    if (digits.isEmpty) {
+      return const TextEditingValue(text: '', selection: TextSelection.collapsed(offset: 0));
+    }
+
+    final buffer = StringBuffer();
+    // (XX
+    if (digits.isNotEmpty) {
+      buffer.write('(');
+      final codeEnd = digits.length >= 2 ? 2 : digits.length;
+      buffer.write(digits.substring(0, codeEnd));
+      if (digits.length >= 2) {
+        buffer.write(') ');
+      }
+    }
+    // XXX
+    if (digits.length > 2) {
+      final p1End = digits.length >= 5 ? 5 : digits.length;
+      buffer.write(digits.substring(2, p1End));
+    }
+    // -XX
+    if (digits.length > 5) {
+      final p2End = digits.length >= 7 ? 7 : digits.length;
+      buffer.write('-${digits.substring(5, p2End)}');
+    }
+    // -XX
+    if (digits.length > 7) {
+      buffer.write('-${digits.substring(7, digits.length)}');
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+/// Avtomatik O'zbekiston to'liq telefon raqamini formatlovchi: +998 (XX) XXX-XX-XX
 class UzbekPhoneInputFormatter extends TextInputFormatter {
   final bool allowEmpty;
   const UzbekPhoneInputFormatter({this.allowEmpty = true});
@@ -132,7 +208,6 @@ class UzbekPhoneInputFormatter extends TextInputFormatter {
     // Faqat raqamlarni ajratib olish
     var digits = text.replaceAll(RegExp(r'\D'), '');
 
-    // Agar bo'sh bo'lsa
     if (digits.isEmpty) {
       return const TextEditingValue(
         text: '',
@@ -140,25 +215,29 @@ class UzbekPhoneInputFormatter extends TextInputFormatter {
       );
     }
 
-    // Agar 998 bilan boshlanmasa va uzunligi 9 yoki undan kam bo'lsa
+    // Agar o'chirilayotgan bo'lsa va 998 dan kam qolsa, tozalash imkonini berish
+    if (newValue.text.length < oldValue.text.length && digits.length <= 3) {
+      return const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      );
+    }
+
     if (!digits.startsWith('998') && digits.length <= 9) {
       digits = '998$digits';
     }
 
-    // Maksimal 12 ta raqam (998 XX XXX XX XX)
     if (digits.length > 12) {
       digits = digits.substring(0, 12);
     }
 
     final buffer = StringBuffer();
-    // +998
     if (digits.length >= 3) {
       buffer.write('+${digits.substring(0, 3)}');
     } else {
       buffer.write('+$digits');
     }
 
-    // (XX)
     if (digits.length > 3) {
       final codeEnd = digits.length >= 5 ? 5 : digits.length;
       final code = digits.substring(3, codeEnd);
@@ -168,19 +247,16 @@ class UzbekPhoneInputFormatter extends TextInputFormatter {
       }
     }
 
-    // XXX
     if (digits.length > 5) {
       final part1End = digits.length >= 8 ? 8 : digits.length;
       buffer.write(digits.substring(5, part1End));
     }
 
-    // -XX
     if (digits.length > 8) {
       final part2End = digits.length >= 10 ? 10 : digits.length;
       buffer.write('-${digits.substring(8, part2End)}');
     }
 
-    // -XX
     if (digits.length > 10) {
       buffer.write('-${digits.substring(10, digits.length)}');
     }

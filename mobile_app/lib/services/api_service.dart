@@ -333,6 +333,44 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> openShift({double openingBalance = 0, String? notes, String? cashierName}) async {
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConstants.openShift),
+        headers: _headers(),
+        body: jsonEncode({
+          'openingBalance': openingBalance,
+          'notes': notes ?? 'Mobil ilovadan ochildi',
+          if (cashierName != null) 'cashierName': cashierName,
+        }),
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      }
+      return {'success': false, 'message': 'Smenani ochishda xatolik (${response.statusCode})'};
+    } catch (e) {
+      return {'success': false, 'message': 'Ulanish xatosi: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> closeShift(String shiftId, {double closingBalance = 0}) async {
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConstants.closeShift(shiftId)),
+        headers: _headers(),
+        body: jsonEncode({
+          'closingBalance': closingBalance,
+        }),
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      }
+      return {'success': false, 'message': 'Smenani yopishda xatolik (${response.statusCode})'};
+    } catch (e) {
+      return {'success': false, 'message': 'Ulanish xatosi: $e'};
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getPayments() async {
     try {
       final response = await http.get(Uri.parse(ApiConstants.payments), headers: _headers());

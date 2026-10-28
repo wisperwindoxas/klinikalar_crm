@@ -20,7 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
-  bool _autoFormatPhone = false; // Default to false so alphanumeric logins work immediately
+  bool _autoFormatPhone = true; // By default: 🇺🇿 +998 (XX) XXX-XX-XX
 
   @override
   void dispose() {
@@ -30,8 +30,24 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-    final rawLogin = _phoneController.text.trim();
     final rawPassword = _passwordController.text;
+    String rawLogin;
+
+    if (_autoFormatPhone) {
+      final clean = Formatters.cleanPhone(_phoneController.text);
+      if (clean.length < 9) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('9 xonali telefon raqamingizni to‘liq kiriting'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+      rawLogin = '+998$clean';
+    } else {
+      rawLogin = _phoneController.text.trim();
+    }
 
     if (rawLogin.isEmpty || rawPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -205,9 +221,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Telefon raqam yoki Login',
-                          style: TextStyle(
+                        Text(
+                          _autoFormatPhone ? 'Telefon raqam' : 'Foydalanuvchi logini',
+                          style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textSecondary,
@@ -217,14 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           onTap: () {
                             setState(() {
                               _autoFormatPhone = !_autoFormatPhone;
-                              if (_autoFormatPhone) {
-                                final clean = Formatters.cleanPhone(_phoneController.text);
-                                if (clean.length >= 9) {
-                                  _phoneController.text = Formatters.formatPhone(clean);
-                                }
-                              } else {
-                                _phoneController.text = Formatters.cleanPhone(_phoneController.text);
-                              }
+                              _phoneController.clear();
                             });
                           },
                           borderRadius: BorderRadius.circular(8),
@@ -239,13 +248,13 @@ class _LoginScreenState extends State<LoginScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  _autoFormatPhone ? Icons.check_circle_rounded : Icons.edit_note_rounded,
+                                  _autoFormatPhone ? Icons.phone_android_rounded : Icons.person_outline_rounded,
                                   size: 13,
                                   color: _autoFormatPhone ? AppColors.primary : AppColors.textMuted,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  _autoFormatPhone ? '+998 Format' : 'Oddiy matn',
+                                  _autoFormatPhone ? '🇺🇿 +998 Raqam' : 'Matnli Login',
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
@@ -262,14 +271,35 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _phoneController,
                       keyboardType: _autoFormatPhone ? TextInputType.phone : TextInputType.text,
-                      inputFormatters: _autoFormatPhone ? [const UzbekPhoneInputFormatter()] : [],
+                      inputFormatters: _autoFormatPhone ? [const Uzbek9DigitPhoneFormatter()] : [],
                       decoration: InputDecoration(
-                        prefixIcon: Icon(
-                          _autoFormatPhone ? Icons.phone_outlined : Icons.person_outline_rounded,
-                          size: 20,
-                          color: AppColors.textMuted,
-                        ),
-                        hintText: _autoFormatPhone ? '+998 (90) 123-45-67' : 'Login yoki telefon raqami',
+                        prefixIcon: _autoFormatPhone
+                            ? Container(
+                                padding: const EdgeInsets.only(left: 14, right: 10),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text('🇺🇿', style: TextStyle(fontSize: 22)),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      '+998',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Container(
+                                      width: 1.2,
+                                      height: 22,
+                                      color: AppColors.border,
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : const Icon(Icons.person_outline_rounded, size: 20, color: AppColors.textMuted),
+                        hintText: _autoFormatPhone ? '(90) 123-45-67' : 'Masalan: alisher_alimov',
                         suffixIcon: _phoneController.text.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.clear, size: 18, color: AppColors.textMuted),

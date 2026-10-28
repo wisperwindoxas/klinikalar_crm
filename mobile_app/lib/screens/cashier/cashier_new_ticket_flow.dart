@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/regions_data.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/doctor_model.dart';
 import '../../models/patient_model.dart';
@@ -30,38 +31,14 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
   int _currentStep = 0; // 0: Patient, 1: Doctor & Services, 2: Payment
   bool _isLoading = false;
 
-  // Step 1: Patient fields
-  final _searchController = TextEditingController();
-  List<PatientModel> _patientSearchResults = [];
+  // Patient fields
   PatientModel? _selectedPatient;
-
-  // New patient form fields
-  bool _isNewPatientForm = false;
-  bool _phoneFormattingEnabled = true;
   final _nameController = TextEditingController();
-  final _phoneController = TextEditingController(text: '+998 ');
-  final _districtController = TextEditingController();
-  final _neighborhoodController = TextEditingController();
-  final _addressController = TextEditingController();
+  final _phoneController = TextEditingController();
   String _selectedGender = 'male';
   String _selectedRegion = 'Toshkent shahri';
-
-  final List<String> _regions = [
-    'Toshkent shahri',
-    'Toshkent viloyati',
-    'Samarqand viloyati',
-    'Farg‘ona viloyati',
-    'Andijon viloyati',
-    'Namangan viloyati',
-    'Buxoro viloyati',
-    'Qashqadaryo viloyati',
-    'Surxondaryo viloyati',
-    'Xorazm viloyati',
-    'Navoiy viloyati',
-    'Jizzax viloyati',
-    'Sirdaryo viloyati',
-    'Qoraqalpog‘iston Respublikasi',
-  ];
+  String _selectedDistrict = 'Yunusobod tumani';
+  final _addressController = TextEditingController();
 
   // Step 2: Doctor & Service Selection
   List<DoctorModel> _doctors = [];
@@ -77,7 +54,7 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
   void initState() {
     super.initState();
     if (widget.initialPatient != null) {
-      _selectedPatient = widget.initialPatient;
+      _selectExistingPatient(widget.initialPatient!);
       _currentStep = 1;
     }
     _loadInitialData();
@@ -85,11 +62,8 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
 
   @override
   void dispose() {
-    _searchController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
-    _districtController.dispose();
-    _neighborhoodController.dispose();
     _addressController.dispose();
     _receivedCashController.dispose();
     super.dispose();
@@ -109,13 +83,199 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
     });
   }
 
-  Future<void> _searchPatients(String query) async {
-    if (query.length < 2) {
-      setState(() => _patientSearchResults = []);
-      return;
-    }
-    final results = await ApiService().getPatients(search: query);
-    setState(() => _patientSearchResults = results);
+  void _selectExistingPatient(PatientModel p) {
+    setState(() {
+      _selectedPatient = p;
+      _nameController.text = p.fullName;
+
+      final digits = p.phone.replaceAll(RegExp(r'\D'), '');
+      String local9 = digits.length >= 9 ? digits.substring(digits.length - 9) : digits;
+      if (local9.length == 9) {
+        _phoneController.text = '(${local9.substring(0, 2)}) ${local9.substring(2, 5)}-${local9.substring(5, 7)}-${local9.substring(7, 9)}';
+      } else {
+        _phoneController.text = local9;
+      }
+
+      _selectedGender = (p.gender?.toLowerCase() == 'female') ? 'female' : 'male';
+
+      if (p.region != null && UzbekistanRegionsData.regions.contains(p.region)) {
+        _selectedRegion = p.region!;
+      }
+      final districts = UzbekistanRegionsData.getDistricts(_selectedRegion);
+      if (districts.isNotEmpty) {
+        _selectedDistrict = districts.first;
+      }
+
+      _addressController.text = p.address ?? '';
+    });
+  }
+
+  void _showExistingPatientPicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final searchCtrl = TextEditingController();
+        List<PatientModel> searchResults = [];
+        bool searching = false;
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            void performSearch(String q) async {
+              if (q.trim().length < 2) {
+                setModalState(() => searchResults = []);
+                return;
+              }
+              setModalState(() => searching = true);
+              final res = await ApiService().getPatients(search: q.trim());
+              setModalState(() {
+                searchResults = res;
+                searching = false;
+              });
+            }
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.75,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.fromLTRB(20, 14, 20, MediaQuery.of(context).viewInsets.bottom + 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Mavjud bemorni tanlash',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20, color: AppColors.textMuted),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: searchCtrl,
+                    autofocus: true,
+                    onChanged: performSearch,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary),
+                      hintText: 'Bemor ismi yoki telefon raqami...',
+                      suffixIcon: searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () {
+                                searchCtrl.clear();
+                                setModalState(() => searchResults = []);
+                              },
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (searching)
+                    const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                    )
+                  else if (searchResults.isEmpty)
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.person_search_rounded, size: 48, color: AppColors.textMuted),
+                            const SizedBox(height: 10),
+                            Text(
+                              searchCtrl.text.isEmpty
+                                  ? 'Bemorni topish uchun ism yoki telefon raqamini yozing'
+                                  : 'Bemor topilmadi',
+                              style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.separated(
+                        itemCount: searchResults.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, idx) {
+                          final p = searchResults[idx];
+                          final isFemale = (p.gender ?? '').toLowerCase() == 'female';
+
+                          return InkWell(
+                            onTap: () {
+                              _selectExistingPatient(p);
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Bemor ma‘lumotlari to‘ldirildi: ${p.fullName}'),
+                                  backgroundColor: AppColors.success,
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(14),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: isFemale ? const Color(0xFFFCE7F3) : const Color(0xFFEFF6FF),
+                                    child: Icon(
+                                      isFemale ? Icons.face_3_rounded : Icons.face_6_rounded,
+                                      color: isFemale ? const Color(0xFFDB2777) : const Color(0xFF2563EB),
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(p.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                        const SizedBox(height: 2),
+                                        Text(Formatters.formatPhone(p.phone), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                        if (p.address != null && p.address!.isNotEmpty)
+                                          Text(p.address!, style: const TextStyle(fontSize: 11, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.textMuted),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   double get _totalPrice {
@@ -134,18 +294,33 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
 
     String? patientId = _selectedPatient?.id;
 
-    // If new patient, create in database first
-    if (patientId == null || _isNewPatientForm) {
-      final cleanPhone = Formatters.cleanPhone(_phoneController.text);
-      final addressParts = <String>[];
-      if (_selectedRegion.isNotEmpty) addressParts.add(_selectedRegion);
-      if (_districtController.text.trim().isNotEmpty) addressParts.add(_districtController.text.trim());
-      if (_neighborhoodController.text.trim().isNotEmpty) addressParts.add(_neighborhoodController.text.trim());
-      if (_addressController.text.trim().isNotEmpty) addressParts.add(_addressController.text.trim());
-      final fullAddress = addressParts.join(', ');
+    // Validate name
+    final fullName = _nameController.text.trim();
+    if (fullName.isEmpty) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bemorning to‘liq ismini kiriting'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
 
+    // Validate phone (9 digits)
+    final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.length != 9) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Iltimos, telefon raqamini to‘liq kiriting (9 ta raqam)'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+    final cleanPhone = '+998$digits';
+
+    final fullAddress = '$_selectedRegion, $_selectedDistrict${_addressController.text.trim().isNotEmpty ? ", " + _addressController.text.trim() : ""}';
+
+    // If no existing patient selected, create new patient in database
+    if (patientId == null) {
       final pRes = await ApiService().createPatient({
-        'fullName': _nameController.text.trim(),
+        'fullName': fullName,
         'phone': cleanPhone,
         'gender': _selectedGender,
         'address': fullAddress,
@@ -165,7 +340,7 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
     if (patientId == null) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bemor tanlanmagan'), backgroundColor: AppColors.error),
+        const SnackBar(content: Text('Bemor ID aniqlanmadi'), backgroundColor: AppColors.error),
       );
       return;
     }
@@ -209,7 +384,7 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
         context,
         ticketData: {
           'ticketNumber': firstTicket['ticketNumber'] ?? firstTicket['number'] ?? 'K-020',
-          'patientName': _selectedPatient?.fullName ?? _nameController.text,
+          'patientName': fullName,
           'doctorName': _selectedDoctor?.fullName ?? 'Shifokor',
           'roomNumber': _selectedDoctor?.roomNumber ?? '104',
           'serviceName': _cart.isNotEmpty ? _cart.first.name : 'Konsultatsiya',
@@ -281,15 +456,16 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
                 child: ElevatedButton(
                   onPressed: () {
                     if (_currentStep == 0) {
-                      if (_selectedPatient == null && !_isNewPatientForm) {
+                      if (_nameController.text.trim().isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Iltimos bemorni tanlang yoki yangisini kiriting')),
+                          const SnackBar(content: Text('Bemorning to‘liq ismini kiriting'), backgroundColor: AppColors.error),
                         );
                         return;
                       }
-                      if (_isNewPatientForm && _nameController.text.trim().isEmpty) {
+                      final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+                      if (digits.length != 9) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Bemorning to‘liq ismini kiriting')),
+                          const SnackBar(content: Text('Iltimos, telefon raqamini 9 ta raqam shaklida kiriting'), backgroundColor: AppColors.error),
                         );
                         return;
                       }
@@ -379,277 +555,272 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
 
   // ==================== STEP 0: PATIENT ====================
   Widget _buildPatientStep() {
+    final availableDistricts = UzbekistanRegionsData.getDistricts(_selectedRegion);
+
     return SingleChildScrollView(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _isNewPatientForm ? 'Yangi bemor ma\'lumotlari' : 'Bemor qidirish',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          // 1. Prominent "Mavjud bemorlarni tanlash" button at the very top
+          InkWell(
+            onTap: _showExistingPatientPicker,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.mintLight.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.primary, width: 1.5),
               ),
-              TextButton.icon(
-                icon: Icon(_isNewPatientForm ? Icons.search : Icons.person_add_alt_1_rounded, size: 16),
-                label: Text(_isNewPatientForm ? 'Qidiruvga qaytish' : 'Yangi bemor'),
-                onPressed: () {
-                  setState(() {
-                    _isNewPatientForm = !_isNewPatientForm;
-                    _selectedPatient = null;
-                  });
-                },
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.person_search_rounded, color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Mavjud bemorlarni tanlash',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primary),
+                        ),
+                        Text(
+                          'Baza orqali avtomatik to‘ldirish',
+                          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: AppColors.primary),
+                ],
               ),
-            ],
+            ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-          if (!_isNewPatientForm) ...[
-            TextFormField(
-              controller: _searchController,
-              onChanged: _searchPatients,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted),
-                hintText: 'Telefon raqam yoki F.I.Sh kiriting...',
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _patientSearchResults = []);
-                        },
-                      )
-                    : null,
+          // If a patient was picked from the database, show indicator banner
+          if (_selectedPatient != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.successLight.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.success.withOpacity(0.5)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Baza bemori: ${_selectedPatient!.fullName}',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.success),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _selectedPatient = null;
+                        _nameController.clear();
+                        _phoneController.clear();
+                        _addressController.clear();
+                      });
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Text('Tozalash', style: TextStyle(fontSize: 11, color: AppColors.error, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 12),
-            if (_selectedPatient != null) ...[
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.mintLight,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.primary),
+          ],
+
+          const Text(
+            'Bemor Ma‘lumotlarini Kiritish',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 10),
+
+          // Full Name
+          const Text('F.I.Sh (To‘liq ismi)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+          const SizedBox(height: 6),
+          TextFormField(
+            controller: _nameController,
+            decoration: const InputDecoration(
+              hintText: 'Masalan: Olimov Sanjar Rustamovich',
+              prefixIcon: Icon(Icons.person_outline_rounded, color: AppColors.primary, size: 20),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Phone Number (Formatted 9 digits with Uzbekistan flag and static +998, safe backspace)
+          const Text('Telefon raqami', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+          const SizedBox(height: 6),
+          TextFormField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            inputFormatters: [Uzbek9DigitPhoneFormatter()],
+            decoration: InputDecoration(
+              prefixIcon: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                child: const Text(
+                  '🇺🇿 +998',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-                child: Row(
+              ),
+              hintText: '(90) 123-45-67',
+              suffixIcon: _phoneController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: () {
+                        _phoneController.clear();
+                        setState(() {});
+                      },
+                    )
+                  : null,
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 12),
+
+          // Gender and Region
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const CircleAvatar(
-                      backgroundColor: AppColors.primary,
-                      radius: 20,
-                      child: Icon(Icons.check, color: Colors.white, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(_selectedPatient!.fullName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                          Text(Formatters.formatPhone(_selectedPatient!.phone), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                          if (_selectedPatient!.address != null)
-                            Text(_selectedPatient!.address!, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                        ],
+                    const Text('Jinsi', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: AppColors.textMuted, size: 18),
-                      onPressed: () => setState(() => _selectedPatient = null),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedGender,
+                          isExpanded: true,
+                          items: const [
+                            DropdownMenuItem(value: 'male', child: Text('Erkak', style: TextStyle(fontSize: 12))),
+                            DropdownMenuItem(value: 'female', child: Text('Ayol', style: TextStyle(fontSize: 12))),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setState(() => _selectedGender = val);
+                          },
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ] else ...[
-              if (_patientSearchResults.isNotEmpty) ...[
-                const Text('Qidiruv natijalari:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
-                const SizedBox(height: 6),
-                ..._patientSearchResults.map((p) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(
-                        backgroundColor: AppColors.mintLight,
-                        child: Text(p.fullName.isNotEmpty ? p.fullName[0] : 'B', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Viloyat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
                       ),
-                      title: Text(p.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      subtitle: Text('${Formatters.formatPhone(p.phone)} • ${p.totalVisits} ta tashrif', style: const TextStyle(fontSize: 11)),
-                      trailing: const Icon(Icons.check_circle_outline, color: AppColors.primary, size: 20),
-                      onTap: () {
-                        setState(() {
-                          _selectedPatient = p;
-                          _patientSearchResults = [];
-                        });
-                      },
-                    )),
-              ] else ...[
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        const Icon(Icons.person_search_rounded, size: 40, color: AppColors.textMuted),
-                        const SizedBox(height: 8),
-                        const Text('Bemorni qidiring yoki yangisini ro‘yxatga oling', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ] else ...[
-            // New Patient Form
-            const Text('F.I.Sh (To‘liq ismi)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
-            const SizedBox(height: 6),
-            TextFormField(
-              controller: _nameController,
-              decoration: const InputDecoration(hintText: 'Masalan: Olimov Sanjar Rustamovich'),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Telefon raqami', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
-                InkWell(
-                  onTap: () {
-                    setState(() {
-                      _phoneFormattingEnabled = !_phoneFormattingEnabled;
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(6),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _phoneFormattingEnabled ? Icons.check_circle : Icons.radio_button_unchecked,
-                          size: 13,
-                          color: _phoneFormattingEnabled ? AppColors.primary : AppColors.textMuted,
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: UzbekistanRegionsData.regions.contains(_selectedRegion)
+                              ? _selectedRegion
+                              : UzbekistanRegionsData.regions.first,
+                          isExpanded: true,
+                          items: UzbekistanRegionsData.regions
+                              .map((r) => DropdownMenuItem(
+                                    value: r,
+                                    child: Text(r, style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis),
+                                  ))
+                              .toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _selectedRegion = val;
+                                final districts = UzbekistanRegionsData.getDistricts(val);
+                                _selectedDistrict = districts.isNotEmpty ? districts.first : '';
+                              });
+                            }
+                          },
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _phoneFormattingEnabled ? '+998 Format' : 'Oddiy matn',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: _phoneFormattingEnabled ? AppColors.primary : AppColors.textMuted,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            TextFormField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              inputFormatters: _phoneFormattingEnabled ? [const UzbekPhoneInputFormatter()] : [],
-              decoration: InputDecoration(
-                hintText: _phoneFormattingEnabled ? '+998 (90) 123-45-67' : '901234567',
-                prefixIcon: const Icon(Icons.phone_rounded, color: AppColors.primary, size: 20),
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Jinsi', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _selectedGender,
-                            isExpanded: true,
-                            items: const [
-                              DropdownMenuItem(value: 'male', child: Text('Erkak', style: TextStyle(fontSize: 12))),
-                              DropdownMenuItem(value: 'female', child: Text('Ayol', style: TextStyle(fontSize: 12))),
-                            ],
-                            onChanged: (val) {
-                              if (val != null) setState(() => _selectedGender = val);
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // District Dropdown (dynamically populated based on selected region)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Tuman / Shahar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: availableDistricts.contains(_selectedDistrict)
+                        ? _selectedDistrict
+                        : (availableDistricts.isNotEmpty ? availableDistricts.first : null),
+                    isExpanded: true,
+                    items: availableDistricts
+                        .map((d) => DropdownMenuItem(
+                              value: d,
+                              child: Text(d, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                            ))
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) setState(() => _selectedDistrict = val);
+                    },
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Viloyat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _selectedRegion,
-                            isExpanded: true,
-                            items: _regions.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis))).toList(),
-                            onChanged: (val) {
-                              if (val != null) setState(() => _selectedRegion = val);
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Additional address
+          const Text('Qo‘shimcha manzil (Mahalla, ko‘cha, uy)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+          const SizedBox(height: 6),
+          TextFormField(
+            controller: _addressController,
+            decoration: const InputDecoration(
+              hintText: 'Masalan: Bog‘ishamol MFY, 15-uy',
+              prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.textMuted, size: 20),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Tuman / Shahar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _districtController,
-                        decoration: const InputDecoration(hintText: 'Yunusobod tumani'),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Mahalla / Ko‘cha', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _neighborhoodController,
-                        decoration: const InputDecoration(hintText: 'Bog‘ishamol MFY'),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Text('Qo‘shimcha manzil (Uy, kvartira)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
-            const SizedBox(height: 6),
-            TextFormField(
-              controller: _addressController,
-              decoration: const InputDecoration(hintText: '15-uy, 42-xonadon'),
-            ),
-          ],
+          ),
+          const SizedBox(height: 10),
         ],
       ),
     );
@@ -661,38 +832,99 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Shifokorni tanlang:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 105,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Shifokorni tanlang:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+              if (_doctors.isNotEmpty)
+                Text('${_doctors.length} nafar shifokor', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          if (_doctors.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Center(
+                child: Column(
+                  children: [
+                    const Icon(Icons.medical_services_outlined, size: 36, color: AppColors.textMuted),
+                    const SizedBox(height: 8),
+                    const Text('Shifokorlar ro‘yxati yuklanmoqda yoki topilmadi', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: _loadInitialData,
+                      icon: const Icon(Icons.refresh, size: 16),
+                      label: const Text('Qayta yuklash'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else ...[
+            // Doctor cards list
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
               itemCount: _doctors.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final doc = _doctors[index];
                 final isSelected = _selectedDoctor?.id == doc.id;
-                return GestureDetector(
+
+                return InkWell(
                   onTap: () => setState(() => _selectedDoctor = doc),
+                  borderRadius: BorderRadius.circular(14),
                   child: Container(
-                    width: 150,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isSelected ? AppColors.mintLight : Colors.white,
+                      color: isSelected ? AppColors.mintLight.withOpacity(0.6) : Colors.white,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: isSelected ? AppColors.primary : AppColors.border, width: isSelected ? 2 : 1),
+                      border: Border.all(
+                        color: isSelected ? AppColors.primary : AppColors.border,
+                        width: isSelected ? 2 : 1,
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        Text(doc.fullName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                        Text(doc.specialty, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary), maxLines: 1),
-                        const Spacer(),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: isSelected ? AppColors.primary : AppColors.mintLight,
+                          child: Icon(
+                            Icons.person_rounded,
+                            color: isSelected ? Colors.white : AppColors.primary,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(doc.fullName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                              const SizedBox(height: 2),
+                              Text('${doc.specialty} • ${doc.roomNumber}-xona', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text('${doc.roomNumber}-xona', style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
-                            Text(Formatters.formatCurrency(doc.consultationPrice), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                            Text(
+                              Formatters.formatCurrency(doc.consultationPrice),
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
+                            ),
+                            const SizedBox(height: 4),
+                            Icon(
+                              isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                              color: isSelected ? AppColors.primary : AppColors.textMuted,
+                              size: 20,
+                            ),
                           ],
                         ),
                       ],
@@ -701,7 +933,8 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
                 );
               },
             ),
-          ),
+          ],
+
           const SizedBox(height: 18),
 
           const Text('Qo‘shimcha xizmatlar (Tahlil / UZI / Muolaja):', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
