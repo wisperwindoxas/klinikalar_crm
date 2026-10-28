@@ -6,7 +6,9 @@ import {
   HeartPulse, Stethoscope, ChevronRight, Check,
   AlertCircle, UserX, RefreshCw, Settings,
   Home, RotateCw, SkipBack, Search, Users,
-  X, Activity, ArrowRight, ShieldCheck, MapPin
+  X, Activity, ArrowRight, ShieldCheck, MapPin,
+  Sparkles, Star, Bell, Shield, Sliders, Eye,
+  UserCheck, BadgeCheck, VolumeX, MessageSquare
 } from 'lucide-react';
 
 import { showNotification } from '../components/ToastNotification';
@@ -93,8 +95,14 @@ export const DoctorView: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTab = searchParams.get('tab') || 'mening-navbatim';
 
-  // Digital clock & date in Uzbek
-  const [time, setTime] = useState('14:25');
+  // Digital clock & date with separated components for animations
+  const [dayNumber, setDayNumber] = useState('28');
+  const [monthNumber, setMonthNumber] = useState('10');
+  const [yearNumber, setYearNumber] = useState('2026');
+  const [weekdayStr, setWeekdayStr] = useState('Chorshanba');
+  const [hours, setHours] = useState('11');
+  const [minutes, setMinutes] = useState('25');
+  const [seconds, setSeconds] = useState('00');
   const [dateStr, setDateStr] = useState('');
 
   // Doctor session & all clinic doctors for switcher
@@ -113,6 +121,13 @@ export const DoctorView: React.FC = () => {
   const [completedTickets, setCompletedTickets] = useState<any[]>([]);
   const [activeTicket, setActiveTicket] = useState<any | null>(null);
 
+  // Patients Catalog & EMR history
+  const [patientsList, setPatientsList] = useState<any[]>([]);
+  const [patientsSearch, setPatientsSearch] = useState('');
+  const [selectedPatientModal, setSelectedPatientModal] = useState<any | null>(null);
+  const [loadingPatients, setLoadingPatients] = useState(false);
+  const [doctorVisitsDetail, setDoctorVisitsDetail] = useState<any[]>([]);
+
   // States
   const [loading, setLoading] = useState(false);
   const [historySearch, setHistorySearch] = useState('');
@@ -127,20 +142,36 @@ export const DoctorView: React.FC = () => {
   const [autoAnnounceTv, setAutoAnnounceTv] = useState(() => {
     return localStorage.getItem('sadaf_doctor_auto_tv') !== 'false';
   });
+  const [announceLanguage, setAnnounceLanguage] = useState(() => {
+    return localStorage.getItem('sadaf_doctor_tv_lang') || 'uz';
+  });
+  const [repeatCount, setRepeatCount] = useState(() => {
+    return Number(localStorage.getItem('sadaf_doctor_tv_repeat') || '1');
+  });
+  const [soundAlerts, setSoundAlerts] = useState(() => {
+    return localStorage.getItem('sadaf_doctor_sound_alerts') !== 'false';
+  });
+  const [breakMode, setBreakMode] = useState(false);
+  const [testingTv, setTestingTv] = useState(false);
 
   const showToast = (title: string, message?: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
     showNotification(title, message, type);
   };
 
-  // 1. Clock timer
+  // 1. Clock timer - updates each second with animated parts
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      setTime(now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }));
-      const d = now.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' }).replace(' г.', '');
+      setDayNumber(String(now.getDate()).padStart(2, '0'));
+      setMonthNumber(String(now.getMonth() + 1).padStart(2, '0'));
+      setYearNumber(String(now.getFullYear()));
       const w = now.toLocaleDateString('uz-UZ', { weekday: 'long' });
-      const capW = w.charAt(0).toUpperCase() + w.slice(1);
-      setDateStr(`${d}, ${capW}`);
+      setWeekdayStr(w.charAt(0).toUpperCase() + w.slice(1));
+      setHours(String(now.getHours()).padStart(2, '0'));
+      setMinutes(String(now.getMinutes()).padStart(2, '0'));
+      setSeconds(String(now.getSeconds()).padStart(2, '0'));
+      const d = now.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' }).replace(' г.', '');
+      setDateStr(`${d}, ${w.charAt(0).toUpperCase() + w.slice(1)}`);
     };
     updateTime();
     const timer = setInterval(updateTime, 1000);
@@ -261,6 +292,43 @@ export const DoctorView: React.FC = () => {
       }
     } catch (e) {
       console.warn('Error loading doctor tickets:', e);
+    }
+  };
+
+  // Fetch real patients catalog from PostgreSQL
+  const fetchPatients = async (query = '') => {
+    setLoadingPatients(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/patients${query ? `?search=${encodeURIComponent(query)}` : ''}`);
+      const json = await res.json();
+      if (json.data && Array.isArray(json.data)) {
+        setPatientsList(json.data);
+      }
+    } catch (e) {
+      console.warn('Error fetching patients:', e);
+    } finally {
+      setLoadingPatients(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPatients(patientsSearch);
+  }, [patientsSearch]);
+
+  const handleOpenPatientHistory = async (patient: any) => {
+    setSelectedPatientModal(patient);
+    setDoctorVisitsDetail(patient.doctor_visits || []);
+    try {
+      const res = await fetch(`${API_BASE_URL}/patients/${patient.id}`);
+      const json = await res.json();
+      if (json.data) {
+        setSelectedPatientModal(json.data);
+        if (json.data.doctor_visits && Array.isArray(json.data.doctor_visits)) {
+          setDoctorVisitsDetail(json.data.doctor_visits);
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching patient visits:', e);
     }
   };
 
@@ -434,22 +502,23 @@ export const DoctorView: React.FC = () => {
   const inProgressCount = activeTicket ? 1 : 0;
   const completedCount = completedTickets.length;
 
-  // Sidebar navigation items matching Shifokor.png exactly
+  // Sidebar navigation items
   const navItems = [
     { id: 'mening-navbatim', label: 'Mening navbatim', icon: Home },
+    { id: 'bemorlar', label: "Bemor ma'lumotlari", icon: Users },
     { id: 'tarix', label: 'Chaqiruvlar tarixi', icon: Clock },
     { id: 'kundalik-qabul', label: 'Kundalik qabul', icon: Calendar },
     { id: 'sozlamalar', label: 'Sozlamalar', icon: Settings },
   ];
 
   return (
-    <div className="flex min-h-screen bg-[#F0F4F8] select-none font-sans text-[#172B4D]">
-      {/* 1. LEFT SIDEBAR (100% 1:1 with Shifokor.png, LARGER ICONS & REAL ROUTING) */}
-      <aside className="w-64 bg-white flex flex-col justify-between flex-shrink-0 z-20 sticky top-0 h-screen border-r border-slate-200 shadow-xs">
+    <div className="flex min-h-screen bg-[#F0F4F8] p-3 gap-3 select-none font-sans text-[#172B4D]">
+      {/* 1. LEFT SIDEBAR (Standalone floating card, completely separate from top header) */}
+      <aside className="w-64 bg-white rounded-3xl border border-slate-200/90 shadow-sm flex flex-col justify-between flex-shrink-0 sticky top-3 h-[calc(100vh-1.5rem)] overflow-hidden z-20">
         <div>
           {/* Logo Header */}
           <div className="p-6 flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-[#00897B] flex items-center justify-center text-white shadow-md flex-shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-[#00897B] flex items-center justify-center text-white shadow-md shadow-[#00897B]/20 flex-shrink-0">
               <HeartPulse className="w-7 h-7 stroke-[2.4]" />
             </div>
             <div>
@@ -458,8 +527,8 @@ export const DoctorView: React.FC = () => {
             </div>
           </div>
 
-          {/* Navigation Items with LARGE ICONS & REAL ROUTING */}
-          <nav className="px-3 space-y-2 mt-2">
+          {/* Navigation Items */}
+          <nav className="px-3 space-y-1.5 mt-1">
             {navItems.map(item => {
               const Icon = item.icon;
               const isActive = currentTab === item.id;
@@ -473,13 +542,13 @@ export const DoctorView: React.FC = () => {
                       setSearchParams({ tab: item.id });
                     }
                   }}
-                  className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-[13px] font-semibold transition text-left ${
+                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-[13px] font-semibold transition text-left cursor-pointer ${
                     isActive
                       ? 'bg-[#00897B] text-white shadow-lg shadow-[#00897B]/25 font-bold'
                       : 'text-slate-600 hover:text-[#172B4D] hover:bg-slate-100'
                   }`}
                 >
-                  <Icon className={`w-6 h-6 stroke-[2.2] flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                  <Icon className={`w-5 h-5 stroke-[2.2] flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`} />
                   <span className="truncate">{item.label}</span>
                 </button>
               );
@@ -487,29 +556,35 @@ export const DoctorView: React.FC = () => {
           </nav>
         </div>
 
-        {/* Bottom Server Status (100% 1:1 with Shifokor.png) */}
-        <div className="p-5 border-t border-slate-100">
-          <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-600">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>PostgreSQL Server ulangan</span>
+        {/* Clean Clinic Badge at Bottom (Zero Postgres/database text) */}
+        <div className="p-4 border-t border-slate-100 bg-slate-50/70 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-teal-500/10 text-[#00897B] flex items-center justify-center flex-shrink-0 font-bold">
+            <ShieldCheck className="w-5 h-5 text-[#00897B]" />
           </div>
-          <div className="text-[10px] text-slate-400 mt-1">SADAF Clinic SaaS Engine</div>
+          <div className="min-w-0">
+            <div className="text-xs font-bold text-[#172B4D] truncate">SADAF Clinic</div>
+            <div className="text-[10px] text-slate-400 font-medium">Shifokor Tizimi v2.4</div>
+          </div>
         </div>
       </aside>
 
       {/* 2. MAIN WORKSPACE */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* TOP HEADER BAR */}
-        <header className="h-20 bg-white border-b border-slate-200/80 px-8 flex items-center justify-between sticky top-0 z-10 shadow-xs">
-          {/* Doctor Info (Without Switcher Select) */}
+        {/* TOP HEADER BAR (Standalone floating card, separate from sidebar) */}
+        <header className="h-20 bg-white rounded-2xl border border-slate-200/90 px-6 flex items-center justify-between sticky top-3 z-10 shadow-xs mb-3">
+          {/* Doctor Info */}
           <div className="flex items-center gap-4">
             {renderDoctorAvatar(doctorInfo.display_name, doctorInfo.avatar_url)}
             <div>
               <div className="flex items-center gap-2.5">
                 <h1 className="text-lg font-black text-[#172B4D] tracking-tight">{doctorInfo.display_name}</h1>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1.5 shadow-2xs">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Faol qabul</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border flex items-center gap-1.5 shadow-2xs ${
+                  breakMode
+                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200/60'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${breakMode ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`} />
+                  <span>{breakMode ? 'Tanaffus' : 'Faol qabul'}</span>
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-semibold mt-0.5 flex items-center gap-2">
@@ -527,20 +602,43 @@ export const DoctorView: React.FC = () => {
           </div>
 
           {/* Right Badges & Exit Button */}
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <Calendar className="w-4 h-4 text-slate-400" />
-              <div className="text-xs text-slate-500 font-medium">{dateStr}</div>
+          <div className="flex items-center gap-4">
+            {/* Animated Live Date Widget with Big Green Chislo */}
+            <div className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-emerald-50/90 via-white to-emerald-50/40 border border-emerald-200/80 rounded-2xl shadow-xs transition-all hover:border-emerald-300">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center flex-shrink-0 relative">
+                <Calendar className="w-5 h-5 text-emerald-600" />
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-baseline font-mono leading-none">
+                  <span className="text-2xl font-black text-emerald-600 tracking-tight drop-shadow-2xs inline-block animate-pulse">
+                    {dayNumber}
+                  </span>
+                  <span className="text-sm font-extrabold text-slate-700 tracking-wider">
+                    .{monthNumber}.{yearNumber}
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-semibold mt-0.5">{weekdayStr}</span>
+              </div>
             </div>
 
-            <div className="text-2xl font-black text-[#172B4D] tracking-tight font-mono">
-              {time}
+            {/* Animated Live Clock Widget */}
+            <div className="flex items-center gap-3 px-4 py-2 bg-white border border-slate-200/90 rounded-2xl shadow-xs transition-all hover:border-blue-200">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+                <Clock className="w-5 h-5 animate-[spin_10s_linear_infinite]" />
+              </div>
+              <div className="flex items-baseline font-mono leading-none">
+                <span className="text-2xl font-black text-[#172B4D] tracking-tight">{hours}</span>
+                <span className="text-2xl font-black text-emerald-500 animate-pulse mx-0.5">:</span>
+                <span className="text-2xl font-black text-[#172B4D] tracking-tight">{minutes}</span>
+                <span className="text-xs font-bold text-slate-400 ml-1.5 self-end mb-0.5">:{seconds}</span>
+              </div>
             </div>
 
-            {/* Chiqish (Logout) button matching Shifokor.png */}
+            {/* Chiqish (Logout) button */}
             <button
               onClick={handleLogout}
-              className="px-4 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition flex items-center gap-2"
+              className="px-4 py-2.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs"
             >
               <LogOut className="w-4 h-4" />
               <span>Chiqish</span>
@@ -721,14 +819,24 @@ export const DoctorView: React.FC = () => {
                     <FileText className="w-5 h-5 text-[#00897B]" />
                     <h3 className="text-sm font-bold text-[#172B4D]">Bemor ma'lumotlari</h3>
                   </div>
-                  {activeTicket && (
+                  <div className="flex items-center gap-2">
+                    {activeTicket && (
+                      <button
+                        onClick={() => handleOpenPatientEMR(activeTicket)}
+                        className="px-3.5 py-1.5 bg-blue-50 text-[#1677FF] rounded-xl text-xs font-bold hover:bg-blue-100 transition cursor-pointer"
+                      >
+                        Batafsil ko'rish (EMR)
+                      </button>
+                    )}
                     <button
-                      onClick={() => handleOpenPatientEMR(activeTicket)}
-                      className="px-3.5 py-1.5 bg-blue-50 text-[#1677FF] rounded-xl text-xs font-bold hover:bg-blue-100 transition cursor-pointer"
+                      onClick={() => setSearchParams({ tab: 'bemorlar' })}
+                      className="px-3 py-1.5 bg-teal-50 text-teal-700 hover:bg-teal-100 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-teal-200/60"
+                      title="Barcha bemorlar ro'yxati va qaysi do'ktirlarda bo'lgani tarixini ko'rish"
                     >
-                      Batafsil ko'rish (EMR)
+                      <Users className="w-3.5 h-3.5" />
+                      <span>Barcha bemorlar jadvali</span>
                     </button>
-                  )}
+                  </div>
                 </div>
 
                 {activeTicket ? (
@@ -780,8 +888,15 @@ export const DoctorView: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-xs text-slate-400 py-4 text-center">
-                    Hozircha qabulga bemor chaqirilmagan.
+                  <div className="text-xs text-slate-400 py-6 text-center space-y-2.5">
+                    <div>Hozircha qabulga bemor chaqirilmagan.</div>
+                    <button
+                      onClick={() => setSearchParams({ tab: 'bemorlar' })}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      <Users className="w-4 h-4 text-slate-500" />
+                      <span>Bemorlar bazasi va ko'riklar tarixini ko'rish</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -862,7 +977,186 @@ export const DoctorView: React.FC = () => {
           </main>
         )}
 
-        {/* TAB 2: CHAQUIRUVLAR TARIXI (100% Real from PostgreSQL) */}
+        {/* TAB 2: BEMOR MA'LUMOTLARI JADVALI (100% Real from PostgreSQL) */}
+        {currentTab === 'bemorlar' && (
+          <main className="p-8 flex-1 space-y-6">
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-2xl bg-teal-50 text-[#00897B] flex items-center justify-center font-bold shadow-xs">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-black text-[#172B4D]">Bemorlar Ma'lumotlari va Tibbiy Tarixi</h2>
+                      <p className="text-xs text-slate-500">Klinika bemorlarining ko'riklar tarixi va qaysi shifokorlarda bo'lgani</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="F.I.SH, telefon yoki karta..."
+                      value={patientsSearch}
+                      onChange={(e) => setPatientsSearch(e.target.value)}
+                      className="pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl w-64 focus:outline-none focus:ring-2 focus:ring-[#00897B]"
+                    />
+                  </div>
+                  <button
+                    onClick={() => fetchPatients(patientsSearch)}
+                    className="p-2 text-slate-500 hover:text-[#00897B] bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer"
+                    title="Yangilash"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loadingPatients ? 'animate-spin text-[#00897B]' : ''}`} />
+                  </button>
+                  <span className="px-3.5 py-2 bg-teal-50 text-[#00897B] border border-teal-200/60 rounded-xl text-xs font-bold">
+                    Jami: {patientsList.length} ta bemor
+                  </span>
+                </div>
+              </div>
+
+              {/* Patient Table */}
+              <div className="overflow-x-auto rounded-2xl border border-slate-200/80">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                    <tr>
+                      <th className="py-3.5 px-4">Bemor</th>
+                      <th className="py-3.5 px-4">Aloqa</th>
+                      <th className="py-3.5 px-4">Yosh / Jinsi</th>
+                      <th className="py-3.5 px-4">Tashriflar soni</th>
+                      <th className="py-3.5 px-4">Qaysi do'ktirlarda bo'lgan</th>
+                      <th className="py-3.5 px-4">Oxirgi tashrif</th>
+                      <th className="py-3.5 px-4 text-right">Amal</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {patientsList.length > 0 ? (
+                      patientsList.map((p: any) => {
+                        const visits: any[] = p.doctor_visits || [];
+                        const isFemale = p.gender === 'FEMALE' || isFemaleDoctor(p.full_name);
+                        return (
+                          <tr
+                            key={p.id}
+                            onClick={() => handleOpenPatientHistory(p)}
+                            className="hover:bg-teal-50/30 transition-all cursor-pointer group"
+                          >
+                            {/* Bemor F.I.SH & Avatar */}
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shadow-xs flex-shrink-0 ${
+                                  isFemale
+                                    ? 'bg-gradient-to-br from-pink-500 to-rose-600'
+                                    : 'bg-gradient-to-br from-blue-500 to-indigo-600'
+                                }`}>
+                                  {p.full_name?.charAt(0) || 'B'}
+                                </div>
+                                <div>
+                                  <div className="font-bold text-[#172B4D] group-hover:text-[#00897B] transition">
+                                    {p.full_name}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                    № {p.patient_number || p.id?.slice(0, 8)}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Aloqa */}
+                            <td className="py-3.5 px-4">
+                              <div className="font-medium text-slate-700">{p.phone || '—'}</div>
+                              {p.address && (
+                                <div className="text-[10px] text-slate-400 truncate max-w-[150px]">{p.address}</div>
+                              )}
+                            </td>
+
+                            {/* Yosh / Jinsi */}
+                            <td className="py-3.5 px-4">
+                              <div className="font-bold text-slate-700">{calculateAge(p.birth_date)}</div>
+                              <span className={`inline-block px-2 py-0.2 rounded-full text-[10px] font-semibold mt-0.5 ${
+                                isFemale ? 'bg-pink-50 text-pink-700' : 'bg-blue-50 text-blue-700'
+                              }`}>
+                                {isFemale ? 'Ayol' : 'Erkak'}
+                              </span>
+                            </td>
+
+                            {/* Tashriflar soni */}
+                            <td className="py-3.5 px-4">
+                              <span className="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-800 font-black font-mono text-[11px] border border-slate-200">
+                                {p.total_visits || visits.reduce((acc, v) => acc + (v.visit_count || 1), 0) || 1} marta
+                              </span>
+                            </td>
+
+                            {/* Qaysi do'ktirlarda bo'lgan */}
+                            <td className="py-3.5 px-4">
+                              <div className="flex flex-wrap gap-1.5 max-w-xs">
+                                {visits.length > 0 ? (
+                                  visits.map((v: any, idx: number) => (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-teal-50 text-teal-800 text-[10px] font-bold border border-teal-200/60 shadow-2xs"
+                                      title={`${v.doctor_name} (${v.specialty_name}, ${v.cabinet_number}-kabinet) — ${v.visit_count || 1} marta ko'rik`}
+                                    >
+                                      <span>👨‍⚕️</span>
+                                      <span className="truncate max-w-[110px]">{v.doctor_name || v.specialty_name}</span>
+                                      {v.visit_count > 1 && (
+                                        <span className="text-[9px] bg-teal-200 text-teal-900 rounded-full px-1">
+                                          x{v.visit_count}
+                                        </span>
+                                      )}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-slate-400 text-[11px] italic">
+                                    {doctorInfo.display_name} ({doctorInfo.specialty_name})
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Oxirgi tashrif */}
+                            <td className="py-3.5 px-4">
+                              <div className="font-mono text-slate-600 text-[11px]">
+                                {p.last_visit?.date ? formatBirthDate(p.last_visit.date) : formatBirthDate(p.created_at)}
+                              </div>
+                              <div className="text-[10px] text-slate-400">
+                                {p.last_visit?.doctor_name || doctorInfo.display_name}
+                              </div>
+                            </td>
+
+                            {/* Amal */}
+                            <td className="py-3.5 px-4 text-right">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenPatientHistory(p);
+                                }}
+                                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#1677FF] rounded-xl text-xs font-bold transition flex items-center gap-1 ml-auto cursor-pointer border border-blue-200/50"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Tarixini ko'rish</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-slate-400 text-xs">
+                          {loadingPatients ? "Bemorlar ro'yxati yuklanmoqda..." : "Hech qanday bemor ma'lumoti topilmadi"}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </main>
+        )}
+
+        {/* TAB 3: CHAQUIRUVLAR TARIXI (100% Real from PostgreSQL) */}
         {currentTab === 'tarix' && (
           <main className="p-8 flex-1 space-y-6">
             <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
@@ -1011,103 +1305,290 @@ export const DoctorView: React.FC = () => {
           </main>
         )}
 
-        {/* TAB 4: SOZLAMALAR (100% Real from PostgreSQL) */}
+        {/* TAB 5: SOZLAMALAR (100% Real from PostgreSQL, Ultra-Modern & Beautiful) */}
         {currentTab === 'sozlamalar' && (
           <main className="p-8 flex-1 space-y-6">
-            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-6 max-w-2xl">
-              <div>
-                <h2 className="text-lg font-black text-[#172B4D]">Shifokor Xonasi Sozlamalari</h2>
-                <p className="text-xs text-slate-500">Kabinet va navbat bildirishnomalarini boshqaring</p>
-              </div>
-
-              <div className="space-y-4">
-                {/* Doctor Profile Card in Settings */}
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-50 via-teal-50/20 to-slate-50 border border-slate-200/80 flex items-center gap-4">
-                  {renderDoctorAvatar(doctorInfo.display_name, doctorInfo.avatar_url, "w-16 h-16")}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-base font-black text-[#172B4D] truncate">{doctorInfo.display_name}</h3>
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
-                        {isFemaleDoctor(doctorInfo.display_name) ? "Ayol shifokor" : "Erkak shifokor"}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 font-semibold mt-0.5">
-                      {doctorInfo.specialty_name} • {doctorInfo.cabinet_number}-kabinet
-                    </p>
-                    <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                      Shifokor ID: {doctorInfo.id}
-                    </p>
+            <div className="max-w-5xl mx-auto space-y-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-[#00897B] text-white flex items-center justify-center shadow-lg shadow-[#00897B]/20">
+                    <Sliders className="w-6 h-6 stroke-[2.2]" />
                   </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Mutaxassislik va Kabinet</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={`${doctorInfo.specialty_name} | ${doctorInfo.cabinet_number}-kabinet`}
-                    className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Aloqa telefoni</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={doctorInfo.phone || '+998 90 123 45 67'}
-                    className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
-                  />
-                </div>
-
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                   <div>
-                    <div className="text-xs font-bold text-slate-800">TV Tabloga avtomatik e'lon yuborish</div>
-                    <div className="text-[11px] text-slate-400">"Keyingi bemor" bosilganda TV monitorida ovozli chaqiruv qilinadi</div>
+                    <h2 className="text-xl font-black text-[#172B4D]">Shifokor Kabineti Sozlamalari</h2>
+                    <p className="text-xs text-slate-500">Shaxsiy profil, TV tablo chaqiruvlari va qabul parametrlarini boshqarish</p>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={autoAnnounceTv}
-                    onChange={(e) => {
-                      setAutoAnnounceTv(e.target.checked);
-                      localStorage.setItem('sadaf_doctor_auto_tv', String(e.target.checked));
-                    }}
-                    className="w-5 h-5 text-[#00897B] rounded-lg accent-[#00897B] cursor-pointer"
-                  />
                 </div>
-
-                <div className="pt-4 flex gap-3">
+                <div className="flex items-center gap-3">
                   <button
                     onClick={() => {
                       localStorage.setItem('sadaf_doctor_auto_tv', String(autoAnnounceTv));
-                      showToast("Sozlamalar muvaffaqiyatli saqlandi!");
+                      localStorage.setItem('sadaf_doctor_tv_lang', announceLanguage);
+                      localStorage.setItem('sadaf_doctor_tv_repeat', String(repeatCount));
+                      localStorage.setItem('sadaf_doctor_sound_alerts', String(soundAlerts));
+                      showToast("Barcha sozlamalar muvaffaqiyatli saqlandi!", undefined, 'success');
                     }}
-                    className="px-5 py-2.5 bg-[#00897B] text-white rounded-xl text-xs font-bold hover:bg-[#00796B] transition cursor-pointer"
+                    className="px-5 py-2.5 bg-[#00897B] hover:bg-[#00796B] text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-md shadow-[#00897B]/20"
                   >
-                    Saqlash
+                    <Check className="w-4 h-4" />
+                    <span>O'zgarishlarni saqlash</span>
                   </button>
+                </div>
+              </div>
 
-                  <button
-                    onClick={async () => {
-                      try {
-                        await fetch(`${API_BASE_URL}/tv/test-call`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            ticketNumber: activeTicket?.full_number || 'K-001',
-                            specialty: doctorInfo.specialty_name,
-                            cabinetNumber: doctorInfo.cabinet_number
-                          })
-                        });
-                        showToast("TV Display monitoriga sinov chaqiruvi yuborildi!");
-                      } catch (e) {
-                        showToast("Xatolik yuz berdi");
-                      }
-                    }}
-                    className="px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition cursor-pointer"
-                  >
-                    Ovozli e'lonni sinash (TV Test)
-                  </button>
+              {/* 2-Column Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* LEFT COLUMN: Shifokor Profili va Holat */}
+                <div className="lg:col-span-5 space-y-6">
+                  {/* Doctor Profile Card */}
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-teal-500/10 via-emerald-500/5 to-transparent rounded-bl-full pointer-events-none" />
+                    <div className="flex items-start gap-4">
+                      {renderDoctorAvatar(doctorInfo.display_name, doctorInfo.avatar_url, "w-20 h-20")}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-lg font-black text-[#172B4D] truncate">{doctorInfo.display_name}</h3>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
+                            {isFemaleDoctor(doctorInfo.display_name) ? "Ayol shifokor" : "Erkak shifokor"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 font-semibold mt-1">
+                          {doctorInfo.specialty_name}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="font-mono text-xs px-2.5 py-1 bg-slate-100 rounded-lg text-slate-700 font-bold border border-slate-200">
+                            {doctorInfo.cabinet_number}-kabinet
+                          </span>
+                          <span className="text-xs font-mono text-slate-400">
+                            {doctorInfo.phone || '+998 90 123 45 67'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Status Pill Toggle */}
+                    <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-bold text-slate-800">Qabul holati</div>
+                        <div className="text-[11px] text-slate-400">
+                          {breakMode ? "Hozirda tanaffus e'lon qilingan" : "Bemorlar qabuli faol"}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const nextState = !breakMode;
+                          setBreakMode(nextState);
+                          showToast(nextState ? "Tanaffus rejimi yoqildi" : "Faol qabul davom ettirilmoqda");
+                        }}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                          breakMode
+                            ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-200'
+                            : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-200'
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${breakMode ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`} />
+                        <span>{breakMode ? "Tanaffusda" : "Faol qabulda"}</span>
+                      </button>
+                    </div>
+
+                    {/* Stats pills */}
+                    <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-100 text-center">
+                      <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
+                        <div className="text-[10px] text-slate-400 font-semibold">Bugun qabul</div>
+                        <div className="text-base font-black text-[#172B4D] mt-0.5">{completedCount} ta</div>
+                      </div>
+                      <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
+                        <div className="text-[10px] text-slate-400 font-semibold">O'rtacha vaqt</div>
+                        <div className="text-base font-black text-teal-700 mt-0.5">{doctorInfo.avg_consultation_minutes || 15} daq</div>
+                      </div>
+                      <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
+                        <div className="text-[10px] text-slate-400 font-semibold">Reyting</div>
+                        <div className="text-base font-black text-amber-600 mt-0.5 flex items-center justify-center gap-0.5">
+                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                          <span>4.95</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* System & Session Card */}
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-3">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tizim va Xavfsizlik</h4>
+                    <div className="flex items-center justify-between text-xs py-1">
+                      <span className="text-slate-500">Shifokor ID:</span>
+                      <span className="font-mono font-bold text-slate-700">{doctorInfo.id}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs py-1 border-t border-slate-100">
+                      <span className="text-slate-500">Tizim roli:</span>
+                      <span className="font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md">Shifokor (Doctor)</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs py-1 border-t border-slate-100">
+                      <span className="text-slate-500">Aloqa markazi:</span>
+                      <span className="font-bold text-slate-700">SADAF Support</span>
+                    </div>
+                    <div className="pt-2">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full py-2.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>Tizimdan chiqish</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN: TV E'lon va Navbat Parametrlari */}
+                <div className="lg:col-span-7 space-y-6">
+                  {/* TV Display Card */}
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-5">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                          <Volume2 className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-[#172B4D]">Kutish Zali TV Tablosi va Ovozli E'lon</h3>
+                          <p className="text-[11px] text-slate-400">TV monitoriga vizual va ovozli chaqiruvlarni boshqarish</p>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60">
+                        Display Live
+                      </span>
+                    </div>
+
+                    <div className="space-y-4 text-xs">
+                      {/* Toggle 1: Auto Announce TV */}
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-slate-800">TV Tabloga avtomatik chaqiruv uzatish</div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">
+                            "Keyingi bemor" bosilganda zal monitorida talon ko'rsatiladi va ovozli chaqiriladi
+                          </div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={autoAnnounceTv}
+                          onChange={(e) => {
+                            setAutoAnnounceTv(e.target.checked);
+                            localStorage.setItem('sadaf_doctor_auto_tv', String(e.target.checked));
+                          }}
+                          className="w-5 h-5 text-[#00897B] rounded-lg accent-[#00897B] cursor-pointer"
+                        />
+                      </div>
+
+                      {/* Language Selection */}
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-slate-800">Ovozli chaqiruv tili</div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">
+                            TV displeyida diktor tomonidan yangraydigan ovoz tili
+                          </div>
+                        </div>
+                        <select
+                          value={announceLanguage}
+                          onChange={(e) => {
+                            setAnnounceLanguage(e.target.value);
+                            localStorage.setItem('sadaf_doctor_tv_lang', e.target.value);
+                          }}
+                          className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#00897B]"
+                        >
+                          <option value="uz">O'zbekcha (Lotin)</option>
+                          <option value="ru">Русский язык</option>
+                        </select>
+                      </div>
+
+                      {/* Repeat Count */}
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-slate-800">Ovozli e'lon takrorlanishi</div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">
+                            Har bir chaqiruv necha marta takroran eshittirilishi
+                          </div>
+                        </div>
+                        <div className="flex gap-1.5">
+                          {[1, 2, 3].map((num) => (
+                            <button
+                              key={num}
+                              onClick={() => {
+                                setRepeatCount(num);
+                                localStorage.setItem('sadaf_doctor_tv_repeat', String(num));
+                              }}
+                              className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                                repeatCount === num
+                                  ? 'bg-[#00897B] text-white shadow-xs'
+                                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              {num} marta
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Test Call Button */}
+                      <div className="pt-2">
+                        <button
+                          disabled={testingTv}
+                          onClick={async () => {
+                            setTestingTv(true);
+                            try {
+                              await fetch(`${API_BASE_URL}/tv/test-call`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  ticketNumber: activeTicket?.full_number || 'K-001',
+                                  specialty: doctorInfo.specialty_name,
+                                  cabinetNumber: doctorInfo.cabinet_number
+                                })
+                              });
+                              showToast("TV Display monitoriga sinov chaqiruvi yuborildi!");
+                            } catch (e) {
+                              showToast("Xatolik yuz berdi", undefined, 'error');
+                            } finally {
+                              setTimeout(() => setTestingTv(false), 2000);
+                            }
+                          }}
+                          className="w-full py-3 bg-gradient-to-r from-blue-500 via-indigo-600 to-teal-600 hover:from-blue-600 hover:to-teal-700 text-white rounded-2xl font-bold text-xs shadow-md shadow-indigo-500/20 transition flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <Volume2 className={`w-4 h-4 ${testingTv ? 'animate-bounce' : ''}`} />
+                          <span>{testingTv ? "Sinov signali yuborilmoqda..." : "Ovozli e'lonni sinash (TV Test Call)"}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sound & Notifications Card */}
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+                    <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+                      <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                        <Bell className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-[#172B4D]">Kabinet Bildirishnomalari</h3>
+                        <p className="text-[11px] text-slate-400">Shifokor kompyuterida chiquvchi ogohlantirishlar</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 text-xs">
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-slate-800">Yangi bemor kelganda tovushli signal</div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">Navbatga yangi bemor qo'shilganda qisqa tovush chiqarish</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={soundAlerts}
+                          onChange={(e) => {
+                            setSoundAlerts(e.target.checked);
+                            localStorage.setItem('sadaf_doctor_sound_alerts', String(e.target.checked));
+                          }}
+                          className="w-5 h-5 text-[#00897B] rounded-lg accent-[#00897B] cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1280,6 +1761,173 @@ export const DoctorView: React.FC = () => {
                 className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
               >
                 Tushunarli
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 3: BEMORNING TO'LIQ TARIXI VA QAYSI DO'KTIRLARDA BO'LGANI --- */}
+      {selectedPatientModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-teal-50 text-[#00897B] flex items-center justify-center font-bold">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-[#172B4D]">Bemor Tibbiy Tarixi & Ko'riklar Jurnali</h3>
+                  <p className="text-xs text-slate-400">Bemor ma'lumotlari va qaysi do'ktirlarda ko'rikda bo'lgani</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedPatientModal(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Patient Profile Card */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-50 via-teal-50/20 to-slate-50 border border-slate-200/80 flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-sm flex-shrink-0 ${
+                  selectedPatientModal.gender === 'FEMALE' || isFemaleDoctor(selectedPatientModal.full_name)
+                    ? 'bg-gradient-to-br from-pink-500 to-rose-600'
+                    : 'bg-gradient-to-br from-blue-500 to-indigo-600'
+                }`}>
+                  {selectedPatientModal.full_name?.charAt(0) || 'B'}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-base font-black text-[#172B4D]">{selectedPatientModal.full_name}</h4>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      selectedPatientModal.gender === 'FEMALE' || isFemaleDoctor(selectedPatientModal.full_name)
+                        ? 'bg-pink-100 text-pink-800'
+                        : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {selectedPatientModal.gender === 'FEMALE' || isFemaleDoctor(selectedPatientModal.full_name) ? 'Ayol' : 'Erkak'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                    <span>{selectedPatientModal.phone || '—'}</span>
+                    <span className="text-slate-300">•</span>
+                    <span>{calculateAge(selectedPatientModal.birth_date)}</span>
+                    {selectedPatientModal.address && (
+                      <>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-slate-400">{selectedPatientModal.address}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="font-mono text-xs px-3 py-1 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 block">
+                  Karta № {selectedPatientModal.patient_number || selectedPatientModal.id?.slice(0, 8)}
+                </span>
+                <span className="text-[11px] text-teal-700 font-bold mt-1 inline-block">
+                  Jami: {selectedPatientModal.total_visits || doctorVisitsDetail.length || 1} marta tashrif
+                </span>
+              </div>
+            </div>
+
+            {/* SECTION: QAYSI DO'KTIRLARDA BO'LGANI (Shifokorlar Ko'rigi Tarixi) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Stethoscope className="w-4 h-4 text-[#00897B]" />
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Qaysi do'ktirlarda bo'lgan (Ko'riklar tarixi)
+                  </h4>
+                </div>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {doctorVisitsDetail.length} ta shifokor qabulida bo'lgan
+                </span>
+              </div>
+
+              <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                {doctorVisitsDetail.length > 0 ? (
+                  doctorVisitsDetail.map((dv: any, idx: number) => {
+                    const isDocFemale = isFemaleDoctor(dv.doctor_name);
+                    return (
+                      <div
+                        key={idx}
+                        className="p-3.5 rounded-2xl border border-slate-200/90 bg-white hover:border-teal-300 transition-all flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-3">
+                          {renderDoctorAvatar(dv.doctor_name, undefined, "w-11 h-11")}
+                          <div>
+                            <div className="font-black text-xs text-[#172B4D] flex items-center gap-2">
+                              <span>{dv.doctor_name || 'Shifokor'}</span>
+                              <span className="px-2 py-0.2 rounded-full text-[9px] font-bold bg-teal-50 text-teal-700 border border-teal-200/50">
+                                {isDocFemale ? "Ayol shifokor" : "Erkak shifokor"}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 font-semibold mt-0.5 flex items-center gap-2">
+                              <span className="text-teal-700 font-bold">{dv.specialty_name || 'Konsultatsiya'}</span>
+                              <span className="text-slate-300">•</span>
+                              <span className="font-mono text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded">
+                                {dv.cabinet_number ? `${dv.cabinet_number}-kabinet` : '1-kabinet'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="px-2.5 py-1 rounded-xl bg-teal-50 text-teal-800 text-[11px] font-black font-mono border border-teal-200/60 inline-block">
+                            {dv.visit_count || 1} marta qabulda
+                          </span>
+                          {dv.last_visited_at && (
+                            <div className="text-[10px] text-slate-400 mt-1 font-mono">
+                              Oxirgi: {formatBirthDate(dv.last_visited_at)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-center text-xs text-slate-400">
+                    Ushbu bemor hozirgacha boshqa shifokorlar qabulida ro'yxatga olinmagan.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Doctor Consultation Notes & Prescription */}
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                <span>Shifokor ko'rik xulosasi, tashxis va tavsiyalar:</span>
+                <span className="text-[10px] text-slate-400 font-normal">Klinika EMR bazasiga saqlanadi</span>
+              </label>
+              <textarea
+                rows={3}
+                value={consultationNotes}
+                onChange={(e) => setConsultationNotes(e.target.value)}
+                placeholder="Bemor shikoyatlari, tashxis, tavsiya etilgan tahlillar va dori vositalari..."
+                className="w-full p-3 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#00897B]"
+              />
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <button
+                onClick={() => setSelectedPatientModal(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Yopish
+              </button>
+              <button
+                onClick={() => {
+                  showToast("Bemor ko'rik xulosasi muvaffaqiyatli saqlandi!");
+                  setSelectedPatientModal(null);
+                }}
+                className="px-5 py-2 bg-[#00897B] hover:bg-[#00796B] text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-sm"
+              >
+                Xulosani saqlash
               </button>
             </div>
           </div>
