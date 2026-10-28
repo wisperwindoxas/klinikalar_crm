@@ -40,16 +40,38 @@ class AuthService extends ChangeNotifier {
     _isLoading = false;
 
     if (result['success'] == true) {
-      final data = result['data'];
-      final userMap = data['user'] ?? data;
+      final rawData = result['data'];
+      Map<String, dynamic> userMap = {};
+      String token = '';
+
+      if (rawData is Map<String, dynamic>) {
+        if (rawData['user'] is Map<String, dynamic>) {
+          userMap = Map<String, dynamic>.from(rawData['user']);
+        } else if (rawData['data'] is Map<String, dynamic> &&
+            rawData['data']['user'] is Map<String, dynamic>) {
+          userMap = Map<String, dynamic>.from(rawData['data']['user']);
+        } else if (rawData['data'] is Map<String, dynamic>) {
+          userMap = Map<String, dynamic>.from(rawData['data']);
+        } else {
+          userMap = Map<String, dynamic>.from(rawData);
+        }
+
+        token = (rawData['token'] ??
+                (rawData['data'] is Map ? rawData['data']['token'] : null) ??
+                '')
+            .toString();
+      }
 
       _currentUser = UserModel.fromJson(userMap);
-      final token = data['token'] ?? '';
-      ApiService().setToken(token);
+      if (token.isNotEmpty) {
+        ApiService().setToken(token);
+      }
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('cached_user', jsonEncode(_currentUser!.toJson()));
-      await prefs.setString('auth_token', token);
+      if (token.isNotEmpty) {
+        await prefs.setString('auth_token', token);
+      }
 
       notifyListeners();
       return {'success': true, 'user': _currentUser};

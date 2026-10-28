@@ -87,21 +87,20 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _navigateToRole() {
     final user = AuthService().currentUser;
-    Widget targetScreen;
+    if (user == null) return;
 
-    if (user != null && user.isDoctor) {
-      targetScreen = const DoctorMainScreen();
-    } else if (user != null && user.isCashier) {
-      targetScreen = const CashierMainScreen();
-    } else if (user != null && user.isManager) {
+    Widget targetScreen;
+    if (user.isManager) {
       targetScreen = const ManagerMainScreen();
+    } else if (user.isCashier) {
+      targetScreen = const CashierMainScreen();
     } else {
-      // Default to doctor screen if role unclear
       targetScreen = const DoctorMainScreen();
     }
 
-    Navigator.of(context).pushReplacement(
+    Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => targetScreen),
+      (route) => false,
     );
   }
 

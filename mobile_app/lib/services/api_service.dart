@@ -47,12 +47,23 @@ class ApiService {
 
       final data = jsonDecode(response.body);
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        if (data['token'] != null) {
-          setToken(data['token']);
+        // Backend returns: {"success": true, "data": {"token": "...", "user": {...}}}
+        Map<String, dynamic> payload = {};
+        if (data is Map<String, dynamic>) {
+          if (data['data'] is Map<String, dynamic>) {
+            payload = Map<String, dynamic>.from(data['data']);
+          } else {
+            payload = Map<String, dynamic>.from(data);
+          }
         }
-        return {'success': true, 'data': data};
+
+        final token = payload['token']?.toString() ?? (data is Map ? data['token']?.toString() : null);
+        if (token != null && token.isNotEmpty) {
+          setToken(token);
+        }
+        return {'success': true, 'data': payload};
       }
-      return {'success': false, 'message': data['message'] ?? 'Login yoki parol xato'};
+      return {'success': false, 'message': (data is Map ? data['message'] : null) ?? 'Login yoki parol xato'};
     } on TimeoutException {
       return {
         'success': false,

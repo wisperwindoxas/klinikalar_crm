@@ -39,12 +39,12 @@ class RootGateScreen extends StatelessWidget {
     }
 
     final user = auth.currentUser!;
-    if (user.isDoctor) {
-      return const DoctorMainScreen();
+    if (user.isManager) {
+      return const ManagerMainScreen();
     } else if (user.isCashier) {
       return const CashierMainScreen();
     } else {
-      return const ManagerMainScreen();
+      return const DoctorMainScreen();
     }
   }
 }
