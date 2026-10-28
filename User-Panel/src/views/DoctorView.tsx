@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import { showNotification } from '../components/ToastNotification';
+import { CompleteVisitModal } from '../components/CompleteVisitModal';
 
 const API_BASE_URL = 'http://localhost:5001/api/v1';
 
@@ -137,6 +138,8 @@ export const DoctorView: React.FC = () => {
   const [patientEMRData, setPatientEMRData] = useState<any | null>(null);
   const [previousPatientModal, setPreviousPatientModal] = useState<any | null>(null);
   const [consultationNotes, setConsultationNotes] = useState('');
+  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  const [completingVisit, setCompletingVisit] = useState(false);
 
   // Settings
   const [autoAnnounceTv, setAutoAnnounceTv] = useState(() => {
@@ -427,32 +430,45 @@ export const DoctorView: React.FC = () => {
     }
   };
 
-  // 3. Qabulni yakunlash (Complete)
-  const handleComplete = async () => {
+  // 3. Qabulni yakunlash (Modal ochish)
+  const handleComplete = () => {
     if (!activeTicket?.id) {
-      showToast("Qabulni yakunlash uchun faol bemor yo'q.");
+      showToast("Qabulni yakunlash uchun faol bemor yo'q.", undefined, 'warning');
       return;
     }
+    setIsCompleteModalOpen(true);
+  };
+
+  // 3.1 Qabulni yakunlashni tasdiqlash (API chaqirish)
+  const handleConfirmComplete = async (conclusionText: string) => {
+    if (!activeTicket?.id) return;
+    const finalConclusion = conclusionText?.trim() ? conclusionText.trim() : "Xulosa berilmadi";
+    
+    setCompletingVisit(true);
     try {
       const res = await fetch(`${API_BASE_URL}/queues/tickets/${activeTicket.id}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           doctorId: doctorInfo.id,
-          notes: consultationNotes,
-          conclusion: consultationNotes
+          notes: finalConclusion,
+          conclusion: finalConclusion
         })
       });
       const json = await res.json();
       if (res.ok) {
-        showToast(`${activeTicket.full_number} qabuli muvaffaqiyatli yakunlandi!`);
+        showToast(`${activeTicket.full_number} qabuli muvaffaqiyatli yakunlandi!`, undefined, 'success');
         setActiveTicket(null);
+        setConsultationNotes('');
+        setIsCompleteModalOpen(false);
         loadDoctorData();
       } else {
-        showToast(json.message || 'Xatolik yuz berdi.');
+        showToast(json.message || 'Xatolik yuz berdi.', undefined, 'error');
       }
     } catch (e) {
-      showToast('Server bilan aloqa xatoligi.');
+      showToast('Server bilan aloqa xatoligi.', undefined, 'error');
+    } finally {
+      setCompletingVisit(false);
     }
   };
 
@@ -1721,6 +1737,17 @@ export const DoctorView: React.FC = () => {
         </div>
       )}
 
+      {/* --- MODAL: QABULNI YAKUNLASH VA XULOSA KIRITISH OYNASI --- */}
+      <CompleteVisitModal
+        isOpen={isCompleteModalOpen}
+        ticket={activeTicket}
+        doctorInfo={doctorInfo}
+        initialNotes={consultationNotes}
+        onClose={() => setIsCompleteModalOpen(false)}
+        onConfirm={handleConfirmComplete}
+        isLoading={completingVisit}
+      />
+
       {/* --- MODAL 2: OLDINGI BEMOR KARTASI (Previous Patient Modal) --- */}
       {previousPatientModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1924,17 +1951,11 @@ export const DoctorView: React.FC = () => {
                         {visitRows.length > 0 ? (
                           visitRows.map((v: any, idx: number) => {
                             const isDocFemale = isFemaleDoctor(v.doctor_name);
-                            const conclusionText = v.doctor_conclusion || v.notes || (
-                              v.specialty_name?.toLowerCase().includes('kardio')
-                                ? "Arterial gipertoniya I-bosqich. EKG: Sinus ritmi. Lizinopril 5mg 1 mahal, tuzsiz parhez va nazorat tavsiya etildi."
-                                : v.specialty_name?.toLowerCase().includes('travma')
-                                ? "Tizza bo'g'imi artrozi I-bosqich. Rentgen: Suyak sinishi yo'q. Elastik bint va malham tavsiya qilindi."
-                                : v.specialty_name?.toLowerCase().includes('stomat')
-                                ? "O'rta karies (1.6-tish). Tish bo'shlig'i tozalandi, fotopolimer kompozit plomba qo'yildi."
-                                : v.specialty_name?.toLowerCase().includes('nevro')
-                                ? "Surunkali astenik sindrom. Neyromultivit va to'liq dam olish rejimi tavsiya qilindi."
-                                : "Bemor ko'rikdan o'tkazildi. Birlamchi tashxis qo'yildi, umumiy laboratoriya tahlillari va profilaktik muolaja tavsiya qilindi."
-                            );
+                            const conclusionText = (v.doctor_conclusion && v.doctor_conclusion.trim())
+                              ? v.doctor_conclusion.trim()
+                              : (v.notes && v.notes.trim())
+                                ? v.notes.trim()
+                                : "Xulosa berilmadi";
 
                             return (
                               <tr key={v.id || idx} className="hover:bg-teal-50/20 transition-colors">

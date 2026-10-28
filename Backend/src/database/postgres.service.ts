@@ -657,16 +657,20 @@ export class PostgresService {
   public async completeTicket(ticketId: string, doctorId: string, notes?: string, conclusion?: string) {
     return this.withTransaction(async (client) => {
       const now = new Date();
+      const finalConclusion = (conclusion && conclusion.trim().length > 0)
+        ? conclusion.trim()
+        : ((notes && notes.trim().length > 0) ? notes.trim() : 'Xulosa berilmadi');
+
       const res = await client.query(`
         UPDATE queue_tickets 
         SET status = 'COMPLETED', 
             completed_at = $1, 
             updated_at = $1,
-            notes = COALESCE($3, notes),
-            doctor_conclusion = COALESCE($4, doctor_conclusion)
+            notes = $3,
+            doctor_conclusion = $4
         WHERE id = $2 
         RETURNING *
-      `, [now, ticketId, notes || null, conclusion || notes || null]);
+      `, [now, ticketId, finalConclusion, finalConclusion]);
 
       await client.query(`
         UPDATE doctors SET current_ticket_id = NULL, updated_at = $1 WHERE id = $2
