@@ -322,9 +322,23 @@ export const DoctorView: React.FC = () => {
       const res = await fetch(`${API_BASE_URL}/patients/${patient.id}`);
       const json = await res.json();
       if (json.data) {
-        setSelectedPatientModal(json.data);
-        if (json.data.doctor_visits && Array.isArray(json.data.doctor_visits)) {
-          setDoctorVisitsDetail(json.data.doctor_visits);
+        const pat = json.data.patient || json.data;
+        const merged = {
+          ...patient,
+          ...pat,
+          full_name: pat.full_name || pat.name || patient.full_name || patient.patient_name || 'Bemor',
+          phone: pat.phone || patient.phone || patient.patient_phone,
+          birth_date: pat.birth_date || patient.birth_date || patient.patient_birth_date,
+          gender: pat.gender || patient.gender || patient.patient_gender,
+          address: pat.address || patient.address || patient.patient_address,
+          doctor_visits: pat.doctor_visits || patient.doctor_visits || [],
+          total_visits: pat.total_visits || patient.total_visits || (pat.doctor_visits?.length || 1),
+          tickets: json.data.tickets || [],
+          payments: json.data.payments || []
+        };
+        setSelectedPatientModal(merged);
+        if (merged.doctor_visits && Array.isArray(merged.doctor_visits)) {
+          setDoctorVisitsDetail(merged.doctor_visits);
         }
       }
     } catch (e) {
@@ -458,9 +472,10 @@ export const DoctorView: React.FC = () => {
         const res = await fetch(`${API_BASE_URL}/patients/${ticket.patient_id}`);
         const json = await res.json();
         if (json.data) {
-          setPatientEMRData(json.data);
-          if (json.data.medical_history) {
-            setConsultationNotes(json.data.medical_history);
+          const pat = json.data.patient || json.data;
+          setPatientEMRData(pat);
+          if (pat.medical_history || pat.notes) {
+            setConsultationNotes(pat.medical_history || pat.notes);
           }
         }
       } catch (e) {
@@ -1778,8 +1793,10 @@ export const DoctorView: React.FC = () => {
                   <Users className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-[#172B4D]">Bemor Tibbiy Tarixi & Ko'riklar Jurnali</h3>
-                  <p className="text-xs text-slate-400">Bemor ma'lumotlari va qaysi do'ktirlarda ko'rikda bo'lgani</p>
+                  <h3 className="text-base font-black text-[#172B4D]">
+                    Bemor: <span className="text-[#00897B]">{selectedPatientModal.full_name || selectedPatientModal.patient_name || selectedPatientModal.name || 'Bemor'}</span>
+                  </h3>
+                  <p className="text-xs text-slate-400">Shaxsiy ma'lumotlari va qaysi do'ktirlarda ko'rikda bo'lgani</p>
                 </div>
               </div>
               <button
@@ -1791,46 +1808,61 @@ export const DoctorView: React.FC = () => {
             </div>
 
             {/* Patient Profile Card */}
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-50 via-teal-50/20 to-slate-50 border border-slate-200/80 flex items-center justify-between">
-              <div className="flex items-center gap-3.5">
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-sm flex-shrink-0 ${
-                  selectedPatientModal.gender === 'FEMALE' || isFemaleDoctor(selectedPatientModal.full_name)
-                    ? 'bg-gradient-to-br from-pink-500 to-rose-600'
-                    : 'bg-gradient-to-br from-blue-500 to-indigo-600'
-                }`}>
-                  {selectedPatientModal.full_name?.charAt(0) || 'B'}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-50 via-teal-50/20 to-slate-50 border border-slate-200/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3.5">
+                  <div className={`w-13 h-13 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-sm flex-shrink-0 ${
+                    selectedPatientModal.gender === 'FEMALE' || isFemaleDoctor(selectedPatientModal.full_name || selectedPatientModal.patient_name)
+                      ? 'bg-gradient-to-br from-pink-500 to-rose-600'
+                      : 'bg-gradient-to-br from-blue-500 to-indigo-600'
+                  }`}>
+                    {(selectedPatientModal.full_name || selectedPatientModal.patient_name || 'B').charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-bold text-teal-700 uppercase tracking-wider">Bemor F.I.SH (Ism-Familiyasi)</div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <h4 className="text-lg font-black text-[#172B4D]">
+                        {selectedPatientModal.full_name || selectedPatientModal.patient_name || selectedPatientModal.name || 'Bemor'}
+                      </h4>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        selectedPatientModal.gender === 'FEMALE' || isFemaleDoctor(selectedPatientModal.full_name || selectedPatientModal.patient_name)
+                          ? 'bg-pink-100 text-pink-800'
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {selectedPatientModal.gender === 'FEMALE' || isFemaleDoctor(selectedPatientModal.full_name || selectedPatientModal.patient_name) ? 'Ayol' : 'Erkak'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-base font-black text-[#172B4D]">{selectedPatientModal.full_name}</h4>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      selectedPatientModal.gender === 'FEMALE' || isFemaleDoctor(selectedPatientModal.full_name)
-                        ? 'bg-pink-100 text-pink-800'
-                        : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {selectedPatientModal.gender === 'FEMALE' || isFemaleDoctor(selectedPatientModal.full_name) ? 'Ayol' : 'Erkak'}
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
-                    <span>{selectedPatientModal.phone || '—'}</span>
-                    <span className="text-slate-300">•</span>
-                    <span>{calculateAge(selectedPatientModal.birth_date)}</span>
-                    {selectedPatientModal.address && (
-                      <>
-                        <span className="text-slate-300">•</span>
-                        <span className="text-slate-400">{selectedPatientModal.address}</span>
-                      </>
-                    )}
-                  </div>
+
+                <div className="text-right">
+                  <span className="font-mono text-xs px-3 py-1 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 block">
+                    Karta № {selectedPatientModal.patient_number || selectedPatientModal.id?.slice(0, 8)}
+                  </span>
+                  <span className="text-[11px] text-teal-700 font-bold mt-1 inline-block">
+                    Jami: {selectedPatientModal.total_visits || doctorVisitsDetail.length || 1} marta tashrif
+                  </span>
                 </div>
               </div>
-              <div className="text-right">
-                <span className="font-mono text-xs px-3 py-1 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 block">
-                  Karta № {selectedPatientModal.patient_number || selectedPatientModal.id?.slice(0, 8)}
-                </span>
-                <span className="text-[11px] text-teal-700 font-bold mt-1 inline-block">
-                  Jami: {selectedPatientModal.total_visits || doctorVisitsDetail.length || 1} marta tashrif
-                </span>
+
+              {/* Patient Detail Metrics Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3 border-t border-slate-200/60 text-xs">
+                <div className="p-2.5 rounded-xl bg-white border border-slate-200/70">
+                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Telefon raqam:</span>
+                  <span className="font-bold text-slate-800 mt-0.5 block">{selectedPatientModal.phone || '—'}</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white border border-slate-200/70">
+                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Yoshi:</span>
+                  <span className="font-bold text-slate-800 mt-0.5 block">{calculateAge(selectedPatientModal.birth_date)}</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white border border-slate-200/70">
+                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Tug'ilgan sana:</span>
+                  <span className="font-bold text-slate-800 mt-0.5 block">{formatBirthDate(selectedPatientModal.birth_date)}</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white border border-slate-200/70">
+                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Manzil:</span>
+                  <span className="font-bold text-slate-800 mt-0.5 block truncate">{selectedPatientModal.address || "Ko'rsatilmagan"}</span>
+                </div>
               </div>
             </div>
 
