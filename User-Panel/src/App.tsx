@@ -5,6 +5,7 @@ import { ManagerPage } from './pages/ManagerPage';
 import { DoctorPage } from './pages/DoctorPage';
 import { OperatorPage } from './pages/OperatorPage';
 import { ToastContainer } from './components/ToastNotification';
+import { SubscriptionGuard } from './components/SubscriptionGuard';
 
 // Auth Protection Helper
 const ProtectedRoute: React.FC<{ children: React.ReactElement; allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
@@ -15,11 +16,18 @@ const ProtectedRoute: React.FC<{ children: React.ReactElement; allowedRoles?: st
 
   try {
     const user = JSON.parse(userJson);
-    if (allowedRoles && !allowedRoles.includes(user.role)) {
-      // Redirect to their default view if they try to access an unauthorized route
-      if (user.role === 'CASHIER') return <Navigate to="/cashier" replace />;
-      if (user.role === 'DOCTOR') return <Navigate to="/doctor" replace />;
-      return <Navigate to="/manager" replace />;
+    const userRole = (user.role || '').toUpperCase();
+    if (allowedRoles) {
+      const effectiveAllowed = [...allowedRoles];
+      if (effectiveAllowed.includes('MANAGER') && !effectiveAllowed.includes('OWNER')) {
+        effectiveAllowed.push('OWNER');
+      }
+      if (!effectiveAllowed.includes(userRole)) {
+        // Redirect to their default view if they try to access an unauthorized route
+        if (userRole === 'CASHIER') return <Navigate to="/cashier" replace />;
+        if (userRole === 'DOCTOR') return <Navigate to="/doctor" replace />;
+        return <Navigate to="/manager" replace />;
+      }
     }
   } catch (e) {
     return <Navigate to="/login" replace />;
@@ -37,8 +45,9 @@ const RootDispatcher: React.FC = () => {
 
   try {
     const user = JSON.parse(userJson);
-    if (user.role === 'CASHIER') return <Navigate to="/cashier" replace />;
-    if (user.role === 'DOCTOR') return <Navigate to="/doctor" replace />;
+    const userRole = (user.role || '').toUpperCase();
+    if (userRole === 'CASHIER') return <Navigate to="/cashier" replace />;
+    if (userRole === 'DOCTOR') return <Navigate to="/doctor" replace />;
     return <Navigate to="/manager" replace />;
   } catch (e) {
     return <Navigate to="/login" replace />;
@@ -48,8 +57,9 @@ const RootDispatcher: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
-      <ToastContainer />
-      <Routes>
+      <SubscriptionGuard>
+        <ToastContainer />
+        <Routes>
         {/* Public Login Route */}
         <Route path="/login" element={<LoginPage />} />
 
@@ -123,6 +133,7 @@ export const App: React.FC = () => {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </SubscriptionGuard>
     </BrowserRouter>
   );
 };

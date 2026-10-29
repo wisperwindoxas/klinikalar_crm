@@ -174,7 +174,7 @@ export const LoginPage: React.FC = () => {
       {/* Main Container Card (Dual Column Responsive) */}
       <div className="w-full max-w-5xl bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl shadow-teal-950/10 border border-teal-100/80 overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[620px] transition-all">
         {/* ================= LEFT COLUMN: Visual & Clinic Branding ================= */}
-        <div className="lg:col-span-5 bg-gradient-to-br from-[#0F766E] via-[#0D9488] to-[#115E59] p-8 sm:p-10 text-white flex flex-col justify-between relative overflow-hidden">
+        <div className="lg:col-span-5 bg-medical-gradient p-8 sm:p-10 text-white flex flex-col justify-between relative overflow-hidden">
           {/* Subtle medical cross pattern */}
           <div className="absolute inset-0 opacity-10 pointer-events-none">
             <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
@@ -190,12 +190,12 @@ export const LoginPage: React.FC = () => {
           {/* Top Brand Header */}
           <div className="relative z-10 space-y-6">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25 flex items-center justify-center shadow-lg text-emerald-300">
-                <HeartPulse className="w-7 h-7 animate-pulse text-white" />
+              <div className="w-14 h-14 bg-transparent flex items-center justify-center shrink-0 filter drop-shadow-lg">
+                <img src="/logo.png" alt="klinika-admin Logo" className="w-full h-full object-contain bg-transparent" />
               </div>
               <div>
                 <h1 className="text-2xl font-black tracking-tight flex items-center gap-1.5">
-                  SADAF CLINIC
+                  klinika-admin
                   <span className="text-[10px] bg-emerald-400 text-teal-950 font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
                     PRO
                   </span>
@@ -347,9 +347,8 @@ export const LoginPage: React.FC = () => {
                     onChange={handleIdentifierChange}
                     onKeyDown={handleKeyDown}
                     placeholder="Masalan: +998 (90) 123-45-67 yoki admin"
-                    className={`w-full ${
-                      inputMode === 'phone' ? 'pl-16' : 'pl-10'
-                    } pr-4 py-3 bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-teal-500 rounded-2xl text-xs sm:text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-teal-500/15 transition-all shadow-sm`}
+                    className={`w-full ${inputMode === 'phone' ? 'pl-16' : 'pl-10'
+                      } pr-4 py-3 bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-teal-500 rounded-2xl text-xs sm:text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-teal-500/15 transition-all shadow-sm`}
                   />
                 </div>
               </div>
@@ -427,7 +426,7 @@ export const LoginPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 bg-gradient-to-r from-teal-600 via-teal-700 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 disabled:from-slate-300 disabled:to-slate-400 text-white font-extrabold text-xs sm:text-sm rounded-2xl transition-all shadow-lg shadow-teal-700/25 hover:shadow-teal-700/35 hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 bg-medical-gradient hover:opacity-95 disabled:from-slate-300 disabled:to-slate-400 text-white font-extrabold text-xs sm:text-sm rounded-2xl transition-all shadow-lg shadow-medical-blue/25 hover:shadow-medical-blue/35 hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loading ? (
                   <div className="flex items-center gap-2">
@@ -453,7 +452,7 @@ export const LoginPage: React.FC = () => {
               <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
               <span>Xavfsiz 256-bit shifrlangan ulanish</span>
             </div>
-            <span>© 2026 SADAF KLINIKA CRM</span>
+            <span>© 2026 klinika-admin CRM</span>
           </div>
         </div>
       </div>

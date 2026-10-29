@@ -395,11 +395,11 @@ export const CashierView: React.FC = () => {
         <div>
           {/* Logo Header */}
           <div className="p-6 flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-[#0084FF] flex items-center justify-center text-white shadow-md flex-shrink-0">
-              <HeartPulse className="w-7 h-7 stroke-[2.4]" />
+            <div className="w-12 h-12 bg-transparent flex items-center justify-center flex-shrink-0 filter drop-shadow-md">
+              <img src="/logo.png" alt="klinika-admin Logo" className="w-full h-full object-contain bg-transparent" />
             </div>
             <div>
-              <div className="font-black text-lg tracking-tight leading-tight">Sadaf Klinika</div>
+              <div className="font-black text-lg tracking-tight leading-tight">klinika-admin</div>
               <div className="text-xs text-slate-400 font-medium">Kassir Qabulxonasi</div>
             </div>
           </div>
@@ -419,9 +419,9 @@ export const CashierView: React.FC = () => {
                       setSearchParams({ tab: item.id });
                     }
                   }}
-                  className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-[13px] font-semibold transition text-left ${
+                  className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-[13px] font-semibold transition text-left cursor-pointer ${
                     isActive
-                      ? 'bg-[#1677FF] text-white shadow-lg shadow-[#1677FF]/30 font-bold'
+                      ? 'bg-medical-blue text-white shadow-lg shadow-medical-blue/30 font-bold'
                       : 'text-slate-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
@@ -437,10 +437,10 @@ export const CashierView: React.FC = () => {
         <div className="p-4 border-t border-slate-800/80 relative">
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between hover:bg-white/10 transition text-left"
+            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between hover:bg-white/10 transition text-left cursor-pointer"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#1677FF] text-white flex items-center justify-center font-black text-xs shadow-sm">
+              <div className="w-10 h-10 rounded-full bg-medical-blue text-white flex items-center justify-center font-black text-xs shadow-sm">
                 KA
               </div>
               <div>
@@ -1774,6 +1774,8 @@ export const CashierView: React.FC = () => {
         isOpen={isTicketModalOpen}
         tickets={issuedResult?.tickets || []}
         payment={issuedResult?.payment}
+        initialPaperSize={printerPaperSize}
+        onPaperSizeChange={setPrinterPaperSize}
         onClose={() => setIsTicketModalOpen(false)}
       />
 

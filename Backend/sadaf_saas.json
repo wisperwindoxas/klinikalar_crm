@@ -7,7 +7,7 @@
       "slug": "sadaf",
       "status": "ACTIVE",
       "createdAt": "2026-09-30T04:18:29.782Z",
-      "updatedAt": "2026-09-30T04:18:29.782Z"
+      "updatedAt": "2026-10-29T06:03:39.985Z"
     },
     {
       "id": "tenant_samarqand_05",
@@ -53,26 +53,56 @@
       "status": "EXPIRED",
       "createdAt": "2026-09-21T10:00:00Z",
       "updatedAt": "2026-09-21T10:00:00Z"
+    },
+    {
+      "id": "tenant_a1fcbdf9",
+      "code": "CLN_4255",
+      "name": "SurxonMedical",
+      "slug": "surxonmedical",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-29T04:12:22.617Z",
+      "updatedAt": "2026-10-29T06:05:20.008Z"
+    },
+    {
+      "id": "tenant_465dfe05",
+      "code": "CLN_3263",
+      "name": "Oazis Medikal",
+      "slug": "oazis-medikal",
+      "status": "TRIAL",
+      "createdAt": "2026-10-29T04:34:49.711Z",
+      "updatedAt": "2026-10-29T04:34:49.711Z"
+    },
+    {
+      "id": "tenant_b9747d4e",
+      "code": "CLN_2575",
+      "name": "Mega Med",
+      "slug": "mega-med",
+      "status": "TRIAL",
+      "createdAt": "2026-10-29T04:35:25.424Z",
+      "updatedAt": "2026-10-29T04:35:25.424Z"
     }
   ],
   "clinics": [
     {
       "id": "clinic_sadaf_01",
       "tenantId": "tenant_sadaf_01",
-      "name": "SADAF KLINIKA",
+      "name": "SADAF Klinika",
       "logoUrl": "",
       "primaryColor": "#81008a",
       "secondaryColor": "#E6FFFA",
       "phone": "+998 71 200 00 00",
       "email": "info@sadaf.uz",
-      "address": "Toshkent sh., Bunyodkor shoh ko'chasi",
+      "address": "Yangi yo'l",
       "queuePrefix": "A",
       "settings": {
         "avgConsultationMinutes": 15,
         "tvSoundEnabled": true,
         "smsNotification": true
       },
-      "createdAt": "2026-09-30T04:18:29.782Z"
+      "createdAt": "2026-09-30T04:18:29.782Z",
+      "region": "Surxondaryo viloyati",
+      "district": "Qumqo‘rg‘on tumani",
+      "updatedAt": "2026-10-29T06:03:39.987Z"
     },
     {
       "id": "clinic_tenant_samarqand_05",
@@ -138,6 +168,51 @@
       "queuePrefix": "M",
       "settings": {},
       "createdAt": "2026-09-21T10:00:00Z"
+    },
+    {
+      "id": "clinic_95f02262",
+      "tenantId": "tenant_a1fcbdf9",
+      "name": "SurxonMedical",
+      "primaryColor": "#008B8B",
+      "phone": "+998 907074757",
+      "email": "windoxas@gmail.com",
+      "address": "Surxondaryo",
+      "queuePrefix": "S",
+      "settings": {
+        "avgConsultationMinutes": 15
+      },
+      "createdAt": "2026-10-29T04:12:22.617Z",
+      "region": "Surxondaryo viloyati",
+      "district": "Qumqo‘rg‘on tumani",
+      "updatedAt": "2026-10-29T06:05:20.013Z"
+    },
+    {
+      "id": "clinic_cab26e50",
+      "tenantId": "tenant_465dfe05",
+      "name": "Oazis Medikal",
+      "primaryColor": "#008B8B",
+      "phone": "+998 93 555 44 33",
+      "email": "jamshid@oazis.uz",
+      "address": "Buxoro viloyati, Buxoro shahri, Mustaqillik ko‘chasi 12",
+      "queuePrefix": "O",
+      "settings": {
+        "avgConsultationMinutes": 15
+      },
+      "createdAt": "2026-10-29T04:34:49.711Z"
+    },
+    {
+      "id": "clinic_4be9f4d5",
+      "tenantId": "tenant_b9747d4e",
+      "name": "Mega Med",
+      "primaryColor": "#008B8B",
+      "phone": "+998 94 999 88 77",
+      "email": "botir@megamed.uz",
+      "address": "Andijon viloyati, Andijon shahri, Bobur shox ko‘chasi 1",
+      "queuePrefix": "M",
+      "settings": {
+        "avgConsultationMinutes": 15
+      },
+      "createdAt": "2026-10-29T04:35:25.424Z"
     }
   ],
   "branches": [
@@ -164,6 +239,42 @@
       "isMain": false,
       "status": "ACTIVE",
       "createdAt": "2026-09-30T04:18:29.782Z"
+    },
+    {
+      "id": "branch_31acf070",
+      "tenantId": "tenant_a1fcbdf9",
+      "clinicId": "clinic_95f02262",
+      "name": "Asosiy filial",
+      "address": "Surxondaryo",
+      "phone": "+998 907074757",
+      "queuePrefix": "A",
+      "isMain": true,
+      "status": "ACTIVE",
+      "createdAt": "2026-10-29T04:12:22.617Z"
+    },
+    {
+      "id": "branch_4cf8c28d",
+      "tenantId": "tenant_465dfe05",
+      "clinicId": "clinic_cab26e50",
+      "name": "Asosiy filial",
+      "address": "Buxoro viloyati, Buxoro shahri, Mustaqillik ko‘chasi 12",
+      "phone": "+998 93 555 44 33",
+      "queuePrefix": "A",
+      "isMain": true,
+      "status": "ACTIVE",
+      "createdAt": "2026-10-29T04:34:49.711Z"
+    },
+    {
+      "id": "branch_849506d9",
+      "tenantId": "tenant_b9747d4e",
+      "clinicId": "clinic_4be9f4d5",
+      "name": "Asosiy filial",
+      "address": "Andijon viloyati, Andijon shahri, Bobur shox ko‘chasi 1",
+      "phone": "+998 94 999 88 77",
+      "queuePrefix": "A",
+      "isMain": true,
+      "status": "ACTIVE",
+      "createdAt": "2026-10-29T04:35:25.424Z"
     }
   ],
   "cabinets": [
@@ -363,6 +474,53 @@
       "branchId": "branch_sadaf_main",
       "status": "ACTIVE",
       "createdAt": "2026-09-30T04:18:29.782Z"
+    },
+    {
+      "id": "user_c2f4e047",
+      "tenantId": "tenant_a1fcbdf9",
+      "fullName": "Soatov Xurshid",
+      "email": "windoxas@gmail.com",
+      "phone": "+998 907074757",
+      "passwordHash": "$2a$10$ZZH1znN/IgLDwtVMTGZw2.CG0vxoms.g.uinlTEIVPqNtQiz8A3KC",
+      "role": "OWNER",
+      "branchId": "branch_31acf070",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-29T04:12:22.617Z"
+    },
+    {
+      "id": "user_d2250eda",
+      "tenantId": "tenant_465dfe05",
+      "fullName": "Karimov Jamshid",
+      "email": "jamshid@oazis.uz",
+      "phone": "+998 93 555 44 33",
+      "passwordHash": "$2a$10$wwKZe9BYYhc2cZsy5z6RT.WsHFyM4LwZW0EiSFBzQOTo5mHXgJ2CK",
+      "role": "OWNER",
+      "branchId": "branch_4cf8c28d",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-29T04:34:49.711Z"
+    },
+    {
+      "id": "user_0c0d4b5f",
+      "tenantId": "tenant_b9747d4e",
+      "fullName": "Rahimov Botir",
+      "email": "botir@megamed.uz",
+      "phone": "+998 94 999 88 77",
+      "passwordHash": "$2a$10$5.x4vOth8Dy.MdIt3sEJ9.k8NScn0lXEdlAPwF0Z8CoSbfFtLphbm",
+      "role": "OWNER",
+      "branchId": "branch_849506d9",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-29T04:35:25.424Z"
+    },
+    {
+      "id": "usr_7de86d27",
+      "tenantId": "tenant_sadaf_01",
+      "fullName": "Test Administrator",
+      "email": "test_1793251573275@klinika.uz",
+      "phone": "+998901112233",
+      "passwordHash": "$2a$10$PzCoZpquyEh30guQ.za3EucbRazDQafOq.l9u6gfeatBxDNPvN9ve",
+      "role": "OPERATOR",
+      "status": "ACTIVE",
+      "createdAt": "2026-10-29T05:26:13.471Z"
     }
   ],
   "specialties": [
@@ -1043,8 +1201,8 @@
     {
       "id": "sub_sadaf_pro",
       "tenantId": "tenant_sadaf_01",
-      "planId": "plan_pro",
-      "planCode": "PRO",
+      "planId": "plan_enterprise",
+      "planCode": "ENTERPRISE",
       "status": "ACTIVE",
       "startDate": "2026-09-01T00:00:00Z",
       "endDate": "2026-10-01T00:00:00Z",
@@ -1103,6 +1261,42 @@
       "status": "EXPIRED",
       "startDate": "2026-09-21T00:00:00Z",
       "endDate": "2026-09-20T00:00:00Z",
+      "gracePeriodDays": 3,
+      "autoRenew": true
+    },
+    {
+      "id": "sub_fccb3040",
+      "tenantId": "tenant_a1fcbdf9",
+      "planId": "plan_pro",
+      "planCode": "PRO",
+      "status": "ACTIVE",
+      "startDate": "2026-10-29T04:12:22.617Z",
+      "endDate": "2026-11-12T04:12:22.719Z",
+      "trialEndDate": "2026-11-12T04:12:22.719Z",
+      "gracePeriodDays": 3,
+      "autoRenew": true
+    },
+    {
+      "id": "sub_addb4e23",
+      "tenantId": "tenant_465dfe05",
+      "planId": "plan_standard",
+      "planCode": "STANDARD",
+      "status": "TRIAL",
+      "startDate": "2026-10-29T04:34:49.711Z",
+      "endDate": "2026-11-12T04:34:49.803Z",
+      "trialEndDate": "2026-11-12T04:34:49.803Z",
+      "gracePeriodDays": 3,
+      "autoRenew": true
+    },
+    {
+      "id": "sub_1a1855ad",
+      "tenantId": "tenant_b9747d4e",
+      "planId": "plan_standard",
+      "planCode": "STANDARD",
+      "status": "TRIAL",
+      "startDate": "2026-10-29T04:35:25.424Z",
+      "endDate": "2026-11-12T04:35:25.511Z",
+      "trialEndDate": "2026-11-12T04:35:25.511Z",
       "gracePeriodDays": 3,
       "autoRenew": true
     }
@@ -1187,6 +1381,224 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "d9f06aa5-002a-4b8e-aae0-94c4ac87f1cc",
+      "tenantId": "tenant_a1fcbdf9",
+      "userId": "system",
+      "userRole": "SUPER_ADMIN",
+      "userFullName": "Super Admin",
+      "action": "UPDATE_CLINIC_DETAILS",
+      "entityType": "CLINIC",
+      "entityId": "tenant_a1fcbdf9",
+      "oldValues": {
+        "name": "SurxonMedical"
+      },
+      "newValues": {
+        "name": "SurxonMedical",
+        "phone": "+998 907074757",
+        "email": "windoxas@gmail.com",
+        "address": "Surxondaryo",
+        "region": "Surxondaryo viloyati",
+        "district": "Qumqo‘rg‘on tumani",
+        "status": "ACTIVE",
+        "planCode": "PRO"
+      },
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "createdAt": "2026-10-29T06:05:20.017Z"
+    },
+    {
+      "id": "36d6fe5c-422c-442d-be55-1bd4f8602979",
+      "tenantId": "tenant_sadaf_01",
+      "userId": "system",
+      "userRole": "SUPER_ADMIN",
+      "userFullName": "Super Admin",
+      "action": "UPDATE_CLINIC_DETAILS",
+      "entityType": "CLINIC",
+      "entityId": "tenant_sadaf_01",
+      "oldValues": {
+        "name": "SADAF Klinika"
+      },
+      "newValues": {
+        "name": "SADAF Klinika",
+        "phone": "+998 71 200 00 00",
+        "email": "info@sadaf.uz",
+        "address": "Yangi yo'l",
+        "region": "Surxondaryo viloyati",
+        "district": "Qumqo‘rg‘on tumani",
+        "status": "ACTIVE",
+        "planCode": "ENTERPRISE"
+      },
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "createdAt": "2026-10-29T06:03:39.991Z"
+    },
+    {
+      "id": "e0443b39-68f1-4eb8-a2be-6742e2854c8d",
+      "tenantId": "tenant_sadaf_01",
+      "userId": "system",
+      "userRole": "SUPER_ADMIN",
+      "userFullName": "Super Admin",
+      "action": "UPDATE_CLINIC_DETAILS",
+      "entityType": "CLINIC",
+      "entityId": "tenant_sadaf_01",
+      "oldValues": {
+        "name": "SADAF Klinika"
+      },
+      "newValues": {
+        "name": "SADAF Klinika",
+        "phone": "+998 71 200 00 00",
+        "email": "info@sadaf.uz",
+        "address": "Toshkent sh., Bunyodkor shoh ko'chasi",
+        "region": "Surxondaryo viloyati",
+        "district": "Qumqo‘rg‘on tumani",
+        "status": "ACTIVE",
+        "planCode": "ENTERPRISE"
+      },
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "createdAt": "2026-10-29T06:03:27.338Z"
+    },
+    {
+      "id": "1537150d-635a-49c6-8ef0-c19ba81e7e86",
+      "tenantId": "tenant_sadaf_01",
+      "userId": "system",
+      "userRole": "SUPER_ADMIN",
+      "userFullName": "Super Admin",
+      "action": "CREATE_CLINIC_USER",
+      "entityType": "USER",
+      "entityId": "usr_7de86d27",
+      "newValues": {
+        "fullName": "Test Administrator",
+        "email": "test_1793251573275@klinika.uz",
+        "role": "OPERATOR"
+      },
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+      "createdAt": "2026-10-29T05:26:13.497Z"
+    },
+    {
+      "id": "e4735ddb-8a89-4296-a917-59c99f6c1261",
+      "tenantId": "tenant_b9747d4e",
+      "userId": "user_0c0d4b5f",
+      "userRole": "OWNER",
+      "userFullName": "Rahimov Botir",
+      "action": "USER_LOGIN",
+      "entityType": "AUTH",
+      "entityId": "user_0c0d4b5f",
+      "ipAddress": "::1",
+      "userAgent": "node",
+      "createdAt": "2026-10-29T04:35:25.691Z"
+    },
+    {
+      "id": "b012cef6-14a8-486f-b770-59f3f0a03ecf",
+      "tenantId": "tenant_b9747d4e",
+      "userId": "user_0c0d4b5f",
+      "userRole": "OWNER",
+      "userFullName": "Rahimov Botir",
+      "action": "CLINIC_SELF_REGISTRATION",
+      "entityType": "CLINIC",
+      "entityId": "clinic_4be9f4d5",
+      "ipAddress": "::1",
+      "userAgent": "node",
+      "createdAt": "2026-10-29T04:35:25.424Z"
+    },
+    {
+      "id": "9700e8db-4e59-4ac7-aa3f-8392900c3bd5",
+      "tenantId": "tenant_465dfe05",
+      "userId": "user_d2250eda",
+      "userRole": "OWNER",
+      "userFullName": "Karimov Jamshid",
+      "action": "USER_LOGIN",
+      "entityType": "AUTH",
+      "entityId": "user_d2250eda",
+      "ipAddress": "::1",
+      "userAgent": "node",
+      "createdAt": "2026-10-29T04:34:50.012Z"
+    },
+    {
+      "id": "e5f87465-51b1-46d0-90ee-d9b66ee24fd3",
+      "tenantId": "tenant_465dfe05",
+      "userId": "user_d2250eda",
+      "userRole": "OWNER",
+      "userFullName": "Karimov Jamshid",
+      "action": "CLINIC_SELF_REGISTRATION",
+      "entityType": "CLINIC",
+      "entityId": "clinic_cab26e50",
+      "ipAddress": "::1",
+      "userAgent": "node",
+      "createdAt": "2026-10-29T04:34:49.711Z"
+    },
+    {
+      "id": "f0d439c8-715c-45f7-97b4-0363b09f6f84",
+      "tenantId": "tenant_a1fcbdf9",
+      "userId": "system",
+      "userRole": "SUPER_ADMIN",
+      "userFullName": "Super Admin",
+      "action": "UPDATE_CLINIC_STATUS",
+      "entityType": "TENANT",
+      "entityId": "tenant_a1fcbdf9",
+      "oldValues": {
+        "status": "TRIAL"
+      },
+      "newValues": {
+        "status": "ACTIVE"
+      },
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "createdAt": "2026-10-29T04:13:13.823Z"
+    },
+    {
+      "id": "d295c041-bcf9-4c6a-b1f9-1a6838d31d2e",
+      "tenantId": "tenant_a1fcbdf9",
+      "userId": "user_c2f4e047",
+      "userRole": "OWNER",
+      "userFullName": "Soatov Xurshid",
+      "action": "CLINIC_SELF_REGISTRATION",
+      "entityType": "CLINIC",
+      "entityId": "clinic_95f02262",
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "createdAt": "2026-10-29T04:12:22.617Z"
+    },
+    {
+      "id": "f4cf135d-51ec-4fdb-b2cc-d33e2fd975d9",
+      "tenantId": "tenant_sadaf_01",
+      "userId": "system",
+      "userRole": "SUPER_ADMIN",
+      "userFullName": "Super Admin",
+      "action": "UPDATE_CLINIC_PLAN",
+      "entityType": "SUBSCRIPTION",
+      "entityId": "sub_sadaf_pro",
+      "oldValues": {
+        "planCode": "STARTER"
+      },
+      "newValues": {
+        "planCode": "ENTERPRISE"
+      },
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "createdAt": "2026-10-29T03:56:21.008Z"
+    },
+    {
+      "id": "1e76272e-447a-4fed-b7f6-b6551bcc22cb",
+      "tenantId": "tenant_sadaf_01",
+      "userId": "system",
+      "userRole": "SUPER_ADMIN",
+      "userFullName": "Super Admin",
+      "action": "UPDATE_CLINIC_PLAN",
+      "entityType": "SUBSCRIPTION",
+      "entityId": "sub_sadaf_pro",
+      "oldValues": {
+        "planCode": "PRO"
+      },
+      "newValues": {
+        "planCode": "STARTER"
+      },
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "createdAt": "2026-10-29T03:56:04.870Z"
+    },
     {
       "id": "ef8f6b44-114c-459d-9125-1bcb7478dbfa",
       "tenantId": "tenant_sadaf_01",

@@ -10,7 +10,7 @@ interface SettingsViewProps {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ clinicData, onRefresh }) => {
   const clinic = clinicData?.clinic;
-  const [name, setName] = useState(clinic?.name || 'SADAF KLINIKA');
+  const [name, setName] = useState(clinic?.name || 'klinika-admin');
   const [primaryColor, setPrimaryColor] = useState(clinic?.primaryColor || '#008B8B');
   const [phone, setPhone] = useState(clinic?.phone || '+998 71 200 00 00');
   const [address, setAddress] = useState(clinic?.address || 'Toshkent sh., Bunyodkor shoh ko\'chasi');

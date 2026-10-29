@@ -34,6 +34,14 @@ class Formatters {
     return '${_currencyFormat.format(val).replaceAll(',', ' ')} so\'m';
   }
 
+  static String formatMoney(dynamic amount) => formatCurrency(amount);
+
+  static String formatNumber(dynamic amount) {
+    if (amount == null) return "0";
+    final num val = (amount is num) ? amount : (num.tryParse(amount.toString()) ?? 0);
+    return _currencyFormat.format(val).replaceAll(',', ' ');
+  }
+
   static String formatPhone(String? phone) {
     if (phone == null || phone.isEmpty) return '-';
     final clean = phone.replaceAll(RegExp(r'\D'), '');

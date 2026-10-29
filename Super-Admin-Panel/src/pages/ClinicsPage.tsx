@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Search, Plus, RefreshCw, CheckCircle2, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Building2, Search, Plus, RefreshCw, CheckCircle2, AlertTriangle, ShieldAlert, Sliders, ExternalLink } from 'lucide-react';
 import { ApiClient } from '../api/client';
 import { AddClinicModal } from '../components/AddClinicModal';
+import { ClinicDetailModal } from '../components/ClinicDetailModal';
 
 export const ClinicsPage: React.FC = () => {
   const [clinics, setClinics] = useState<any[]>([]);
@@ -9,6 +10,8 @@ export const ClinicsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [loading, setLoading] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   useEffect(() => {
     loadClinics();
@@ -123,13 +126,23 @@ export const ClinicsPage: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-50 text-xs">
               {filtered.map(c => (
-                <tr key={c.id} className="hover:bg-slate-50/80 transition">
+                <tr
+                  key={c.id}
+                  onClick={() => {
+                    setSelectedClinicId(c.id);
+                    setIsDetailModalOpen(true);
+                  }}
+                  className="hover:bg-teal-50/50 transition cursor-pointer group"
+                >
                   <td className="py-3.5 font-bold text-slate-800 flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-teal-50 text-teal-800 border border-teal-200 flex items-center justify-center font-bold text-xs">
+                    <div className="w-8 h-8 rounded-xl bg-teal-50 text-teal-800 border border-teal-200 flex items-center justify-center font-bold text-xs group-hover:bg-teal-800 group-hover:text-white transition">
                       {c.name.charAt(0)}
                     </div>
                     <div>
-                      <div>{c.name}</div>
+                      <div className="group-hover:text-teal-800 font-extrabold transition flex items-center gap-1.5">
+                        <span>{c.name}</span>
+                        <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-teal-700 opacity-0 group-hover:opacity-100 transition" />
+                      </div>
                       <div className="text-[10px] text-slate-400 font-normal">{c.address || 'Toshkent sh.'}</div>
                     </div>
                   </td>
@@ -138,13 +151,14 @@ export const ClinicsPage: React.FC = () => {
                   <td className="py-3.5 text-slate-700 font-semibold">
                     {c.branchCount} filial, {c.doctorCount} shifokor
                   </td>
-                  <td className="py-3.5">
+                  <td className="py-3.5" onClick={e => e.stopPropagation()}>
                     <select
                       value={c.planCode}
                       onChange={e => handlePlanChange(c.id, e.target.value)}
-                      className="text-xs font-bold py-1 px-2.5 rounded-lg border border-slate-200 bg-white text-teal-800 focus:outline-none"
+                      className="text-xs font-bold py-1 px-2.5 rounded-lg border border-slate-200 bg-white text-teal-800 focus:outline-none cursor-pointer"
                     >
                       <option value="STARTER">STARTER</option>
+                      <option value="STANDARD">STANDARD</option>
                       <option value="PRO">PRO</option>
                       <option value="BUSINESS">BUSINESS</option>
                       <option value="ENTERPRISE">ENTERPRISE</option>
@@ -163,7 +177,17 @@ export const ClinicsPage: React.FC = () => {
                       {c.status}
                     </span>
                   </td>
-                  <td className="py-3.5 text-right space-x-1.5">
+                  <td className="py-3.5 text-right space-x-1.5" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => {
+                        setSelectedClinicId(c.id);
+                        setIsDetailModalOpen(true);
+                      }}
+                      className="px-3 py-1 bg-teal-800 hover:bg-teal-900 text-white rounded-lg text-xs font-bold transition inline-flex items-center gap-1 shadow-2xs"
+                    >
+                      <Sliders className="w-3 h-3" />
+                      <span>Boshqarish</span>
+                    </button>
                     {c.status !== 'ACTIVE' && (
                       <button
                         onClick={() => handleStatusChange(c.id, 'ACTIVE')}
@@ -200,6 +224,16 @@ export const ClinicsPage: React.FC = () => {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSuccess={() => loadClinics()}
+      />
+
+      <ClinicDetailModal
+        clinicId={selectedClinicId}
+        isOpen={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setSelectedClinicId(null);
+        }}
+        onClinicUpdated={() => loadClinics()}
       />
     </div>
   );

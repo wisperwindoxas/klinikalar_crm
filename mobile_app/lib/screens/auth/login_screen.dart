@@ -3,9 +3,12 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/utils/formatters.dart';
 import '../../services/auth_service.dart';
+import '../../services/security_service.dart';
 import '../doctor/doctor_main_screen.dart';
 import '../cashier/cashier_main_screen.dart';
 import '../manager/manager_main_screen.dart';
+import 'pin_lock_screen.dart';
+import 'pin_setup_sheet.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -68,7 +71,13 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (result['success'] == true) {
-      _navigateToRole();
+      final sec = SecurityService();
+      if (!sec.hasPin) {
+        _promptPinSetup();
+      } else {
+        sec.unlock();
+        _navigateToRole();
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -83,6 +92,48 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     }
+  }
+
+  void _promptPinSetup() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: const Row(
+          children: [
+            Icon(Icons.fingerprint_rounded, color: AppColors.primary, size: 28),
+            SizedBox(width: 10),
+            Text('Tezkor Kirish', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Text(
+          'Har safar login va parol kiritmaslik uchun 4 xonali PIN-kod va barmoq izi orqali kirishni yoqishni xohlaysizmi?',
+          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _navigateToRole();
+            },
+            child: const Text('Keyinroq', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              PinSetupSheet.show(context, onPinSetSuccess: _navigateToRole);
+            },
+            child: const Text('PIN-kod o‘rnatish'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _navigateToRole() {
@@ -165,24 +216,16 @@ class _LoginScreenState extends State<LoginScreen> {
               // App Brand & Logo
               Center(
                 child: Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(22),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.35),
-                        blurRadius: 18,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Icon(
+                  width: 90,
+                  height: 90,
+                  color: Colors.transparent,
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
                       Icons.local_hospital_rounded,
                       size: 40,
-                      color: Colors.white,
+                      color: AppColors.medicalBlue,
                     ),
                   ),
                 ),
@@ -190,7 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 18),
               const Center(
                 child: Text(
-                  'SADAF CLINIC',
+                  'klinika-admin',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
@@ -361,14 +404,26 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    SizedBox(
+                    Container(
                       width: double.infinity,
-                      height: 50,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        gradient: AppColors.medicalGradient,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.medicalBlue.withOpacity(0.35),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _handleLogin,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
                         child: _isLoading
                             ? const SizedBox(
@@ -381,14 +436,38 @@ class _LoginScreenState extends State<LoginScreen> {
                                 children: [
                                   Text(
                                     'Tizimga kirish',
-                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
                                   ),
                                   SizedBox(width: 8),
-                                  Icon(Icons.arrow_forward_rounded, size: 18),
+                                  Icon(Icons.arrow_forward_rounded, size: 18, color: Colors.white),
                                 ],
                               ),
                       ),
                     ),
+                    if (SecurityService().hasPin && AuthService().currentUser != null) ...[
+                      const SizedBox(height: 14),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.fingerprint_rounded, color: AppColors.primary, size: 22),
+                        label: Text(
+                          '${AuthService().currentUser!.fullName} (PIN / Barmoq izi)',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                          side: const BorderSide(color: AppColors.primary, width: 1.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        onPressed: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PinLockScreen(user: AuthService().currentUser!),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),

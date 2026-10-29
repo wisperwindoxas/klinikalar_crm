@@ -5,17 +5,19 @@ import {
   LayoutGrid, CreditCard, Wallet, BarChart3, Tv, ShieldCheck, Settings,
   FileText, ChevronLeft, ChevronDown, Calendar, Clock, LogOut,
   CheckCircle2, ArrowUpRight, ArrowDownRight, Radio, Eye, Check,
-  UserPlus, Ticket, RefreshCw, Plus, Trash2, Edit2, Volume2, Search,
+  UserPlus, Ticket, RefreshCw, Plus, Trash2, Edit2, Volume2, VolumeX, Search,
   ArrowRight, Activity, DollarSign, X, AlertTriangle, Shield,
   Sparkles, Mic, Play, Save, RotateCcw, Award, Briefcase, UserCheck,
   Phone, User, MapPin, Download, FileSpreadsheet, Layers, Hash, Building2, Tag, Banknote, Lock,
-  Globe, Mail, Bell, Percent, Sliders, Copy, Printer, Filter
+  Globe, Mail, Bell, Percent, Sliders, Copy, Printer, Filter, MessageSquare, ShieldAlert, Unlock, Pause,
+  CheckSquare, QrCode
 } from 'lucide-react';
 import { NewPatientModal } from '../components/NewPatientModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { showNotification } from '../components/ToastNotification';
 import { formatUzbekPhone } from '../utils/phone';
 import { UzbekistanAddressSelect } from '../components/UzbekistanAddressSelect';
+import { TicketIssuedModal } from '../components/TicketIssuedModal';
 import * as XLSX from 'xlsx';
 
 const API_BASE_URL = 'http://localhost:5001/api/v1';
@@ -48,6 +50,34 @@ export const ManagerView: React.FC = () => {
   const [currentShift, setCurrentShift] = useState<any>(null);
   const [clinicSettings, setClinicSettings] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+
+  // Subscription & SMS state (100% Real from Backend / PostgreSQL)
+  const [clinicSubscription, setClinicSubscription] = useState<any>(null);
+  const [smsSettings, setSmsSettings] = useState<any>(null);
+  const [loadingSubscription, setLoadingSubscription] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>(() => {
+    const tab = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') || 'bosh-sahifa' : 'bosh-sahifa';
+    return {
+      HISOBOTLAR_KASSA: ['hisobotlar', 'kassa-smenasi', 'tolovlar'].includes(tab),
+      TIZIM_SOZLAMALARI_GROUP: ['sozlamalar', 'printer-sozlamalari', 'tv-tablosi', 'obuna-sms', 'audit'].includes(tab),
+    };
+  });
+
+  const fetchClinicSubscriptionAndSms = async () => {
+    try {
+      setLoadingSubscription(true);
+      const [subRes, smsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/clinic/subscription`).then(r => r.json()).catch(() => ({ data: null })),
+        fetch(`${API_BASE_URL}/super-admin/sms/settings`).then(r => r.json()).catch(() => ({ data: null }))
+      ]);
+      if (subRes?.data) setClinicSubscription(subRes.data);
+      if (smsRes?.data) setSmsSettings(smsRes.data);
+    } catch (e) {
+      console.warn('Error fetching subscription/sms:', e);
+    } finally {
+      setLoadingSubscription(false);
+    }
+  };
 
   // Audit Logs State (100% Real PostgreSQL)
   const [auditLogsList, setAuditLogsList] = useState<any[]>([]);
@@ -164,7 +194,7 @@ export const ManagerView: React.FC = () => {
 
   // Settings Form (Comprehensive Site & Clinic Settings)
   const [settingsForm, setSettingsForm] = useState({
-    clinicName: 'SADAF KLINIKA',
+    clinicName: 'klinika-admin',
     slogan: 'Zamonaviy tibbiyot va professional xizmat',
     phone: '+998 71 200 00 20',
     email: 'info@sadafclinic.uz',
@@ -187,6 +217,65 @@ export const ManagerView: React.FC = () => {
     voiceLanguage: 'uz-UZ'
   });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  // Printer & Ticket Settings State (100% Real PostgreSQL & localStorage sync)
+  interface TicketPrinterSettings {
+    paperSize: '80mm' | '58mm';
+    copies: number;
+    autoPrint: boolean;
+    soundAlert: boolean;
+    clinicName: string;
+    showLogo: boolean;
+    address: string;
+    phone: string;
+    welcomeNote: string;
+    showDate: boolean;
+    showTicketNumber: boolean;
+    showSpecialty: boolean;
+    showDoctor: boolean;
+    showCabinet: boolean;
+    showPatientName: boolean;
+    showPaymentStatus: boolean;
+    showWaitTime: boolean;
+    showQrCode: boolean;
+    showCutLine: boolean;
+    footerText: string;
+    footerNote: string;
+  }
+
+  const defaultPrinterSettings: TicketPrinterSettings = {
+    paperSize: '80mm',
+    copies: 1,
+    autoPrint: true,
+    soundAlert: true,
+    clinicName: 'KLINIKA-ADMIN',
+    showLogo: true,
+    address: "Toshkent sh., Chilonzor tumani, Bunyodkor ko'chasi 15-uy",
+    phone: '+998 71 200 00 20',
+    welcomeNote: "Navbat talonini qabul yakunigacha saqlang",
+    showDate: true,
+    showTicketNumber: true,
+    showSpecialty: true,
+    showDoctor: true,
+    showCabinet: true,
+    showPatientName: true,
+    showPaymentStatus: true,
+    showWaitTime: true,
+    showQrCode: true,
+    showCutLine: true,
+    footerText: "Tashrifingiz uchun rahmat! Salomat bo'ling!",
+    footerNote: "Navbatingizni zal monitorida kuzatib boring"
+  };
+  const [printerSettings, setPrinterSettings] = useState<TicketPrinterSettings>(() => {
+    try {
+      const saved = localStorage.getItem('sadaf_ticket_settings');
+      if (saved) return { ...defaultPrinterSettings, ...JSON.parse(saved) };
+    } catch {}
+    return defaultPrinterSettings;
+  });
+  const [isSavingPrinterSettings, setIsSavingPrinterSettings] = useState(false);
+  const [previewPaperSize, setPreviewPaperSize] = useState<'80mm' | '58mm'>('80mm');
+  const [isTestTicketModalOpen, setIsTestTicketModalOpen] = useState(false);
 
   // Users State (100% PostgreSQL users)
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -229,9 +318,10 @@ export const ManagerView: React.FC = () => {
 
   // TV Tablosi Yozuvlari va Chaqiruv Ovoz Shabloni (To'liq Boshqaruv)
   const [tvSettings, setTvSettings] = useState({
-    clinicName: 'SADAF TIBBIYOT MARKAZI',
+    clinicName: 'klinika-admin',
     tvVoiceTemplate: 'Talon raqami {letter}{zeros}, {number} raqam egasi, sizni {cabinet} xona, {specialty} xonasiga marhamat!',
     tvVoiceName: 'uz-UZ-MadinaNeural',
+    tvSoundEnabled: true,
     tvSloganTitle: 'Sog‘lig‘ingiz biz uchun muhim!',
     tvSloganSubtitle: 'Navbat bilan qabulga marhamat!',
     tvCallingTitle: 'Hozir chaqirilmoqda!',
@@ -264,6 +354,29 @@ export const ManagerView: React.FC = () => {
       clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    if (['hisobotlar', 'kassa-smenasi', 'tolovlar'].includes(currentTabSlug)) {
+      setExpandedMenus({
+        HISOBOTLAR_KASSA: true,
+        TIZIM_SOZLAMALARI_GROUP: false,
+      });
+    } else if (['sozlamalar', 'printer-sozlamalari', 'tv-tablosi', 'obuna-sms', 'audit'].includes(currentTabSlug)) {
+      setExpandedMenus({
+        HISOBOTLAR_KASSA: false,
+        TIZIM_SOZLAMALARI_GROUP: true,
+      });
+    } else {
+      setExpandedMenus({
+        HISOBOTLAR_KASSA: false,
+        TIZIM_SOZLAMALARI_GROUP: false,
+      });
+    }
+
+    if (currentTabSlug === 'obuna-sms') {
+      fetchClinicSubscriptionAndSms();
+    }
+  }, [currentTabSlug]);
 
   const loadManagerData = async () => {
     try {
@@ -299,7 +412,7 @@ export const ManagerView: React.FC = () => {
       if (setRes.data) {
         setClinicSettings(setRes.data);
         setSettingsForm({
-          clinicName: setRes.data.clinic_name || 'SADAF KLINIKA',
+          clinicName: setRes.data.clinic_name || 'klinika-admin',
           slogan: setRes.data.slogan || 'Zamonaviy tibbiyot va professional xizmat',
           phone: setRes.data.phone || '+998 71 200 00 20',
           email: setRes.data.email || 'info@sadafclinic.uz',
@@ -322,9 +435,10 @@ export const ManagerView: React.FC = () => {
           voiceLanguage: setRes.data.voice_language || 'uz-UZ'
         });
         setTvSettings({
-          clinicName: setRes.data.clinic_name || 'SADAF TIBBIYOT MARKAZI',
+          clinicName: setRes.data.clinic_name || 'klinika-admin',
           tvVoiceTemplate: setRes.data.tv_voice_template || 'Talon raqami {letter}{zeros}, {number} raqam egasi, sizni {cabinet} xona, {specialty} xonasiga marhamat!',
           tvVoiceName: setRes.data.tv_voice_name || 'uz-UZ-MadinaNeural',
+          tvSoundEnabled: setRes.data.tv_sound_enabled !== false,
           tvSloganTitle: setRes.data.tv_slogan_title || 'Sog‘lig‘ingiz biz uchun muhim!',
           tvSloganSubtitle: setRes.data.tv_slogan_subtitle || 'Navbat bilan qabulga marhamat!',
           tvCallingTitle: setRes.data.tv_calling_title || 'Hozir chaqirilmoqda!',
@@ -335,10 +449,20 @@ export const ManagerView: React.FC = () => {
           tvInstruction2: setRes.data.tv_instruction_2 || "Navbat raqami ovozli e'lon qilinadi",
           tvInstruction3: setRes.data.tv_instruction_3 || 'Talon raqamini va kabinet raqamini diqqat bilan tinglang'
         });
+        if (setRes.data.printer_settings && typeof setRes.data.printer_settings === 'object') {
+          setPrinterSettings(prev => ({ ...prev, ...setRes.data.printer_settings }));
+          localStorage.setItem('sadaf_ticket_settings', JSON.stringify(setRes.data.printer_settings));
+        }
       }
       if (tvRes.data?.upcomingQueue) {
         setLiveQueueList(tvRes.data.upcomingQueue);
       }
+      fetch(`${API_BASE_URL}/clinic/subscription`).then(r => r.json()).then(res => {
+        if (res?.data) setClinicSubscription(res.data);
+      }).catch(() => {});
+      fetch(`${API_BASE_URL}/super-admin/sms/settings`).then(r => r.json()).then(res => {
+        if (res?.data) setSmsSettings(res.data);
+      }).catch(() => {});
     } catch (e) {
       console.warn('loadManagerData error:', e);
     }
@@ -1045,7 +1169,7 @@ export const ManagerView: React.FC = () => {
   const handleResetSettings = () => {
     if (clinicSettings) {
       setSettingsForm({
-        clinicName: clinicSettings.clinic_name || 'SADAF KLINIKA',
+        clinicName: clinicSettings.clinic_name || 'klinika-admin',
         slogan: clinicSettings.slogan || 'Zamonaviy tibbiyot va professional xizmat',
         phone: clinicSettings.phone || '+998 71 200 00 20',
         email: clinicSettings.email || 'info@sadafclinic.uz',
@@ -1365,24 +1489,96 @@ export const ManagerView: React.FC = () => {
     }
   };
 
+  // --- PRINTER VA TALON SOZLAMALARI ---
+  const handleSavePrinterSettings = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setIsSavingPrinterSettings(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/clinic/settings`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
+        body: JSON.stringify({
+          printer_settings: printerSettings
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Saqlashda xatolik yuz berdi');
+
+      localStorage.setItem('sadaf_ticket_settings', JSON.stringify(printerSettings));
+      try {
+        const cashSaved = localStorage.getItem('sadaf_cashier_settings');
+        const parsed = cashSaved ? JSON.parse(cashSaved) : {};
+        parsed.printerPaperSize = printerSettings.paperSize;
+        parsed.autoPrintEnabled = printerSettings.autoPrint;
+        parsed.soundEnabled = printerSettings.soundAlert;
+        localStorage.setItem('sadaf_cashier_settings', JSON.stringify(parsed));
+      } catch {}
+
+      showNotification('Sozlamalar saqlandi', 'Printer va talon sozlamalari muvaffaqiyatli saqlandi va barcha kassirlar uchun kuchga kirdi!', 'success');
+    } catch (err: any) {
+      showNotification('Xatolik', err.message || 'Sozlamalarni saqlashda xatolik yuz berdi', 'error');
+    } finally {
+      setIsSavingPrinterSettings(false);
+    }
+  };
+
+  const handleResetPrinterSettings = () => {
+    setPrinterSettings(defaultPrinterSettings);
+    setPreviewPaperSize('80mm');
+    showNotification("Boshlang'ich holat", "Printer sozlamalari standart holatga qaytarildi. Saqlash tugmasini bosing.", 'info');
+  };
+
+  const handleTestPrint = () => {
+    setIsTestTicketModalOpen(true);
+  };
+
   // Navigation menu items matching Meneger.png with larger icons & real routing slugs
-  const menuItems = [
+  const menuItems: Array<{
+    id: string;
+    slug: string;
+    label: string;
+    icon: any;
+    children?: Array<{ id: string; slug: string; label: string; icon: any }>;
+  }> = [
     { id: 'BOSH_SAHIFA', slug: 'bosh-sahifa', label: 'Bosh sahifa', icon: SlidersHorizontal },
     { id: 'NAVBATLAR', slug: 'navbatlar', label: 'Navbatlar', icon: SlidersHorizontal },
     { id: 'BEMORLAR', slug: 'bemorlar', label: 'Bemorlar', icon: Users },
     { id: 'SHIFOKORLAR', slug: 'shifokorlar', label: 'Shifokorlar', icon: Stethoscope },
     { id: 'KABINETLAR', slug: 'kabinetlar', label: 'Kabinetlar', icon: DoorOpen },
     { id: 'XIZMATLAR', slug: 'xizmatlar', label: 'Xizmatlar', icon: LayoutGrid },
-    { id: 'TOLOVLAR', slug: 'tolovlar', label: "To'lovlar", icon: CreditCard },
-    { id: 'KASSA_SMENASI', slug: 'kassa-smenasi', label: 'Kassa smenasi', icon: Wallet },
-    { id: 'HISOBOTLAR', slug: 'hisobotlar', label: 'Hisobotlar', icon: BarChart3 },
-    { id: 'TV_TABLOSI', slug: 'tv-tablosi', label: 'TV tablosi', icon: Tv },
+    {
+      id: 'HISOBOTLAR_KASSA',
+      slug: 'hisobotlar-group',
+      label: 'Hisobotlar & Kassa',
+      icon: BarChart3,
+      children: [
+        { id: 'HISOBOTLAR', slug: 'hisobotlar', label: 'Hisobotlar', icon: BarChart3 },
+        { id: 'KASSA_SMENASI', slug: 'kassa-smenasi', label: 'Kassa smenasi', icon: Wallet },
+        { id: 'TOLOVLAR', slug: 'tolovlar', label: "To'lovlar", icon: CreditCard },
+      ]
+    },
     { id: 'XODIMLAR', slug: 'xodimlar', label: 'Xodimlar va rollar', icon: ShieldCheck },
-    { id: 'TIZIM_SOZLAMALARI', slug: 'sozlamalar', label: 'Tizim sozlamalari', icon: Settings },
-    { id: 'AUDIT_JURNALI', slug: 'audit', label: 'Audit jurnali', icon: FileText },
+    {
+      id: 'TIZIM_SOZLAMALARI_GROUP',
+      slug: 'sozlamalar-group',
+      label: 'Tizim sozlamalari',
+      icon: Settings,
+      children: [
+        { id: 'TIZIM_SOZLAMALARI', slug: 'sozlamalar', label: 'Asosiy sozlamalar', icon: Settings },
+        { id: 'PRINTER_SOZLAMALARI', slug: 'printer-sozlamalari', label: 'Printer sozlamalari', icon: Printer },
+        { id: 'TV_TABLOSI', slug: 'tv-tablosi', label: 'TV tablosi', icon: Tv },
+        { id: 'OBUNA_SMS', slug: 'obuna-sms', label: 'Obuna va SMS', icon: CreditCard },
+        { id: 'AUDIT_JURNALI', slug: 'audit', label: 'Audit jurnali', icon: FileText },
+      ]
+    },
   ];
 
-  const activeMenuItem = menuItems.find(m => m.slug === currentTabSlug) || menuItems[0];
+  // Resolve active item across top-level and nested children (prefer child view tabs)
+  const allNavItems = menuItems.flatMap(m => m.children ? m.children : [m]);
+  const activeMenuItem = allNavItems.find(m => m.slug === currentTabSlug) || menuItems[0];
   const activeTab = activeMenuItem.id;
 
   // 100% Real Database Metrics (No mock data)
@@ -1412,16 +1608,16 @@ export const ManagerView: React.FC = () => {
         {/* Top Brand */}
         <div>
           <div className="p-5 flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-[#0084FF] flex items-center justify-center text-white shadow-md flex-shrink-0">
-              <HeartPulse className="w-7 h-7 stroke-[2.4]" />
+            <div className="w-12 h-12 bg-transparent flex items-center justify-center flex-shrink-0 filter drop-shadow-md">
+              <img src="/logo.png" alt="klinika-admin Logo" className="w-full h-full object-contain bg-transparent" />
             </div>
             {!sidebarCollapsed && (
               <div className="overflow-hidden">
                 <div className="font-bold text-lg text-white tracking-tight leading-tight">
-                  Klinika
+                  klinika-admin
                 </div>
                 <div className="text-xs text-slate-400 font-medium">
-                  Navbat Tizimi
+                  Boshqaruv Tizimi
                 </div>
               </div>
             )}
@@ -1431,11 +1627,83 @@ export const ManagerView: React.FC = () => {
           <nav className="px-3 space-y-1.5 mt-2 overflow-y-auto max-h-[calc(100vh-160px)]">
             {menuItems.map(item => {
               const Icon = item.icon;
+
+              if (item.children) {
+                const isGroupActive = item.children.some(c => c.id === activeTab || c.slug === currentTabSlug);
+                const isExpanded = !!expandedMenus[item.id];
+
+                return (
+                  <div key={item.id} className="space-y-1">
+                    <button
+                      onClick={() => {
+                        if (sidebarCollapsed) {
+                          setSidebarCollapsed(false);
+                        }
+                        const willBeOpen = !expandedMenus[item.id];
+                        setExpandedMenus({
+                          HISOBOTLAR_KASSA: item.id === 'HISOBOTLAR_KASSA' ? willBeOpen : false,
+                          TIZIM_SOZLAMALARI_GROUP: item.id === 'TIZIM_SOZLAMALARI_GROUP' ? willBeOpen : false,
+                        });
+                        if (willBeOpen && item.children && item.children.length > 0) {
+                          const isAlreadyInGroup = item.children.some(c => c.slug === currentTabSlug);
+                          if (!isAlreadyInGroup) {
+                            setSearchParams({ tab: item.children[0].slug });
+                          }
+                        }
+                      }}
+                      title={item.label}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-[13px] font-semibold transition text-left cursor-pointer ${
+                        isGroupActive
+                          ? 'bg-white/10 text-white font-bold'
+                          : 'text-slate-400 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-4 min-w-0">
+                        <Icon className={`w-6 h-6 stroke-[2.2] flex-shrink-0 ${isGroupActive ? 'text-medical-blue' : 'text-slate-400'}`} />
+                        {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                      </div>
+                      {!sidebarCollapsed && (
+                        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-white' : ''}`} />
+                      )}
+                    </button>
+
+                    {/* Submenu dropdown items */}
+                    {!sidebarCollapsed && isExpanded && (
+                      <div className="pl-4 pr-1 space-y-1 py-1">
+                        {item.children.map(child => {
+                          const ChildIcon = child.icon;
+                          const isChildActive = activeTab === child.id || currentTabSlug === child.slug;
+                          return (
+                            <button
+                              key={child.id}
+                              onClick={() => setSearchParams({ tab: child.slug })}
+                              title={child.label}
+                              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-left cursor-pointer ${
+                                isChildActive
+                                  ? 'bg-medical-blue text-white font-bold shadow-md shadow-medical-blue/30'
+                                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+                              }`}
+                            >
+                              <ChildIcon className={`w-4 h-4 flex-shrink-0 ${isChildActive ? 'text-white' : 'text-slate-400'}`} />
+                              <span className="truncate">{child.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               const isActive = activeTab === item.id;
               return (
                 <button
                   key={item.id}
                   onClick={() => {
+                    setExpandedMenus({
+                      HISOBOTLAR_KASSA: false,
+                      TIZIM_SOZLAMALARI_GROUP: false,
+                    });
                     if (item.slug === 'bosh-sahifa') {
                       setSearchParams({});
                     } else {
@@ -1443,9 +1711,9 @@ export const ManagerView: React.FC = () => {
                     }
                   }}
                   title={item.label}
-                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-[13px] font-semibold transition text-left ${
+                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-[13px] font-semibold transition text-left cursor-pointer ${
                     isActive
-                      ? 'bg-[#0084FF] text-white shadow-lg shadow-[#0084FF]/25 font-bold'
+                      ? 'bg-medical-blue text-white shadow-lg shadow-medical-blue/30 font-bold'
                       : 'text-slate-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
@@ -1550,6 +1818,50 @@ export const ManagerView: React.FC = () => {
 
         {/* 3. SCROLLABLE CONTENT AREA */}
         <main className="flex-1 p-6 overflow-y-auto space-y-6">
+          {/* Super Admin Lock / Suspension Alert Banner */}
+          {clinicSubscription?.status === 'BLOCKED' && (
+            <div className="p-4 bg-rose-50 border border-rose-300 rounded-2xl flex items-center justify-between text-rose-800 shadow-sm animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold shrink-0">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black">Diqqat: Klinika Super Admin tomonidan Qulflangan (BLOCKED)</h4>
+                  <p className="text-xs text-rose-600 mt-0.5">
+                    Obuna muddati tugagan yoki xizmat to'xtatilgan. Qayta faollashtirish uchun Super Admin bilan bog'laning: +998 71 200 00 00
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSearchParams({ tab: 'obuna-sms' })}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer shrink-0"
+              >
+                Obunani ko'rish
+              </button>
+            </div>
+          )}
+
+          {clinicSubscription?.status === 'SUSPENDED' && (
+            <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex items-center justify-between text-amber-800 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0">
+                  <Pause className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black">Ogohlantirish: Klinika xizmati vaqtincha to'xtatilgan (SUSPENDED)</h4>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    Xizmatni davom ettirish va qayta faollashtirish uchun Super Admin bilan bog'laning.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSearchParams({ tab: 'obuna-sms' })}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer shrink-0"
+              >
+                Tafsilotlar
+              </button>
+            </div>
+          )}
           {/* TAB 1: BOSH SAHIFA / MAIN DASHBOARD (100% 1:1 WITH Meneger.png) */}
           {activeTab === 'BOSH_SAHIFA' && (
             <div className="space-y-6">
@@ -3088,15 +3400,16 @@ export const ManagerView: React.FC = () => {
             return (
               <div className="space-y-6">
                 {/* Hero Header */}
-                <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 rounded-3xl p-6 text-white shadow-xl shadow-emerald-500/10 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
-                  <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+                <div className="bg-medical-gradient rounded-3xl p-6 text-white shadow-xl shadow-medical-blue/20 border border-white/25 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+                  <div className="absolute -right-10 -bottom-10 w-56 h-56 bg-white/15 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute -left-10 -top-10 w-48 h-48 bg-medical-blue-dark/20 rounded-full blur-2xl pointer-events-none" />
                   <div className="relative z-10">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-emerald-100 text-xs font-semibold mb-2">
-                      <Stethoscope className="w-3.5 h-3.5 text-emerald-300" />
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/20 hover:bg-white/25 backdrop-blur-md text-white border border-white/30 text-xs font-semibold mb-2 shadow-xs transition">
+                      <Stethoscope className="w-3.5 h-3.5 text-medical-turquoise" />
                       <span>Tibbiy Xizmatlar & Mutaxassisliklar</span>
                     </div>
-                    <h3 className="text-2xl font-black tracking-tight">Klinika Xizmatlari Jurnali</h3>
-                    <p className="text-xs text-emerald-100/90 max-w-xl mt-1">
+                    <h3 className="text-2xl font-black tracking-tight text-white drop-shadow-xs">Klinika Xizmatlari Jurnali</h3>
+                    <p className="text-xs text-white/95 max-w-xl mt-1 leading-relaxed">
                       Barcha tibbiy xizmatlar narxi, to'lov siyosati va har bir xizmat turiga biriktirilgan shifokorlar ro'yxati (PostgreSQL)
                     </p>
                   </div>
@@ -3104,18 +3417,18 @@ export const ManagerView: React.FC = () => {
                   <div className="relative z-10 flex flex-wrap items-center gap-3">
                     <button
                       onClick={exportServicesToExcel}
-                      className="px-4 py-2.5 bg-white/15 hover:bg-white/25 backdrop-blur-md text-white border border-white/20 text-xs font-bold rounded-2xl flex items-center gap-2 transition shadow-sm cursor-pointer"
+                      className="px-4 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white border border-white/30 text-xs font-bold rounded-2xl flex items-center gap-2 transition shadow-sm cursor-pointer active:scale-95"
                       title="Barcha xizmatlarni .xlsx formatida yuklab olish"
                     >
-                      <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
+                      <FileSpreadsheet className="w-4 h-4 text-medical-turquoise" />
                       <span>Excelga eksport (.xlsx)</span>
                     </button>
 
                     <button
                       onClick={() => handleOpenServiceModal()}
-                      className="px-4 py-2.5 bg-white text-emerald-800 hover:bg-emerald-50 text-xs font-black rounded-2xl flex items-center gap-2 shadow-lg shadow-black/10 transition cursor-pointer"
+                      className="px-5 py-2.5 bg-white hover:bg-slate-50 text-medical-blue-dark text-xs font-black rounded-2xl flex items-center gap-2 shadow-lg shadow-medical-blue-dark/20 border border-white/80 transition-all cursor-pointer active:scale-95"
                     >
-                      <Plus className="w-4 h-4 text-emerald-600" />
+                      <Plus className="w-4 h-4 text-medical-blue-dark stroke-[2.5]" />
                       <span>Yangi xizmat</span>
                     </button>
                   </div>
@@ -3124,7 +3437,7 @@ export const ManagerView: React.FC = () => {
                 {/* 4 KPI Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                    <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-medical-blue shrink-0">
                       <Tag className="w-5 h-5" />
                     </div>
                     <div>
@@ -3134,7 +3447,7 @@ export const ManagerView: React.FC = () => {
                   </div>
 
                   <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                    <div className="w-11 h-11 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center text-medical-turquoise-dark shrink-0">
                       <DollarSign className="w-5 h-5" />
                     </div>
                     <div>
@@ -3173,7 +3486,7 @@ export const ManagerView: React.FC = () => {
                       placeholder="Xizmat nomi yoki mutaxassislik..."
                       value={serviceSearch}
                       onChange={e => setServiceSearch(e.target.value)}
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-medical-blue/20 focus:border-medical-blue transition"
                     />
                   </div>
 
@@ -3195,7 +3508,7 @@ export const ManagerView: React.FC = () => {
                           onClick={() => setServiceSpecialtyFilter(spec.id)}
                           className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                             serviceSpecialtyFilter === spec.id
-                              ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/20'
+                              ? 'bg-medical-blue text-white shadow-xs shadow-medical-blue/20'
                               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                           }`}
                         >
@@ -3381,15 +3694,16 @@ export const ManagerView: React.FC = () => {
             return (
               <div className="space-y-6">
                 {/* Hero Header */}
-                <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 rounded-3xl p-6 text-white shadow-xl shadow-emerald-500/10 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
-                  <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+                <div className="bg-medical-gradient rounded-3xl p-6 text-white shadow-xl shadow-medical-blue/20 border border-white/25 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+                  <div className="absolute -right-10 -bottom-10 w-56 h-56 bg-white/15 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute -left-10 -top-10 w-48 h-48 bg-medical-blue-dark/20 rounded-full blur-2xl pointer-events-none" />
                   <div className="relative z-10">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-emerald-100 text-xs font-semibold mb-2">
-                      <Banknote className="w-3.5 h-3.5 text-emerald-300" />
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/20 hover:bg-white/25 backdrop-blur-md text-white border border-white/30 text-xs font-semibold mb-2 shadow-xs transition">
+                      <Banknote className="w-3.5 h-3.5 text-medical-turquoise" />
                       <span>Klinika Kassasi & Moliyaviy Cheklar</span>
                     </div>
-                    <h3 className="text-2xl font-black tracking-tight">Barcha To'lovlar Jurnali</h3>
-                    <p className="text-xs text-emerald-100/90 max-w-xl mt-1">
+                    <h3 className="text-2xl font-black tracking-tight text-white drop-shadow-xs">Barcha To'lovlar Jurnali</h3>
+                    <p className="text-xs text-white/95 max-w-xl mt-1 leading-relaxed">
                       Klinika kassasiga qabul qilingan barcha to'lovlar, qaysi shifokor uchun to'langanligi va chek tafsilotlari (PostgreSQL)
                     </p>
                   </div>
@@ -3397,16 +3711,16 @@ export const ManagerView: React.FC = () => {
                   <div className="relative z-10 flex flex-wrap items-center gap-3">
                     <button
                       onClick={exportPaymentsToExcel}
-                      className="px-4 py-2.5 bg-white/15 hover:bg-white/25 backdrop-blur-md text-white border border-white/20 text-xs font-bold rounded-2xl flex items-center gap-2 transition shadow-sm cursor-pointer"
+                      className="px-4 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white border border-white/30 text-xs font-bold rounded-2xl flex items-center gap-2 transition shadow-sm cursor-pointer active:scale-95"
                       title="Barcha to'lovlar jurnalini .xlsx formatida yuklab olish"
                     >
-                      <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
+                      <FileSpreadsheet className="w-4 h-4 text-medical-turquoise" />
                       <span>Excelga eksport (.xlsx)</span>
                     </button>
 
-                    <div className="px-4 py-2 bg-white/20 backdrop-blur-md rounded-2xl text-right">
-                      <div className="text-[10px] text-emerald-200 font-medium">Jami tushum</div>
-                      <div className="text-lg font-black text-white font-mono">{totalSum.toLocaleString()} so'm</div>
+                    <div className="px-5 py-2 bg-white/20 hover:bg-white/25 backdrop-blur-md rounded-2xl text-right border border-white/30 shadow-sm transition">
+                      <div className="text-[10px] text-white/90 font-bold uppercase tracking-wider">Jami tushum</div>
+                      <div className="text-lg font-black text-white font-mono drop-shadow-xs">{totalSum.toLocaleString()} so'm</div>
                     </div>
                   </div>
                 </div>
@@ -3414,7 +3728,7 @@ export const ManagerView: React.FC = () => {
                 {/* 4 Financial KPI Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                    <div className="w-11 h-11 rounded-xl bg-blue-50/80 border border-blue-100 flex items-center justify-center text-medical-blue shrink-0">
                       <Wallet className="w-5 h-5" />
                     </div>
                     <div>
@@ -3426,7 +3740,7 @@ export const ManagerView: React.FC = () => {
                   </div>
 
                   <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                    <div className="w-11 h-11 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center text-medical-turquoise-dark shrink-0">
                       <Banknote className="w-5 h-5" />
                     </div>
                     <div>
@@ -3438,7 +3752,7 @@ export const ManagerView: React.FC = () => {
                   </div>
 
                   <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0">
+                    <div className="w-11 h-11 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-medical-blue-dark shrink-0">
                       <CreditCard className="w-5 h-5" />
                     </div>
                     <div>
@@ -3469,7 +3783,7 @@ export const ManagerView: React.FC = () => {
                       placeholder="Bemor, chek № yoki shifokor ismi..."
                       value={paymentSearch}
                       onChange={e => setPaymentSearch(e.target.value)}
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-medical-blue/20 focus:border-medical-blue transition"
                     />
                   </div>
 
@@ -3489,7 +3803,7 @@ export const ManagerView: React.FC = () => {
                         onClick={() => setPaymentMethodFilter('CASH')}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                           paymentMethodFilter === 'CASH'
-                            ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/20'
+                            ? 'bg-medical-blue text-white shadow-xs shadow-medical-blue/20'
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
@@ -4213,66 +4527,135 @@ export const ManagerView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Card 2: Ovoz Tanlovi (Madina / Sardor) */}
-                  <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
-                    <h4 className="text-sm font-bold text-[#172B4D]">Ovoz Tanlovi (Tabiiy Studiya Suxandoni)</h4>
-                    <p className="text-[11px] text-slate-500">
-                      Bemorlarni chaqirish uchun qaysi tabiiy o'zbek tili inson ovozidan foydalanilsin:
-                    </p>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Madina (Female) */}
-                      <label
-                        className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-start gap-3.5 ${
-                          tvSettings.tvVoiceName === 'uz-UZ-MadinaNeural'
-                            ? 'border-emerald-500 bg-emerald-50/50 shadow-sm'
-                            : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="tvVoiceName"
-                          checked={tvSettings.tvVoiceName === 'uz-UZ-MadinaNeural'}
-                          onChange={() => setTvSettings({ ...tvSettings, tvVoiceName: 'uz-UZ-MadinaNeural' })}
-                          className="mt-1"
-                        />
+                  {/* Card 2: TV Ovozini Yoqish/O'chirish va Ovoz Tanlovi */}
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-5">
+                    {/* TV Tablo Ovoz Holati Toggle Switch */}
+                    <div className="flex items-center justify-between pb-5 border-b border-slate-100">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center transition ${
+                          tvSettings.tvSoundEnabled
+                            ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-200'
+                            : 'bg-rose-500/10 text-rose-600 border border-rose-200'
+                        }`}>
+                          {tvSettings.tvSoundEnabled ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
+                        </div>
                         <div>
-                          <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                            <span>Madina (Ayol ovozi)</span>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                              Tavsiya etiladi
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-[#172B4D]">TV Tablo Ovozli E'lonlari</h4>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              tvSettings.tvSoundEnabled
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-rose-100 text-rose-800'
+                            }`}>
+                              {tvSettings.tvSoundEnabled ? 'Faol (Yoqilgan)' : "O'chirilgan (Ovozsiz)"}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-500 mt-1">
-                            Mayin, jarangdor va aniq tabiiy studiya ovozi. Kasalxona va klinika qabulxonalariga mos.
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            TV tabloda bemorlarni chaqirish va qo'ng'iroq signallarini yoqish yoki o'chirish (real-vaqt rejimida TV ga uzatiladi)
                           </p>
                         </div>
-                      </label>
+                      </div>
 
-                      {/* Sardor (Male) */}
-                      <label
-                        className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-start gap-3.5 ${
-                          tvSettings.tvVoiceName === 'uz-UZ-SardorNeural'
-                            ? 'border-emerald-500 bg-emerald-50/50 shadow-sm'
-                            : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                      {/* Switch Button */}
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const newStatus = !tvSettings.tvSoundEnabled;
+                          setTvSettings(prev => ({ ...prev, tvSoundEnabled: newStatus }));
+                          try {
+                            const res = await fetch(`${API_BASE_URL}/clinic/settings`, {
+                              method: 'PATCH',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                              },
+                              body: JSON.stringify({ tvSoundEnabled: newStatus })
+                            });
+                            if (res.ok) {
+                              showNotification(
+                                newStatus ? 'TV ovozi yoqildi' : "TV ovozi o'chirildi",
+                                newStatus ? "TV tabloda barcha ovozli e'lonlar faollashtirildi." : "TV tablo ovozsiz (jim) rejimga o'tkazildi.",
+                                newStatus ? 'success' : 'warning'
+                              );
+                            }
+                          } catch (err) {
+                            console.error(err);
+                          }
+                        }}
+                        className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors duration-200 focus:outline-none cursor-pointer ${
+                          tvSettings.tvSoundEnabled ? 'bg-emerald-600' : 'bg-slate-300'
                         }`}
+                        title={tvSettings.tvSoundEnabled ? "Ovozni o'chirish" : "Ovozni yoqish"}
                       >
-                        <input
-                          type="radio"
-                          name="tvVoiceName"
-                          checked={tvSettings.tvVoiceName === 'uz-UZ-SardorNeural'}
-                          onChange={() => setTvSettings({ ...tvSettings, tvVoiceName: 'uz-UZ-SardorNeural' })}
-                          className="mt-1"
+                        <span
+                          className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-md transition-transform duration-200 ease-in-out ${
+                            tvSettings.tvSoundEnabled ? 'translate-x-9' : 'translate-x-1'
+                          }`}
                         />
-                        <div>
-                          <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                            <span>Sardor (Erkak ovozi)</span>
+                      </button>
+                    </div>
+
+                    {/* Voice Selection */}
+                    <div>
+                      <h4 className="text-sm font-bold text-[#172B4D] mb-1">Ovoz Tanlovi (Tabiiy Studiya Suxandoni)</h4>
+                      <p className="text-[11px] text-slate-500 mb-3.5">
+                        Bemorlarni chaqirish uchun qaysi tabiiy o'zbek tili inson ovozidan foydalanilsin (TV tabloda xam doimiy saqlanadi):
+                      </p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Madina (Female) */}
+                        <label
+                          className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-start gap-3.5 ${
+                            tvSettings.tvVoiceName === 'uz-UZ-MadinaNeural'
+                              ? 'border-emerald-500 bg-emerald-50/50 shadow-sm'
+                              : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="tvVoiceName"
+                            checked={tvSettings.tvVoiceName === 'uz-UZ-MadinaNeural'}
+                            onChange={() => setTvSettings({ ...tvSettings, tvVoiceName: 'uz-UZ-MadinaNeural' })}
+                            className="mt-1"
+                          />
+                          <div>
+                            <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                              <span>Madina (Ayol ovozi)</span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                Tavsiya etiladi
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                              Mayin, jarangdor va aniq tabiiy studiya ovozi. Kasalxona va klinika qabulxonalariga mos.
+                            </p>
                           </div>
-                          <p className="text-xs text-slate-500 mt-1">
-                            Vazmin, rasmiy va ishonchli suxandon shifokor ovozi.
-                          </p>
-                        </div>
-                      </label>
+                        </label>
+
+                        {/* Sardor (Male) */}
+                        <label
+                          className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-start gap-3.5 ${
+                            tvSettings.tvVoiceName === 'uz-UZ-SardorNeural'
+                              ? 'border-emerald-500 bg-emerald-50/50 shadow-sm'
+                              : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="tvVoiceName"
+                            checked={tvSettings.tvVoiceName === 'uz-UZ-SardorNeural'}
+                            onChange={() => setTvSettings({ ...tvSettings, tvVoiceName: 'uz-UZ-SardorNeural' })}
+                            className="mt-1"
+                          />
+                          <div>
+                            <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                              <span>Sardor (Erkak ovozi)</span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                              Vazmin, rasmiy va ishonchli suxandon shifokor ovozi.
+                            </p>
+                          </div>
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -4646,35 +5029,36 @@ export const ManagerView: React.FC = () => {
           {activeTab === 'TIZIM_SOZLAMALARI' && (
             <div className="space-y-6 w-full">
               {/* Header Banner */}
-              <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white p-7 rounded-3xl border border-blue-500/20 shadow-xl">
-                <div className="absolute top-0 right-0 -mt-10 -mr-10 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="relative overflow-hidden bg-medical-gradient text-white p-7 rounded-3xl border border-white/25 shadow-xl shadow-medical-blue/20">
+                <div className="absolute top-0 right-0 -mt-10 -mr-10 w-72 h-72 bg-white/15 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -left-10 -bottom-10 w-56 h-56 bg-medical-blue-dark/20 rounded-full blur-2xl pointer-events-none" />
                 <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                   <div>
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                      <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-md border border-white/30 shrink-0">
                         <SlidersHorizontal className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                        <h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2.5 drop-shadow-xs">
                           Tizim va Sayt Sozlamalari
-                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/30">
                             PostgreSQL 16
                           </span>
                         </h2>
-                        <p className="text-xs text-slate-300 mt-0.5">
+                        <p className="text-xs text-white/95 mt-0.5 leading-relaxed">
                           Klinika brendi, elektron navbat qoidalari, ish rejimi va sayt aloqa ma'lumotlarini real vaqtda boshqarish
                         </p>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400 mt-3">
-                      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 text-emerald-400 font-semibold">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-white/95 mt-3">
+                      <span className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/20 backdrop-blur-md border border-white/30 text-white font-semibold shadow-xs">
+                        <span className="w-2 h-2 rounded-full bg-medical-turquoise animate-pulse" />
                         Tizim Faol
                       </span>
-                      <span className="px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 text-slate-300">
+                      <span className="px-3 py-1 rounded-xl bg-white/20 backdrop-blur-md border border-white/30 text-white font-medium shadow-xs">
                         Oxirgi yangilanish: {clinicSettings?.updated_at ? new Date(clinicSettings.updated_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }) : 'Hozir'}
                       </span>
-                      <span className="px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 text-blue-300">
+                      <span className="px-3 py-1 rounded-xl bg-white/20 backdrop-blur-md border border-white/30 text-white font-medium shadow-xs">
                         Valyuta: {settingsForm.currency}
                       </span>
                     </div>
@@ -4685,25 +5069,25 @@ export const ManagerView: React.FC = () => {
                       type="button"
                       onClick={handleResetSettings}
                       disabled={isSavingSettings}
-                      className="px-4 py-2.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-bold transition flex items-center gap-2 shadow-sm disabled:opacity-50"
+                      className="px-4 py-2.5 rounded-2xl border border-white/30 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white text-xs font-bold transition flex items-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer active:scale-95"
                     >
-                      <RotateCcw className="w-4 h-4" />
+                      <RotateCcw className="w-4 h-4 text-medical-turquoise" />
                       Tiklash
                     </button>
                     <button
                       type="button"
                       onClick={() => handleSaveSettings()}
                       disabled={isSavingSettings}
-                      className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-blue-600/30 active:scale-95 disabled:opacity-50"
+                      className="px-6 py-2.5 rounded-2xl bg-white hover:bg-slate-50 text-medical-blue-dark text-xs font-black transition flex items-center gap-2 shadow-lg shadow-medical-blue-dark/20 border border-white/80 active:scale-95 disabled:opacity-50 cursor-pointer"
                     >
                       {isSavingSettings ? (
                         <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <RefreshCw className="w-4 h-4 animate-spin text-medical-blue-dark" />
                           Saqlanmoqda...
                         </>
                       ) : (
                         <>
-                          <Save className="w-4 h-4" />
+                          <Save className="w-4 h-4 text-medical-blue-dark stroke-[2.5]" />
                           Sozlamalarni saqlash
                         </>
                       )}
@@ -4720,18 +5104,18 @@ export const ManagerView: React.FC = () => {
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Klinika Brendi</p>
-                    <p className="text-xs font-black text-slate-800 truncate">{settingsForm.clinicName || 'SADAF KLINIKA'}</p>
+                    <p className="text-xs font-black text-slate-800 truncate">{settingsForm.clinicName || 'klinika-admin'}</p>
                     <p className="text-[10px] text-slate-400 truncate mt-0.5">{settingsForm.slogan || 'Rasmiy tibbiyot markazi'}</p>
                   </div>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
-                    <CreditCard className="w-5 h-5 text-emerald-600" />
+                  <div className="w-11 h-11 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center shrink-0">
+                    <CreditCard className="w-5 h-5 text-medical-turquoise-dark" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">To'lov Tartibi</p>
-                    <p className="text-xs font-black text-emerald-700 truncate">
+                    <p className="text-xs font-black text-medical-blue-dark truncate">
                       {settingsForm.defaultPaymentPolicy === 'PAY_BEFORE_CALL' ? "Oldindan to'lov" : "Xizmatdan so'ng"}
                     </p>
                     <p className="text-[10px] text-slate-400 truncate mt-0.5">Prefiks: {settingsForm.defaultQueuePrefix} (Talon)</p>
@@ -4787,7 +5171,7 @@ export const ManagerView: React.FC = () => {
                           type="text"
                           value={settingsForm.clinicName}
                           onChange={e => setSettingsForm({ ...settingsForm, clinicName: e.target.value })}
-                          placeholder="SADAF KLINIKA"
+                          placeholder="klinika-admin"
                           className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition"
                         />
                       </div>
@@ -5222,7 +5606,7 @@ export const ManagerView: React.FC = () => {
                         {settingsForm.clinicName?.charAt(0) || 'S'}
                       </div>
                       <div>
-                        <h5 className="text-base font-black text-slate-900">{settingsForm.clinicName || 'SADAF KLINIKA'}</h5>
+                        <h5 className="text-base font-black text-slate-900">{settingsForm.clinicName || 'klinika-admin'}</h5>
                         <p className="text-xs text-slate-500">{settingsForm.slogan || 'Zamonaviy tibbiyot va professional xizmat'}</p>
                         <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400 mt-1">
                           <span className="flex items-center gap-1">
@@ -5292,6 +5676,887 @@ export const ManagerView: React.FC = () => {
             </div>
           )}
 
+          {/* TAB: PRINTER VA TALON SOZLAMALARI (100% REAL POSTGRESQL & TERMAL PRINTER ENTEGRATSIYASI) */}
+          {activeTab === 'PRINTER_SOZLAMALARI' && (
+            <div className="space-y-6 w-full">
+              {/* Settings Sub-navigation Pills */}
+              <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200/80 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setSearchParams({ tab: 'sozlamalar' })}
+                  className="px-4 py-2 rounded-xl text-xs font-bold transition text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center gap-2 cursor-pointer"
+                >
+                  <Sliders className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Asosiy tizim sozlamalari</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSearchParams({ tab: 'printer-sozlamalari' })}
+                  className="px-4 py-2 rounded-xl text-xs font-bold transition bg-[#0084FF] text-white shadow-sm flex items-center gap-2 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5 text-white" />
+                  <span>Printer va talon sozlamalari</span>
+                  <span className="px-1.5 py-0.5 text-[9px] font-bold bg-white/20 text-white rounded">Faol</span>
+                </button>
+              </div>
+
+              {/* Header Banner with Title and Actions */}
+              <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-600 shrink-0">
+                      <Printer className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xl font-black text-[#172B4D]">Printer va Talon Sozlamalari</h3>
+                        <span className="px-2.5 py-0.5 bg-teal-50 text-teal-700 text-[10px] font-bold rounded-full border border-teal-200">
+                          XP-80T / XP-58 Moslashuvchan
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Kassirlar tomonidan chiqariladigan termal chek va navbat talonlarining parametrlari, qog'oz formati (80 mm / 58 mm) va elementlar tarkibini to'liq boshqarish
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleResetPrinterSettings}
+                    className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-slate-200 cursor-pointer"
+                    title="Boshlang'ich standart parametrlarga qaytarish"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Qaytarish</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleTestPrint}
+                    className="px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    title="Hozirgi sozlamalarni printerda sinov tariqasida chop etib ko'rish"
+                  >
+                    <Printer className="w-4 h-4 text-blue-600" />
+                    <span>Sinov chop etish</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSavePrinterSettings}
+                    disabled={isSavingPrinterSettings}
+                    className="px-5 py-2.5 bg-[#0F766E] hover:bg-[#115E59] text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm disabled:opacity-60 cursor-pointer"
+                  >
+                    {isSavingPrinterSettings ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4" />
+                    )}
+                    <span>{isSavingPrinterSettings ? 'Saqlanmoqda...' : 'Saqlash va qo‘llash'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Main 2-column Grid */}
+              <div className="grid grid-cols-12 gap-6 items-start">
+                {/* LEFT COLUMN: SOZLAMALAR FORMASI (SPAN 7) */}
+                <div className="col-span-12 xl:col-span-7 space-y-6">
+                  {/* Card 1: Printer va qog'oz formati */}
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 flex items-center justify-center font-bold">
+                          <Sliders className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-[#172B4D]">Printer va Qog'oz Formati</h4>
+                          <p className="text-[11px] text-slate-500">Termal printer qog'ozi kengligi va nusxalar soni</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-2">Asosiy qog'oz kengligi (Formati)</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPrinterSettings(prev => ({ ...prev, paperSize: '80mm' }));
+                            setPreviewPaperSize('80mm');
+                          }}
+                          className={`p-4 rounded-2xl border text-left transition flex items-start justify-between cursor-pointer ${
+                            printerSettings.paperSize === '80mm'
+                              ? 'border-[#0F766E] bg-teal-50/50 ring-2 ring-[#0F766E]/20'
+                              : 'border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-xs text-slate-900">80 mm (XP-80T)</span>
+                              <span className="px-1.5 py-0.5 bg-teal-100 text-teal-800 text-[9px] font-bold rounded">Tavsiya etiladi</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                              Standart keng kassa cheki (72 mm chop kengligi). Yirik raqamlar va to'liq ma'lumotlar sig'adi.
+                            </p>
+                          </div>
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                            printerSettings.paperSize === '80mm' ? 'bg-[#0F766E] text-white' : 'border border-slate-300'
+                          }`}>
+                            {printerSettings.paperSize === '80mm' && <Check className="w-3.5 h-3.5" />}
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPrinterSettings(prev => ({ ...prev, paperSize: '58mm' }));
+                            setPreviewPaperSize('58mm');
+                          }}
+                          className={`p-4 rounded-2xl border text-left transition flex items-start justify-between cursor-pointer ${
+                            printerSettings.paperSize === '58mm'
+                              ? 'border-[#0F766E] bg-teal-50/50 ring-2 ring-[#0F766E]/20'
+                              : 'border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-xs text-slate-900">58 mm (XP-58)</span>
+                              <span className="px-1.5 py-0.5 bg-slate-100 text-slate-700 text-[9px] font-bold rounded">Ixcham</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                              Kichik ixcham termoprinterlar uchun (48 mm chop kengligi). Qog'ozni tejaydi.
+                            </p>
+                          </div>
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                            printerSettings.paperSize === '58mm' ? 'bg-[#0F766E] text-white' : 'border border-slate-300'
+                          }`}>
+                            {printerSettings.paperSize === '58mm' && <Check className="w-3.5 h-3.5" />}
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1.5">Har bir buyurtmada nusxalar soni</label>
+                        <select
+                          value={printerSettings.copies || 1}
+                          onChange={e => setPrinterSettings(prev => ({ ...prev, copies: Number(e.target.value) }))}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-[#0F766E]/20 focus:border-[#0F766E] outline-none"
+                        >
+                          <option value={1}>1 ta nusxa (Faqat bemor uchun)</option>
+                          <option value={2}>2 ta nusxa (Bemor va Shifokor uchun)</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2 pt-1">
+                        <label className="flex items-center justify-between cursor-pointer p-2 rounded-xl hover:bg-slate-50 border border-slate-100">
+                          <div>
+                            <span className="text-xs font-bold text-slate-800 block">Avtomatik chop etish</span>
+                            <span className="text-[10px] text-slate-400">Kassirda talon berilganda printer oynasi ochilsin</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={!!printerSettings.autoPrint}
+                            onChange={e => setPrinterSettings(prev => ({ ...prev, autoPrint: e.target.checked }))}
+                            className="w-4 h-4 text-[#0F766E] rounded-md focus:ring-[#0F766E]"
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between cursor-pointer p-2 rounded-xl hover:bg-slate-50 border border-slate-100">
+                          <div>
+                            <span className="text-xs font-bold text-slate-800 block">Ovozli tasdiq (Chime)</span>
+                            <span className="text-[10px] text-slate-400">Talon muvaffaqiyatli chiqqanda ohang chalinishi</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={!!printerSettings.soundAlert}
+                            onChange={e => setPrinterSettings(prev => ({ ...prev, soundAlert: e.target.checked }))}
+                            className="w-4 h-4 text-[#0F766E] rounded-md focus:ring-[#0F766E]"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Klinika rekvizitlari va sarlavhasi (Header) */}
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center font-bold">
+                          <Building2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-[#172B4D]">Klinika Rekvizitlari (Talon Sarlavhasi)</h4>
+                          <p className="text-[11px] text-slate-500">Chekning eng yuqori qismida chiqadigan brend va aloqa ma'lumotlari</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Klinika nomi (Bosh sarlavha)</label>
+                        <input
+                          type="text"
+                          value={printerSettings.clinicName || ''}
+                          onChange={e => setPrinterSettings(prev => ({ ...prev, clinicName: e.target.value }))}
+                          placeholder="KLINIKA-ADMIN"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold focus:ring-2 focus:ring-[#0F766E]/20 focus:border-[#0F766E] outline-none uppercase tracking-wide"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Telefon raqam</label>
+                        <input
+                          type="text"
+                          value={printerSettings.phone || ''}
+                          onChange={e => setPrinterSettings(prev => ({ ...prev, phone: e.target.value }))}
+                          placeholder="+998 71 200 00 20"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-[#0F766E]/20 focus:border-[#0F766E] outline-none"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Manzil</label>
+                        <input
+                          type="text"
+                          value={printerSettings.address || ''}
+                          onChange={e => setPrinterSettings(prev => ({ ...prev, address: e.target.value }))}
+                          placeholder="Toshkent sh., Chilonzor tumani, Bunyodkor ko'chasi 15-uy"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-[#0F766E]/20 focus:border-[#0F766E] outline-none"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Qo'shimcha sarlavha osti eslatmasi</label>
+                        <input
+                          type="text"
+                          value={printerSettings.welcomeNote || ''}
+                          onChange={e => setPrinterSettings(prev => ({ ...prev, welcomeNote: e.target.value }))}
+                          placeholder="Navbat talonini qabul yakunigacha saqlang"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-[#0F766E]/20 focus:border-[#0F766E] outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Talonda nimalar ko'rsatilsin? (Elementlar filtri) */}
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center font-bold">
+                          <CheckSquare className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-[#172B4D]">Talon Tarkibi (Nimalar Ko'rsatilsin?)</h4>
+                          <p className="text-[11px] text-slate-500">Keraksiz maydonlarni o'chirib, chekni ixchamlashtirishingiz mumkin</p>
+                        </div>
+                      </div>
+                      <span className="text-xs text-purple-700 font-bold bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200">
+                        Real vaqtda filtr
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {[
+                        { key: 'showDate', title: 'Sana va vaqt', desc: 'Chek berilgan sana va daqiqa' },
+                        { key: 'showTicketNumber', title: 'Katta talon raqami', desc: 'Masalan: A-014, S-001' },
+                        { key: 'showSpecialty', title: 'Mutaxassislik / Xizmat', desc: "Ko'rik yoki xizmat nomi" },
+                        { key: 'showDoctor', title: 'Shifokor F.I.Sh.', desc: 'Qabul qiluvchi shifokor ismi' },
+                        { key: 'showCabinet', title: 'Kabinet raqami', desc: 'KABINET № X ko\'rinishida' },
+                        { key: 'showPatientName', title: 'Bemor F.I.Sh.', desc: 'Bemor ismi (chapda, tartibli)' },
+                        { key: 'showPaymentStatus', title: "To'lov holati", desc: "To'langan yoki to'lov qabulda" },
+                        { key: 'showWaitTime', title: 'Taxminiy kutish vaqti', desc: '~15 daqiqa kabi vaqt' },
+                        { key: 'showQrCode', title: 'QR-kod (Smartfon kuzatuv)', desc: 'Navbatni telefonda kuzatish kodi' },
+                        { key: 'showCutLine', title: 'Qirqish chizig\'i (Cut line)', desc: 'Chek oxiridagi uzilish chizig\'i' }
+                      ].map((item) => {
+                        const isChecked = (printerSettings as any)[item.key] !== false;
+                        return (
+                          <label
+                            key={item.key}
+                            className={`flex items-start justify-between p-3 rounded-2xl border transition cursor-pointer ${
+                              isChecked
+                                ? 'border-teal-200 bg-teal-50/30'
+                                : 'border-slate-200 bg-slate-50/50 opacity-75'
+                            }`}
+                          >
+                            <div className="pr-2">
+                              <span className="text-xs font-bold text-slate-800 block">{item.title}</span>
+                              <span className="text-[10px] text-slate-500 leading-tight">{item.desc}</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={e => setPrinterSettings(prev => ({ ...prev, [item.key]: e.target.checked } as any))}
+                              className="w-4 h-4 text-[#0F766E] rounded-md focus:ring-[#0F766E] mt-0.5 shrink-0"
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Card 4: Pastki qism (Footer) va minnatdorchilik */}
+                  <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+                          <MessageSquare className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-[#172B4D]">Talon Pastki Qismi (Footer Matnlari)</h4>
+                          <p className="text-[11px] text-slate-500">Talon tagidagi minnatdorchilik va ko'rsatmalar</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Minnatdorchilik xabari</label>
+                        <input
+                          type="text"
+                          value={printerSettings.footerText || ''}
+                          onChange={e => setPrinterSettings(prev => ({ ...prev, footerText: e.target.value }))}
+                          placeholder="Tashrifingiz uchun rahmat! Salomat bo'ling!"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-[#0F766E]/20 focus:border-[#0F766E] outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Qo'shimcha eslatma / tavsiya</label>
+                        <input
+                          type="text"
+                          value={printerSettings.footerNote || ''}
+                          onChange={e => setPrinterSettings(prev => ({ ...prev, footerNote: e.target.value }))}
+                          placeholder="Navbatingizni zal monitorida kuzatib boring"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-[#0F766E]/20 focus:border-[#0F766E] outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={handleSavePrinterSettings}
+                        disabled={isSavingPrinterSettings}
+                        className="w-full py-3 bg-[#0F766E] hover:bg-[#115E59] text-white rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-60 cursor-pointer"
+                      >
+                        {isSavingPrinterSettings ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4" />
+                        )}
+                        <span>{isSavingPrinterSettings ? 'Saqlanmoqda...' : 'Barcha o\'zgarishlarni bazaga saqlash'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN: JONLI INTERAKTIV TICKET PREVIEW (SPAN 5) */}
+                <div className="col-span-12 xl:col-span-5 sticky top-6 space-y-4">
+                  <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-sm">
+                    {/* Preview Header with size switcher */}
+                    <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-bold text-[#172B4D]">Jonli Talon Simulyatori</h4>
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        </div>
+                        <p className="text-[11px] text-slate-500">Termoprinterda ayni shunday chiqadi</p>
+                      </div>
+
+                      {/* Preview format toggle */}
+                      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewPaperSize('80mm')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                            previewPaperSize === '80mm'
+                              ? 'bg-white text-slate-900 shadow-2xs'
+                              : 'text-slate-500 hover:text-slate-900'
+                          }`}
+                        >
+                          80 mm
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewPaperSize('58mm')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                            previewPaperSize === '58mm'
+                              ? 'bg-white text-slate-900 shadow-2xs'
+                              : 'text-slate-500 hover:text-slate-900'
+                          }`}
+                        >
+                          58 mm
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Paper Preview Area */}
+                    <div className="py-6 bg-slate-100/80 rounded-2xl flex justify-center my-4 overflow-x-auto">
+                      <div
+                        className={`bg-white shadow-xl border border-slate-300 font-mono text-black transition-all ${
+                          previewPaperSize === '80mm' ? 'w-[360px] p-5 rounded-xl' : 'w-[260px] p-3.5 rounded-lg'
+                        }`}
+                      >
+                        {/* HEADER */}
+                        <div className="text-center space-y-0.5 border-b-2 border-dashed border-black pb-2">
+                          <div className={`font-black uppercase tracking-wider text-black ${previewPaperSize === '80mm' ? 'text-base' : 'text-sm'}`}>
+                            {printerSettings.clinicName || 'KLINIKA-ADMIN'}
+                          </div>
+                          {printerSettings.address && (
+                            <div className={`text-black font-sans leading-tight ${previewPaperSize === '80mm' ? 'text-[11px]' : 'text-[9.5px]'}`}>
+                              {printerSettings.address}
+                            </div>
+                          )}
+                          <div className={`text-black font-sans font-medium ${previewPaperSize === '80mm' ? 'text-[11px]' : 'text-[9.5px]'}`}>
+                            {printerSettings.phone && `Tel: ${printerSettings.phone}`}
+                            {printerSettings.phone && printerSettings.showDate !== false && ' • '}
+                            {printerSettings.showDate !== false && new Date().toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                          {printerSettings.welcomeNote && (
+                            <div className={`text-black font-sans italic pt-0.5 ${previewPaperSize === '80mm' ? 'text-[10px]' : 'text-[8.5px]'}`}>
+                              {printerSettings.welcomeNote}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* BIG QUEUE NUMBER */}
+                        {printerSettings.showTicketNumber !== false && (
+                          <div className="text-center py-1">
+                            <div
+                              className={`font-black text-black font-mono leading-none tracking-tight ${
+                                previewPaperSize === '80mm' ? 'text-[68px] sm:text-[72px]' : 'text-[48px] sm:text-[52px]'
+                              }`}
+                              style={{ letterSpacing: '-0.04em' }}
+                            >
+                              S-001
+                            </div>
+                            {printerSettings.showSpecialty !== false && (
+                              <div className={`font-sans font-black text-black uppercase mt-1.5 tracking-wider ${previewPaperSize === '80mm' ? 'text-sm' : 'text-xs'}`}>
+                                STOMATOLOGIYA
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* CABINET AND DOCTOR */}
+                        {(printerSettings.showCabinet !== false || printerSettings.showDoctor !== false) && (
+                          <div className="p-2 border-2 border-black rounded-lg text-center space-y-0.5 font-sans my-1.5">
+                            {printerSettings.showCabinet !== false && (
+                              <div className={`font-black text-black ${previewPaperSize === '80mm' ? 'text-sm' : 'text-xs'}`}>
+                                KABINET № 4
+                              </div>
+                            )}
+                            {printerSettings.showDoctor !== false && (
+                              <div className={`font-semibold text-black break-words ${previewPaperSize === '80mm' ? 'text-xs' : 'text-[11px]'}`}>
+                                Dr. Alisher Alimov
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* PATIENT SECTION */}
+                        {printerSettings.showPatientName !== false && (
+                          <div className="text-left font-sans py-2 border-t-2 border-b-2 border-dashed border-black space-y-1 my-1.5">
+                            <div className="text-[10px] font-bold text-black uppercase tracking-wider">
+                              BEMOR:
+                            </div>
+                            <div className={`font-black text-black leading-snug break-words ${previewPaperSize === '80mm' ? 'text-sm' : 'text-xs'}`}>
+                              Malika Alimova
+                            </div>
+                            {(printerSettings.showPaymentStatus !== false || printerSettings.showWaitTime !== false) && (
+                              <div className="flex items-center justify-between text-[10px] text-black pt-1 border-t border-dotted border-black/40 font-mono">
+                                {printerSettings.showPaymentStatus !== false && <span>To'lov: <b>To'langan</b></span>}
+                                {printerSettings.showWaitTime !== false && <span>Kutish: <b>~15 daq</b></span>}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* QR CODE & INSTRUCTION */}
+                        {printerSettings.showQrCode !== false && (
+                          <div className="pt-2 flex flex-col items-center justify-center space-y-1">
+                            <div className={`border-2 border-black rounded-lg flex items-center justify-center text-black p-1 bg-white ${previewPaperSize === '80mm' ? 'w-14 h-14' : 'w-12 h-12'}`}>
+                              <QrCode className={previewPaperSize === '80mm' ? 'w-10 h-10' : 'w-9 h-9'} />
+                            </div>
+                            <div className={`text-black font-sans leading-tight text-center ${previewPaperSize === '80mm' ? 'text-[10px]' : 'text-[8.5px]'}`}>
+                              Navbatni smartfonda kuzatish uchun QR-kodni skanerlang
+                            </div>
+                          </div>
+                        )}
+
+                        {/* FOOTER TEXT */}
+                        {(printerSettings.footerText || printerSettings.footerNote) && (
+                          <div className="pt-2 text-center font-sans space-y-0.5">
+                            {printerSettings.footerText && (
+                              <div className={`font-bold text-black ${previewPaperSize === '80mm' ? 'text-[10px]' : 'text-[8.5px]'}`}>
+                                {printerSettings.footerText}
+                              </div>
+                            )}
+                            {printerSettings.footerNote && (
+                              <div className={`text-black ${previewPaperSize === '80mm' ? 'text-[9px]' : 'text-[8px]'}`}>
+                                {printerSettings.footerNote}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* CUT LINE GUIDE */}
+                        {printerSettings.showCutLine !== false && (
+                          <div className="pt-3 pb-1 border-b-2 border-dashed border-black/50 text-[10px] text-slate-500 font-sans text-center">
+                            - - - Qirqish chizig'i - - -
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Preview Actions */}
+                    <div className="flex items-center gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={handleTestPrint}
+                        className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                      >
+                        <Printer className="w-4 h-4" />
+                        <span>Sinov chop etish ({previewPaperSize})</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: OBUNA VA SMS (100% REAL POSTGRESQL & SUPER ADMIN INTEGRATION) */}
+          {activeTab === 'OBUNA_SMS' && (
+            <div className="space-y-6 w-full">
+              {/* Header Banner */}
+              <div className="relative overflow-hidden bg-medical-gradient text-white p-7 rounded-3xl border border-white/25 shadow-xl shadow-medical-blue/20">
+                <div className="absolute top-0 right-0 -mt-10 -mr-10 w-72 h-72 bg-white/15 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -left-10 -bottom-10 w-56 h-56 bg-medical-blue-dark/20 rounded-full blur-2xl pointer-events-none" />
+                <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-md border border-white/30 shrink-0">
+                        <CreditCard className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2.5 drop-shadow-xs">
+                          Obuna va SMS Boshqaruvi
+                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/30">
+                            Super Admin Boshqaruvida
+                          </span>
+                        </h2>
+                        <p className="text-xs text-white/95 mt-0.5 leading-relaxed">
+                          Klinikaning faol tarifi, amal qilish muddati, SMS xabarnomalar balansi va tizim qulf holati
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-white/95 mt-3">
+                      <span className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border backdrop-blur-md font-semibold shadow-xs ${
+                        clinicSubscription?.status === 'ACTIVE'
+                          ? 'bg-white/20 border-white/30 text-white'
+                          : clinicSubscription?.status === 'SUSPENDED'
+                          ? 'bg-amber-500/25 border-amber-300/40 text-amber-100'
+                          : 'bg-rose-500/25 border-rose-300/40 text-rose-100'
+                      }`}>
+                        <span className={`w-2 h-2 rounded-full ${
+                          clinicSubscription?.status === 'ACTIVE' ? 'bg-medical-turquoise animate-pulse' :
+                          clinicSubscription?.status === 'SUSPENDED' ? 'bg-amber-300' : 'bg-rose-300'
+                        }`} />
+                        Holat: {clinicSubscription?.status === 'ACTIVE' ? 'Faol Obuna' :
+                                clinicSubscription?.status === 'SUSPENDED' ? 'To‘xtatilgan' :
+                                clinicSubscription?.status === 'TRIAL' ? 'Sinov Muddati' : 'Qulflangan'}
+                      </span>
+                      <span className="px-3 py-1 rounded-xl bg-white/20 backdrop-blur-md border border-white/30 text-white font-medium shadow-xs">
+                        Klinika ID: {clinicSubscription?.clinic_id || 'tenant_sadaf_01'}
+                      </span>
+                      <span className="px-3 py-1 rounded-xl bg-white/20 backdrop-blur-md border border-white/30 text-white font-bold shadow-xs">
+                        SMS Balansi: {Number(clinicSubscription?.sms_balance ?? smsSettings?.balance ?? 1000).toLocaleString('uz-UZ')} dona
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={fetchClinicSubscriptionAndSms}
+                      disabled={loadingSubscription}
+                      className="px-5 py-2.5 rounded-2xl bg-white hover:bg-slate-50 text-medical-blue-dark text-xs font-black transition flex items-center gap-2 shadow-lg shadow-medical-blue-dark/20 border border-white/80 active:scale-95 disabled:opacity-50 cursor-pointer"
+                    >
+                      <RefreshCw className={`w-4 h-4 text-medical-blue-dark stroke-[2.5] ${loadingSubscription ? 'animate-spin' : ''}`} />
+                      <span>Yangilash</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Alert Card */}
+              {clinicSubscription?.status === 'BLOCKED' ? (
+                <div className="p-5 bg-rose-50 border-2 border-rose-400 rounded-3xl flex items-start gap-4 shadow-sm animate-pulse">
+                  <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center shrink-0">
+                    <Lock className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-rose-900">Klinika Tizimi Qulflangan (BLOCKED)</h3>
+                    <p className="text-xs text-rose-700 mt-1 leading-relaxed">
+                      Ushbu klinikaning xizmati Super Admin tomonidan qulflangan. Obuna to'lovi muddati o'tgan yoki faoliyat to'xtatilgan.
+                      Qayta faollashtirish uchun Super Admin boshqaruviga murojaat qiling: <strong>+998 (71) 200-00-00</strong> yoki <strong>@sadaf_support</strong>
+                    </p>
+                  </div>
+                </div>
+              ) : clinicSubscription?.status === 'SUSPENDED' ? (
+                <div className="p-5 bg-amber-50 border-2 border-amber-400 rounded-3xl flex items-start gap-4 shadow-sm">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0">
+                    <Pause className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-amber-900">Klinika Xizmati To'xtatilgan (SUSPENDED)</h3>
+                    <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                      Sizning obunangiz Super Admin tomonidan vaqtincha to'xtatilgan. Xizmatni davom ettirish uchun Super Admin bilan bog'laning.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-5 bg-cyan-50/70 border border-cyan-200/80 rounded-3xl flex items-start gap-4 shadow-xs">
+                  <div className="w-12 h-12 rounded-2xl bg-medical-blue text-white flex items-center justify-center shrink-0 shadow-md shadow-medical-blue/20">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-medical-blue-dark">Klinika Obunasi To'liq Faol (ACTIVE)</h3>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      Sizning klinika tizimingiz cheklovlarsiz ishlamoqda. Shifokorlar xonasi, kassa, TV tablosi va SMS xabarnomalar xizmati 100% faol.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* 4 Stat Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 text-medical-blue flex items-center justify-center shrink-0">
+                    <Layers className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-slate-500">Joriy Tarif Rejasi</div>
+                    <div className="text-lg font-black text-slate-900">
+                      {clinicSubscription?.plan_name || clinicSubscription?.plan_code || 'STARTER'}
+                    </div>
+                    <span className="text-[11px] font-bold text-medical-blue">
+                      {Number(clinicSubscription?.plan_price || 490000).toLocaleString('uz-UZ')} so'm / oy
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-cyan-50 text-medical-turquoise-dark flex items-center justify-center shrink-0">
+                    <Calendar className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-slate-500">Amal Qilish Muddati</div>
+                    <div className="text-lg font-black text-slate-900">
+                      {clinicSubscription?.end_date ? String(clinicSubscription.end_date).split('T')[0] : '2026-12-31'}
+                    </div>
+                    <span className="text-[11px] font-bold text-emerald-600">
+                      {clinicSubscription?.days_remaining ?? 65} kun qoldi
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
+                    <MessageSquare className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-slate-500">Klinika SMS Balansi</div>
+                    <div className="text-lg font-black text-teal-900 font-mono">
+                      {Number(clinicSubscription?.sms_balance ?? smsSettings?.balance ?? 1000).toLocaleString('uz-UZ')} <span className="text-xs font-bold font-sans">dona</span>
+                    </div>
+                    <span className={`text-[11px] font-bold ${clinicSubscription?.sms_enabled !== false ? 'text-teal-600' : 'text-rose-600'}`}>
+                      {clinicSubscription?.sms_enabled !== false ? 'SMS Xizmati Yoqilgan' : 'SMS Xizmati O‘chirilgan'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-5 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                    clinicSubscription?.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600' :
+                    clinicSubscription?.status === 'SUSPENDED' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
+                  }`}>
+                    {clinicSubscription?.status === 'ACTIVE' ? <CheckCircle2 className="w-6 h-6" /> :
+                     clinicSubscription?.status === 'SUSPENDED' ? <Pause className="w-6 h-6" /> : <Lock className="w-6 h-6" />}
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-slate-500">Tizim Qulf Holati</div>
+                    <div className="text-lg font-black text-slate-900">
+                      {clinicSubscription?.status === 'ACTIVE' ? 'Faol / Ochiq' :
+                       clinicSubscription?.status === 'SUSPENDED' ? 'To‘xtatilgan' : 'Qulflangan'}
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-500">
+                      Super Admin boshqaruvida
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Two Column Layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Panel 1: Tarif Imkoniyatlari */}
+                <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                        <Building2 className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-base font-black text-slate-900">Tarif Rejasi va Imkoniyatlari</h4>
+                        <p className="text-xs text-slate-400">Joriy tarif bo‘yicha kiritilgan xususiyatlar</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 bg-blue-100 text-blue-700 font-bold rounded-full text-xs">
+                      {clinicSubscription?.plan_code || 'STARTER'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 pt-1">
+                    {[
+                      { title: 'Filiallar soni', desc: 'Asosiy markaziy klinika filiali', val: '1 ta filial' },
+                      { title: 'Shifokorlar va kabinetlar', desc: 'Cheklanmagan shifokorlar navbati', val: 'Faol' },
+                      { title: 'Elektron navbat va TV tablo', desc: 'Jonli ovozli e\'lon va TV monitori', val: 'Faol' },
+                      { title: 'Kassa va moliyaviy hisobotlar', desc: 'Kassir smenalari va chek integratsiyasi', val: 'Faol' },
+                      { title: 'Bemorlar kartotekasi (EMR)', desc: 'Barcha tashriflar tarixi va xulosalar', val: 'Faol' },
+                      { title: 'SMS xabarnomalar integratsiyasi', desc: 'Eskiz.uz orqali bemorga SMS', val: 'Faol' }
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                        <div className="flex items-center gap-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <div>
+                            <div className="text-xs font-bold text-slate-800">{item.title}</div>
+                            <div className="text-[11px] text-slate-400">{item.desc}</div>
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold text-slate-700">{item.val}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="p-4 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-blue-900">Tarifni ko'tarish yoki uzaytirish</div>
+                      <div className="text-[11px] text-blue-600">PREMIUM yoki ENTERPRISE tariflariga o'tish</div>
+                    </div>
+                    <span className="text-xs font-extrabold text-blue-700">Super Admin orqali</span>
+                  </div>
+                </div>
+
+                {/* Panel 2: SMS Xabarnomalar Xizmati */}
+                <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
+                        <MessageSquare className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-base font-black text-slate-900">SMS Xabarnomalar Tizimi</h4>
+                        <p className="text-xs text-slate-400">Eskiz.uz SMS Gateway holati va shablonlar</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 bg-teal-100 text-teal-800 font-bold rounded-full text-xs">
+                      {clinicSubscription?.sms_enabled !== false ? 'SMS Faol' : 'O\'chirilgan'}
+                    </span>
+                  </div>
+
+                  {/* SMS Balance Highlight Card */}
+                  <div className="p-5 bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-blue-500/10 border border-teal-200 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-teal-900">Mavjud SMS Balansi:</div>
+                      <div className="text-3xl font-black text-teal-900 font-mono mt-0.5">
+                        {Number(clinicSubscription?.sms_balance ?? smsSettings?.balance ?? 1000).toLocaleString('uz-UZ')}
+                        <span className="text-xs font-bold text-teal-700 font-sans ml-1.5">dona SMS</span>
+                      </div>
+                      <div className="text-[11px] text-teal-600 mt-1">SMS Jo'natuvchi (Sender): <strong>{smsSettings?.sender_name || 'SadafMed'}</strong></div>
+                    </div>
+                    <div className="w-14 h-14 rounded-2xl bg-teal-600 text-white flex items-center justify-center shadow-md">
+                      <MessageSquare className="w-7 h-7" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <div className="text-xs font-bold text-slate-700 uppercase tracking-wider text-[11px]">Avtomatik SMS hodisalari:</div>
+
+                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <Ticket className="w-4 h-4 text-blue-600" />
+                        <div>
+                          <div className="text-xs font-bold text-slate-800">Talon berilganda</div>
+                          <div className="text-[11px] text-slate-400">Bemor telefoniga navbat kodi va kabinet SMS ketadi</div>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-bold">Faol</span>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <Clock className="w-4 h-4 text-amber-600" />
+                        <div>
+                          <div className="text-xs font-bold text-slate-800">Navbat yaqinlashganda</div>
+                          <div className="text-[11px] text-slate-400">Oldinda 2 ta bemor qolganda ogohlantirish SMS</div>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-bold">Faol</span>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <div>
+                          <div className="text-xs font-bold text-slate-800">Qabul yakunlanganda</div>
+                          <div className="text-[11px] text-slate-400">Shifokor ko'rigi xulosasi va tavsiyalar SMS</div>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-bold">Faol</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Super Admin Support & Contact Box */}
+              <div className="p-6 bg-slate-900 text-white rounded-3xl border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-6 shadow-lg">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-teal-400 text-xs font-bold uppercase tracking-wider">
+                    <Shield className="w-4 h-4" />
+                    <span>Super Admin Boshqaruvi va Xavfsizlik</span>
+                  </div>
+                  <h4 className="text-lg font-black text-white">Obunani uzaytirish yoki SMS paketini to'ldirish kerakmi?</h4>
+                  <p className="text-xs text-slate-400 max-w-2xl">
+                    Har bir klinikaning obuna holati, qulflash/ochish va SMS balansi Super Admin paneli orqali 100% real vaqtda nazorat qilinadi.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 shrink-0">
+                  <a
+                    href="tel:+998712000000"
+                    className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 border border-white/15"
+                  >
+                    <Phone className="w-4 h-4 text-teal-400" />
+                    <span>+998 (71) 200-00-00</span>
+                  </a>
+                  <a
+                    href="https://t.me"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-5 py-2.5 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-teal-500/25"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span>Super Admin Aloqa</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* TAB 13: AUDIT JURNALI (100% REAL POSTGRESQL - CENTERED TABLE) */}
           {activeTab === 'AUDIT_JURNALI' && (() => {
             const filteredLogs = auditLogsList.filter((log: any) => {
@@ -5318,35 +6583,36 @@ export const ManagerView: React.FC = () => {
             return (
               <div className="space-y-6 w-full max-w-7xl mx-auto">
                 {/* Header Banner */}
-                <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-7 rounded-3xl border border-indigo-500/20 shadow-xl">
-                  <div className="absolute top-0 right-0 -mt-10 -mr-10 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="relative overflow-hidden bg-medical-gradient text-white p-7 rounded-3xl border border-white/25 shadow-xl shadow-medical-blue/20">
+                  <div className="absolute top-0 right-0 -mt-10 -mr-10 w-72 h-72 bg-white/15 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute -left-10 -bottom-10 w-56 h-56 bg-medical-blue-dark/20 rounded-full blur-2xl pointer-events-none" />
                   <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                     <div>
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                        <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-md border border-white/30 shrink-0">
                           <FileText className="w-5 h-5 text-white" />
                         </div>
                         <div>
-                          <h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                          <h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2.5 drop-shadow-xs">
                             Tizim Audit Jurnali & Nazorati
-                            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+                            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/30">
                               PostgreSQL 16
                             </span>
                           </h2>
-                          <p className="text-xs text-slate-300 mt-0.5">
+                          <p className="text-xs text-white/95 mt-0.5 leading-relaxed">
                             Xavfsizlik, xodimlar harakati, navbat chaqiruvlari, kassa to'lovlari va tizim sozlamalari auditi
                           </p>
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400 mt-3">
-                        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 text-emerald-400 font-semibold">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <div className="flex flex-wrap items-center gap-3 text-[11px] text-white/95 mt-3">
+                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/20 backdrop-blur-md border border-white/30 text-white font-semibold shadow-xs">
+                          <span className="w-2 h-2 rounded-full bg-medical-turquoise animate-pulse" />
                           Audit Oqimi Faol
                         </span>
-                        <span className="px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 text-slate-300">
+                        <span className="px-3 py-1 rounded-xl bg-white/20 backdrop-blur-md border border-white/30 text-white font-medium shadow-xs">
                           Jami: {auditLogsList.length} ta yozuv
                         </span>
-                        <span className="px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 text-indigo-300">
+                        <span className="px-3 py-1 rounded-xl bg-white/20 backdrop-blur-md border border-white/30 text-white font-medium shadow-xs">
                           Ko'rsatilmoqda: {filteredLogs.length} ta
                         </span>
                       </div>
@@ -5356,17 +6622,17 @@ export const ManagerView: React.FC = () => {
                       <button
                         type="button"
                         onClick={exportAuditLogsToExcel}
-                        className="px-4 py-2.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white text-xs font-bold transition flex items-center gap-2 shadow-sm cursor-pointer"
+                        className="px-4 py-2.5 rounded-2xl border border-white/30 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white text-xs font-bold transition flex items-center gap-2 shadow-sm cursor-pointer active:scale-95"
                       >
-                        <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                        <FileSpreadsheet className="w-4 h-4 text-medical-turquoise" />
                         Excelga eksport
                       </button>
                       <button
                         type="button"
                         onClick={() => loadManagerData()}
-                        className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-indigo-600/30 active:scale-95 cursor-pointer"
+                        className="px-5 py-2.5 rounded-2xl bg-white hover:bg-slate-50 text-medical-blue-dark text-xs font-black transition flex items-center gap-2 shadow-lg shadow-medical-blue-dark/20 border border-white/80 active:scale-95 cursor-pointer"
                       >
-                        <RefreshCw className="w-4 h-4" />
+                        <RefreshCw className="w-4 h-4 text-medical-blue-dark stroke-[2.5]" />
                         Yangilash
                       </button>
                     </div>
@@ -5400,12 +6666,12 @@ export const ManagerView: React.FC = () => {
                   </div>
 
                   <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
-                      <CreditCard className="w-5 h-5 text-emerald-600" />
+                    <div className="w-11 h-11 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center shrink-0">
+                      <CreditCard className="w-5 h-5 text-medical-turquoise-dark" />
                     </div>
                     <div className="min-w-0">
                       <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Kassa & To'lovlar</p>
-                      <p className="text-base font-black text-emerald-700">
+                      <p className="text-base font-black text-slate-800">
                         {auditLogsList.filter(l => l.log_type === 'PAYMENT').length}
                       </p>
                       <p className="text-[10px] text-slate-400 truncate mt-0.5">Kassada qabul qilingan to'lovlar</p>
@@ -5435,7 +6701,7 @@ export const ManagerView: React.FC = () => {
                       placeholder="Talon raqami, bemor, shifokor, amal yoki xodim bo'yicha qidiruv..."
                       value={auditSearch}
                       onChange={e => setAuditSearch(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                      className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-medical-blue focus:ring-2 focus:ring-medical-blue/20 outline-none transition"
                     />
                   </div>
 
@@ -5454,7 +6720,7 @@ export const ManagerView: React.FC = () => {
                         onClick={() => setAuditActionFilter(f.id)}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                           auditActionFilter === f.id
-                            ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
+                            ? 'bg-medical-blue text-white shadow-sm shadow-medical-blue/25'
                             : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
                         }`}
                       >
@@ -8399,6 +9665,24 @@ export const ManagerView: React.FC = () => {
         description={deleteModalConfig.description}
         itemName={deleteModalConfig.itemName}
         itemDetails={deleteModalConfig.itemDetails}
+      />
+
+      {/* Test Ticket Modal for Manager Print Testing */}
+      <TicketIssuedModal
+        isOpen={isTestTicketModalOpen}
+        tickets={[{
+          ticket_number: 'S-001',
+          full_number: 'S-001',
+          specialty_name: 'STOMATOLOGIYA',
+          doctor_name: 'Dr. Alisher Alimov',
+          cabinet_number: '4',
+          patient_name: 'Malika Alimova',
+          payment_status: 'PAID',
+          estimated_wait_minutes: 15
+        }]}
+        initialPaperSize={previewPaperSize}
+        onPaperSizeChange={setPreviewPaperSize}
+        onClose={() => setIsTestTicketModalOpen(false)}
       />
     </div>
   );

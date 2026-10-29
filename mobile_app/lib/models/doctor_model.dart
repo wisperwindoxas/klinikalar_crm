@@ -13,6 +13,8 @@ class DoctorModel {
   final int currentQueueCount;
   final int todayCompletedCount;
   final String? avatarUrl;
+  final String? username;
+  final String? password;
 
   DoctorModel({
     required this.id,
@@ -27,24 +29,40 @@ class DoctorModel {
     this.currentQueueCount = 0,
     this.todayCompletedCount = 0,
     this.avatarUrl,
+    this.username,
+    this.password,
   });
 
   bool get isActive => status.toUpperCase() == 'ACTIVE';
 
   factory DoctorModel.fromJson(Map<String, dynamic> json) {
+    final rawName = json['display_name'] ??
+        json['displayName'] ??
+        json['fullName'] ??
+        json['full_name'] ??
+        json['name'] ??
+        '';
+    final rawSpecialty = json['specialty_name'] ??
+        json['specialtyName'] ??
+        json['specialty'] ??
+        json['speciality'] ??
+        'Umumiy amaliyotchi';
+
     return DoctorModel(
       id: json['id']?.toString() ?? '',
-      fullName: json['fullName'] ?? json['full_name'] ?? json['name'] ?? '',
-      specialty: json['specialty'] ?? json['speciality'] ?? 'Umumiy amaliyotchi',
-      roomNumber: json['roomNumber'] ?? json['room_number'] ?? json['cabinetNumber'] ?? json['cabinet_number'] ?? '101',
-      cabinetId: json['cabinetId'] ?? json['cabinet_id'],
-      status: json['status'] ?? 'ACTIVE',
-      consultationPrice: Formatters.parseDouble(json['consultationPrice'] ?? json['consultation_price'] ?? 150000),
+      fullName: rawName.toString().trim().isNotEmpty ? rawName.toString().trim() : 'Shifokor',
+      specialty: rawSpecialty.toString().trim().isNotEmpty ? rawSpecialty.toString().trim() : 'Umumiy amaliyotchi',
+      roomNumber: (json['room_number'] ?? json['roomNumber'] ?? json['cabinet_number'] ?? json['cabinetNumber'] ?? '1').toString(),
+      cabinetId: (json['cabinet_id'] ?? json['cabinetId'])?.toString(),
+      status: json['status'] ?? (json['is_active'] == false ? 'INACTIVE' : 'ACTIVE'),
+      consultationPrice: Formatters.parseDouble(json['consultationPrice'] ?? json['consultation_price'] ?? json['price'] ?? 150000),
       experienceYears: Formatters.parseInt(json['experienceYears'] ?? json['experience_years'] ?? 5),
-      phone: json['phone'],
+      phone: json['phone']?.toString() ?? json['user_phone']?.toString(),
       currentQueueCount: Formatters.parseInt(json['currentQueueCount'] ?? json['current_queue_count'] ?? json['waiting_count'] ?? 0),
       todayCompletedCount: Formatters.parseInt(json['todayCompletedCount'] ?? json['today_completed_count'] ?? 0),
       avatarUrl: json['avatarUrl'] ?? json['avatar_url'],
+      username: (json['username'] ?? json['login'])?.toString(),
+      password: (json['password'] ?? json['raw_password'])?.toString(),
     );
   }
 

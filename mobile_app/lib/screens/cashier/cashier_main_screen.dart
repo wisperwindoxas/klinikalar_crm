@@ -7,7 +7,10 @@ import '../../models/ticket_model.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/responsive_frame.dart';
+import '../../services/security_service.dart';
+import '../../widgets/user_profile_sheet.dart';
 import '../auth/login_screen.dart';
+import '../auth/pin_setup_sheet.dart';
 import '../manager/manager_patient_detail_sheet.dart';
 import 'cashier_new_ticket_flow.dart';
 import 'cashier_ticket_sheet.dart';
@@ -471,30 +474,47 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
           automaticallyImplyLeading: false,
           title: Row(
             children: [
-              CircleAvatar(
-                radius: 19,
-                backgroundColor: AppColors.mintLight,
-                child: const Icon(Icons.point_of_sale_rounded, color: AppColors.primary, size: 20),
+              InkWell(
+                onTap: () => UserProfileSheet.show(context),
+                borderRadius: BorderRadius.circular(20),
+                child: CircleAvatar(
+                  radius: 19,
+                  backgroundColor: AppColors.mintLight,
+                  child: const Icon(Icons.point_of_sale_rounded, color: AppColors.primary, size: 20),
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      user?.fullName ?? 'Kassir',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                    ),
-                    Row(
-                      children: [
-                        const Icon(Icons.check_circle_rounded, size: 10, color: AppColors.success),
-                        const SizedBox(width: 4),
-                        Text(user?.phone != null ? 'Smena faol • ${user!.phone}' : 'Smena faol', style: const TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ],
+                child: InkWell(
+                  onTap: () => UserProfileSheet.show(context),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        user?.fullName ?? 'Kassir',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
+                      Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded, size: 10, color: AppColors.success),
+                          const SizedBox(width: 4),
+                          Text(user?.phone != null ? 'Smena faol • ${user!.phone}' : 'Smena faol', style: const TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
+              ),
+              IconButton(
+                icon: Icon(
+                  SecurityService().hasPin ? Icons.lock_outline_rounded : Icons.lock_open_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+                tooltip: 'PIN va Biometriya',
+                onPressed: () => PinSetupSheet.show(context),
               ),
               IconButton(
                 icon: const Icon(Icons.refresh_rounded, color: AppColors.textSecondary),
@@ -1328,7 +1348,28 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
             ),
           ],
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 20),
+
+          // Clinic Branding Footer
+          Center(
+            child: Column(
+              children: [
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.point_of_sale_rounded, color: AppColors.medicalBlue, size: 24),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text('klinika-admin', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                const Text('Kassir & To\'lovlar Qabulxonasi', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             height: 48,

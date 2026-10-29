@@ -120,7 +120,17 @@ export class DatabaseService {
   }
 
   public getUserByEmailOrPhone(identifier: string): User | undefined {
-    return this.data.users.find(u => u.email.toLowerCase() === identifier.toLowerCase() || u.phone === identifier);
+    const clean = identifier.replace(/[\s\-\(\)\+]/g, '');
+    return this.data.users.find(u => {
+      if (u.email && u.email.toLowerCase() === identifier.toLowerCase()) return true;
+      if (u.phone) {
+        const uClean = u.phone.replace(/[\s\-\(\)\+]/g, '');
+        if (uClean === clean) return true;
+        if (clean.length >= 7 && uClean.length >= 7 && (uClean.endsWith(clean) || clean.endsWith(uClean))) return true;
+        if (u.phone === identifier) return true;
+      }
+      return false;
+    });
   }
 
   public getUserById(id: string): User | undefined {
@@ -284,6 +294,28 @@ export class DatabaseService {
       this.data.tenants[idx] = tenant;
       this.save();
     }
+  }
+
+  public deleteClinicAndTenant(tenantId: string): void {
+    this.data.tenants = this.data.tenants.filter(t => t.id !== tenantId);
+    this.data.clinics = this.data.clinics.filter(c => c.tenantId !== tenantId);
+    this.data.branches = this.data.branches.filter(b => b.tenantId !== tenantId);
+    this.data.subscriptions = this.data.subscriptions.filter(s => s.tenantId !== tenantId);
+    this.data.users = this.data.users.filter(u => u.tenantId !== tenantId);
+    this.save();
+  }
+
+  public updateUser(user: User): void {
+    const idx = this.data.users.findIndex(u => u.id === user.id);
+    if (idx !== -1) {
+      this.data.users[idx] = user;
+      this.save();
+    }
+  }
+
+  public deleteUser(userId: string): void {
+    this.data.users = this.data.users.filter(u => u.id !== userId);
+    this.save();
   }
 
   // Seed Data strictly aligned with Design images (Super Admin & User Panel)

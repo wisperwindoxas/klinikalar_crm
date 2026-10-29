@@ -292,7 +292,7 @@ export class QueuesController {
       res.json({
         success: true,
         data: {
-          clinicName: clinic?.name || 'SADAF KLINIKA',
+          clinicName: clinic?.name || 'klinika-admin',
           branchName: branch?.name || 'Asosiy filial',
           primaryColor: clinic?.primaryColor || '#008B8B',
           currentCalled,

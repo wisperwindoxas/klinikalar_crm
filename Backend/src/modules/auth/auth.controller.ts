@@ -78,12 +78,18 @@ export class AuthController {
         }
 
         const role = pgUser.role_code || 'MANAGER';
+        const db = DatabaseService.getInstance();
+        const jsonUser = db.getUsers().find(u => u.id === pgUser.id || (u.phone && u.phone.replace(/[^0-9]/g, '') === cleanPhone));
+        const userTenantId = jsonUser?.tenantId || 'tenant_sadaf_01';
+        const userBranchId = jsonUser?.branchId || 'branch_sadaf_main';
+        const userClinic = db.getClinicByTenant(userTenantId);
+
         const token = jwt.sign(
           {
             userId: pgUser.id,
             role,
-            tenantId: 'tenant_sadaf_01',
-            branchId: 'branch_sadaf_main',
+            tenantId: userTenantId,
+            branchId: userBranchId,
             doctorId: pgUser.doctor_id,
             fullName: pgUser.full_name
           },
@@ -103,11 +109,13 @@ export class AuthController {
               role,
               doctorId: pgUser.doctor_id,
               roomNumber: pgUser.room_number,
-              specialtyName: pgUser.specialty_name
+              specialtyName: pgUser.specialty_name,
+              tenantId: userTenantId,
+              branchId: userBranchId
             },
             clinic: {
-              id: 'tenant_sadaf_01',
-              name: 'SADAF KLINIKA'
+              id: userTenantId,
+              name: userClinic?.name || 'klinika-admin'
             }
           }
         });
@@ -285,11 +293,19 @@ export class AuthController {
       const trialEndDate = new Date();
       trialEndDate.setDate(trialEndDate.getDate() + 14);
 
+      let normalizedPlanCode = 'STANDARD';
+      const upperPlan = String(planCode || '').toUpperCase();
+      if (upperPlan === 'STARTER') normalizedPlanCode = 'STARTER';
+      else if (upperPlan === 'PREMIUM' || upperPlan === 'ENTERPRISE') normalizedPlanCode = 'PREMIUM';
+      else normalizedPlanCode = 'STANDARD';
+
+      const subId = `sub_${uuidv4().substring(0, 8)}`;
+
       db.addSubscription({
-        id: `sub_${uuidv4().substring(0, 8)}`,
+        id: subId,
         tenantId,
-        planId: `plan_${String(planCode).toLowerCase()}`,
-        planCode: planCode as PlanCode,
+        planId: `plan_${normalizedPlanCode.toLowerCase()}`,
+        planCode: normalizedPlanCode as PlanCode,
         status: ClinicStatus.TRIAL,
         startDate: now,
         endDate: trialEndDate.toISOString(),
@@ -297,6 +313,50 @@ export class AuthController {
         gracePeriodDays: 3,
         autoRenew: true
       });
+
+      // 6. Sync to PostgreSQL (Subscriptions & Users)
+      const pg = PostgresService.getInstance();
+      try {
+        await pg.query(
+          `INSERT INTO clinic_subscriptions (
+            id, clinic_id, clinic_name, plan_code, status, start_date, end_date, auto_renew, price_paid, sms_balance, sms_enabled, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          [
+            subId,
+            tenantId,
+            clinicName,
+            normalizedPlanCode,
+            'ACTIVE', // Trial is actively running
+            now.split('T')[0],
+            trialEndDate.toISOString().split('T')[0],
+            true,
+            0,
+            1000,
+            true
+          ]
+        );
+      } catch (err) {
+        console.warn('Postgres subscription insert fallback:', err);
+      }
+
+      try {
+        const cleanPhoneDigits = phone.replace(/[^0-9]/g, '');
+        await pg.query(
+          `INSERT INTO users (
+            id, username, full_name, phone, password_hash, role_id, is_active, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, 'role_manager', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          ON CONFLICT (username) DO UPDATE SET phone = EXCLUDED.phone, password_hash = EXCLUDED.password_hash`,
+          [
+            userId,
+            cleanPhoneDigits || userId,
+            ownerFullName,
+            phone,
+            passwordHash
+          ]
+        );
+      } catch (err) {
+        console.warn('Postgres user insert fallback:', err);
+      }
 
       // Audit Log
       db.addAuditLog({

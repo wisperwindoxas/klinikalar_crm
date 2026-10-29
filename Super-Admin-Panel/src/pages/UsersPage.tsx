@@ -20,7 +20,7 @@ export const UsersPage: React.FC = () => {
     email: '',
     phone: '',
     role: 'MANAGER',
-    clinicName: 'SADAF Central Clinic'
+    clinicName: 'klinika-admin Markaziy Filiali'
   });
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export const UsersPage: React.FC = () => {
       if (res.data) {
         setUsers([res.data, ...users]);
         setShowAddModal(false);
-        setForm({ name: '', email: '', phone: '', role: 'MANAGER', clinicName: 'SADAF Central Clinic' });
+        setForm({ name: '', email: '', phone: '', role: 'MANAGER', clinicName: 'klinika-admin Markaziy Filiali' });
       }
     } catch (e: any) {
       alert(e.message || 'Foydalanuvchi yaratishda xatolik');
@@ -271,7 +271,7 @@ export const UsersPage: React.FC = () => {
 
       {/* Add User Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 animate-fade-in">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 p-6 space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2">

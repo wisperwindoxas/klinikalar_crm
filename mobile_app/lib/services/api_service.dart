@@ -139,12 +139,31 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> completeTicket(String ticketId, {String? notes}) async {
+  Future<Map<String, dynamic>> completeTicket(String ticketId, {String? doctorId, String? notes, String? conclusion}) async {
     try {
       final response = await http.post(
         Uri.parse(ApiConstants.completeTicket(ticketId)),
         headers: _headers(),
-        body: jsonEncode({'notes': notes}),
+        body: jsonEncode({
+          if (doctorId != null) 'doctorId': doctorId,
+          if (notes != null) 'notes': notes,
+          if (conclusion != null) 'conclusion': conclusion,
+        }),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': '$e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> skipTicket(String ticketId, {String? doctorId}) async {
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConstants.skipTicket(ticketId)),
+        headers: _headers(),
+        body: jsonEncode({
+          if (doctorId != null) 'doctorId': doctorId,
+        }),
       );
       return jsonDecode(response.body);
     } catch (e) {

@@ -19,11 +19,21 @@ class CashierTicketSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ticketNumber = ticketData['ticketNumber'] ?? ticketData['number'] ?? 'K-019';
-    final patientName = ticketData['patientName'] ?? 'Bemor';
-    final doctorName = ticketData['doctorName'] ?? 'Shifokor';
-    final roomNumber = ticketData['roomNumber'] ?? '104';
-    final serviceName = ticketData['serviceName'] ?? 'Konsultatsiya';
+    final ticketNumber = (ticketData['ticketNumber']?.toString().trim().isNotEmpty == true)
+        ? ticketData['ticketNumber']
+        : (ticketData['number']?.toString().trim().isNotEmpty == true ? ticketData['number'] : 'K-019');
+    final patientName = (ticketData['patientName']?.toString().trim().isNotEmpty == true)
+        ? ticketData['patientName']
+        : 'Bemor';
+    final doctorName = (ticketData['doctorName']?.toString().trim().isNotEmpty == true)
+        ? ticketData['doctorName']
+        : 'Shifokor';
+    final roomNumber = (ticketData['roomNumber']?.toString().trim().isNotEmpty == true)
+        ? ticketData['roomNumber']
+        : '1';
+    final serviceName = (ticketData['serviceName']?.toString().trim().isNotEmpty == true)
+        ? ticketData['serviceName']
+        : 'Konsultatsiya';
     final amount = ticketData['amount'] ?? 150000;
 
     return Container(

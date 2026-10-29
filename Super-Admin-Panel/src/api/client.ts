@@ -1,7 +1,26 @@
 const API_BASE_URL = 'http://localhost:5001/api/v1';
 
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
+
 export class ApiClient {
   private static token: string = '';
+  private static cache = new Map<string, CacheEntry>();
+  public static CACHE_TTL = 30_000; // 30 soniya in-memory kesh
+
+  public static clearCache(endpointPrefix?: string) {
+    if (endpointPrefix) {
+      for (const key of this.cache.keys()) {
+        if (key.startsWith(endpointPrefix)) {
+          this.cache.delete(key);
+        }
+      }
+    } else {
+      this.cache.clear();
+    }
+  }
 
   public static setToken(t: string) {
     this.token = t;
@@ -17,6 +36,18 @@ export class ApiClient {
 
   public static async request(endpoint: string, options: RequestInit = {}): Promise<any> {
     const token = this.getToken();
+    const method = (options.method || 'GET').toUpperCase();
+    const isGet = method === 'GET';
+    const skipCache = Boolean((options.headers as Record<string, string>)?.['x-skip-cache']);
+
+    // Agar GET so'rov bo'lsa va keshda bo'lsa, bir zumda (0ms) keshdan qaytarish
+    if (isGet && !skipCache) {
+      const cached = this.cache.get(endpoint);
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+        return cached.data;
+      }
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string> || {})
@@ -36,6 +67,17 @@ export class ApiClient {
       if (!response.ok) {
         throw new Error(json.message || 'Xatolik yuz berdi');
       }
+
+      if (isGet) {
+        this.cache.set(endpoint, {
+          data: json,
+          timestamp: Date.now()
+        });
+      } else {
+        // Ma'lumot o'zgarganda (POST, PUT, PATCH, DELETE) keshni tozalash
+        this.clearCache();
+      }
+
       return json;
     } catch (err: any) {
       console.warn(`API Error on ${endpoint}:`, err.message);
@@ -76,6 +118,56 @@ export class ApiClient {
     });
   }
 
+  public static async getClinicDetails(id: string, params?: { startDate?: string; endDate?: string }) {
+    const query = new URLSearchParams();
+    if (params?.startDate) query.set('startDate', params.startDate);
+    if (params?.endDate) query.set('endDate', params.endDate);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.request(`/super-admin/clinics/${id}/details${qs}`, {
+      headers: { 'x-skip-cache': '1' }
+    });
+  }
+
+  public static async updateClinic(id: string, payload: any) {
+    return this.request(`/super-admin/clinics/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  public static async deleteClinic(id: string) {
+    return this.request(`/super-admin/clinics/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  public static async createClinicUser(clinicId: string, userData: any) {
+    return this.request(`/super-admin/clinics/${clinicId}/users`, {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    });
+  }
+
+  public static async updateClinicUser(clinicId: string, userId: string, userData: any) {
+    return this.request(`/super-admin/clinics/${clinicId}/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData)
+    });
+  }
+
+  public static async deleteClinicUser(clinicId: string, userId: string) {
+    return this.request(`/super-admin/clinics/${clinicId}/users/${userId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  public static async toggleClinicUserStatus(clinicId: string, userId: string, status: string) {
+    return this.request(`/super-admin/clinics/${clinicId}/users/${userId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status })
+    });
+  }
+
   public static async createClinic(payload: any) {
     return this.request('/auth/register-clinic', {
       method: 'POST',
@@ -103,6 +195,13 @@ export class ApiClient {
     return this.request(`/super-admin/subscriptions/${id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status })
+    });
+  }
+
+  public static async updateSubscriptionSms(id: string, smsBalance: number, smsEnabled: boolean = true) {
+    return this.request(`/super-admin/subscriptions/${id}/sms`, {
+      method: 'PATCH',
+      body: JSON.stringify({ smsBalance, smsEnabled })
     });
   }
 

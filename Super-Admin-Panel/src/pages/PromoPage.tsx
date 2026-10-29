@@ -199,7 +199,7 @@ export const PromoPage: React.FC = () => {
 
       {/* Add Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 animate-fade-in">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 p-6 space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <h3 className="text-base font-black text-slate-900">Yangi Promo Kod Yaratish</h3>

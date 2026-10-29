@@ -105,4 +105,10 @@ export class WebSocketGateway {
     this.io.to(room).emit('tv.settings_updated', settings);
     this.io.emit('tv.settings_updated', settings);
   }
+
+  public emitSubscriptionUpdated(tenantId: string, subscription: any): void {
+    if (!this.io) return;
+    this.io.to(`tenant_${tenantId}`).emit('clinic.subscription_updated', subscription);
+    this.io.emit('clinic.subscription_updated', subscription);
+  }
 }

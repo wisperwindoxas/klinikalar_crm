@@ -19,7 +19,7 @@ export const SupportPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [newForm, setNewForm] = useState({
-    clinicName: 'Sadaf Tibbiyot Markazi',
+    clinicName: 'klinika-admin Markaziy Filiali',
     contactName: '',
     contactPhone: '',
     subject: '',
@@ -76,7 +76,7 @@ export const SupportPage: React.FC = () => {
         setTickets([res.data, ...tickets]);
         setShowCreateModal(false);
         setNewForm({
-          clinicName: 'Sadaf Tibbiyot Markazi',
+          clinicName: 'klinika-admin Markaziy Filiali',
           contactName: '',
           contactPhone: '',
           subject: '',
@@ -253,7 +253,7 @@ export const SupportPage: React.FC = () => {
 
       {/* Ticket Details & Reply Modal */}
       {activeTicket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 animate-fade-in">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-100 p-6 space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
@@ -330,7 +330,7 @@ export const SupportPage: React.FC = () => {
 
       {/* New Ticket Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 animate-fade-in">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 p-6 space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <h3 className="text-base font-black text-slate-900">Yangi Murojaat Yaratish</h3>

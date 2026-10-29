@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Volume2, VolumeX, Clock, Stethoscope, DoorOpen, Users, Bell, FileText, HeartPulse } from 'lucide-react';
+import { Volume2, VolumeX, Clock, Calendar, Stethoscope, DoorOpen, Users, Bell, FileText, HeartPulse } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { playChime } from './audio/chime';
 
@@ -30,14 +30,14 @@ const UZ_LETTERS: Record<string, string> = {
 export const App: React.FC = () => {
   const [data, setData] = useState<any>(null);
   const [time, setTime] = useState('14:25');
-  const [dateStr, setDateStr] = useState('10-iyun 2025');
+  const [dateStr, setDateStr] = useState('21.02.2026');
   const [dayStr, setDayStr] = useState('Seshanba');
   const [isCallingFlash, setIsCallingFlash] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
-  const [isAudioEnabled, setIsAudioEnabled] = useState(false);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [selectedVoice, setSelectedVoice] = useState<'uz-UZ-MadinaNeural' | 'uz-UZ-SardorNeural'>('uz-UZ-MadinaNeural');
 
-  const isAudioEnabledRef = useRef<boolean>(false);
+  const isAudioEnabledRef = useRef<boolean>(true);
   const selectedVoiceRef = useRef<'uz-UZ-MadinaNeural' | 'uz-UZ-SardorNeural'>('uz-UZ-MadinaNeural');
   const audioQueueRef = useRef<string[]>([]);
   const isSpeakingRef = useRef<boolean>(false);
@@ -231,6 +231,10 @@ const numberToUzbekOrdinal = (n: number | string): string => {
   };
 
   const queueVoiceAnnouncement = (ticket: any) => {
+    if (!isAudioEnabledRef.current) {
+      console.log('TV ovozi meneger tomonidan o\'chirilgan (jim rejim).');
+      return;
+    }
     playChime();
 
     const naturalText = ticket.voiceText || buildNaturalVoiceText(ticket);
@@ -247,17 +251,35 @@ const numberToUzbekOrdinal = (n: number | string): string => {
   };
 
   useEffect(() => {
-    // 1. Clock in Uzbek
+    // 1. Clock in Uzbek (DD.MM.YYYY formatida chiroyli)
     const updateClock = () => {
       const now = new Date();
       setTime(now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }));
-      const d = now.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' });
-      const w = now.toLocaleDateString('uz-UZ', { weekday: 'long' });
-      setDateStr(d.replace(' г.', ''));
-      setDayStr(w.charAt(0).toUpperCase() + w.slice(1));
+      const day = String(now.getDate()).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const year = now.getFullYear();
+      setDateStr(`${day}.${month}.${year}`);
+      const weekdaysUz = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
+      setDayStr(weekdaysUz[now.getDay()]);
     };
     updateClock();
     const timer = setInterval(updateClock, 1000);
+
+    // Audio unlock listener for browser autoplay policy
+    const unlockAudio = () => {
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContextClass) {
+          const ctx = new AudioContextClass();
+          if (ctx.state === 'suspended') {
+            ctx.resume();
+          }
+        }
+      } catch (_) {}
+    };
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
 
     // 2. Fetch initial real TV Feed
     fetchFeed();
@@ -299,6 +321,9 @@ const numberToUzbekOrdinal = (n: number | string): string => {
       if (updatedSettings.tv_voice_name) {
         setSelectedVoice(updatedSettings.tv_voice_name);
       }
+      if (updatedSettings.tv_sound_enabled !== undefined) {
+        setIsAudioEnabled(Boolean(updatedSettings.tv_sound_enabled));
+      }
     });
 
     socket.on('queue.created', () => fetchFeed());
@@ -312,6 +337,9 @@ const numberToUzbekOrdinal = (n: number | string): string => {
     return () => {
       clearInterval(timer);
       clearInterval(refreshInterval);
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
       socket.disconnect();
     };
   }, []);
@@ -324,6 +352,12 @@ const numberToUzbekOrdinal = (n: number | string): string => {
         if (json.data) {
           setData(json.data);
           setIsOnline(true);
+          if (json.data.settings?.tv_voice_name) {
+            setSelectedVoice(json.data.settings.tv_voice_name);
+          }
+          if (json.data.settings?.tv_sound_enabled !== undefined) {
+            setIsAudioEnabled(Boolean(json.data.settings.tv_sound_enabled));
+          }
         }
       }
     } catch (e) {
@@ -389,12 +423,12 @@ const numberToUzbekOrdinal = (n: number | string): string => {
       <header className="h-[96px] bg-[#002B49] text-white px-8 flex items-center justify-between shadow-md flex-shrink-0 z-10">
         {/* Brand Left */}
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-[#00A896]/20 border border-[#00A896]/40 flex items-center justify-center text-[#00E5CC]">
-            <HeartPulse className="w-7 h-7" />
+          <div className="w-14 h-14 bg-transparent flex items-center justify-center flex-shrink-0 filter drop-shadow-md">
+            <img src="/logo.png" alt="klinika-admin Logo" className="w-full h-full object-contain bg-transparent" />
           </div>
           <div>
             <h1 className="text-2xl font-black tracking-tight leading-none text-white">
-              {data?.settings?.clinic_name || data?.clinicName || 'SADAF TIBBIYOT MARKAZI'}
+              {data?.settings?.clinic_name || data?.clinicName || 'klinika-admin'}
             </h1>
             <p className="text-xs text-[#64B5F6] font-medium tracking-wide mt-1 flex items-center gap-2">
               <span>Navbat Tizimi</span>
@@ -417,14 +451,19 @@ const numberToUzbekOrdinal = (n: number | string): string => {
         </div>
 
         {/* Right Date & Huge Digital Time */}
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3 text-right">
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white/90">
-              <Clock className="w-5 h-5" />
+        <div className="flex items-center gap-5">
+          {/* Sana (21.02.2026 formatida katta va chiroyli) */}
+          <div className="flex items-center gap-3.5 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/15 shadow-sm">
+            <div className="w-11 h-11 rounded-xl bg-sky-500/20 text-sky-300 flex items-center justify-center border border-sky-400/30">
+              <Calendar className="w-6 h-6" />
             </div>
-            <div>
-              <div className="text-sm font-bold text-white leading-tight">{dateStr}</div>
-              <div className="text-xs text-[#90CAF9]">{dayStr}</div>
+            <div className="text-left">
+              <div className="text-2xl font-black text-white tracking-widest font-mono leading-none">
+                {dateStr}
+              </div>
+              <div className="text-xs text-sky-200 font-semibold tracking-wide mt-1">
+                {dayStr}
+              </div>
             </div>
           </div>
 
@@ -434,32 +473,34 @@ const numberToUzbekOrdinal = (n: number | string): string => {
             {time}
           </div>
 
-          {/* Voice Selector Pill (Madina / Sardor) */}
-          <button
-            onClick={toggleVoice}
-            className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold flex items-center gap-2 transition cursor-pointer shadow-sm"
-            title="Ovozni o'zgartirish uchun bosing (Madina / Sardor)"
+          {/* Meneger panelida tanlangan Ovoz (Madina / Sardor) */}
+          <div
+            className="px-3.5 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-xs font-bold flex items-center gap-2 shadow-sm"
+            title="Meneger panelidan belgilangan ovoz suxandoni"
           >
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>{selectedVoice.includes('Madina') ? 'Madina (Ayol ovozi)' : 'Sardor (Erkak ovozi)'}</span>
-          </button>
+            <span className={`w-2.5 h-2.5 rounded-full ${selectedVoice.includes('Madina') ? 'bg-emerald-400' : 'bg-sky-400'} animate-pulse`}></span>
+            <span>{selectedVoice.includes('Madina') ? 'Madina (Ayol)' : 'Sardor (Erkak)'}</span>
+          </div>
 
-          {/* Audio Enable / Status button */}
+          {/* TV Audio Status Pill (Meneger paneli bilan boshqariladigan) */}
           <button
             onClick={enableAudio}
-            className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center gap-2 ${
+            className={`px-3.5 py-2 rounded-xl border font-bold text-xs flex items-center gap-2 shadow-sm transition cursor-pointer ${
               isAudioEnabled
-                ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
-                : 'bg-amber-500/20 border-amber-400 text-amber-300 animate-pulse hover:bg-amber-500/30'
+                ? 'bg-emerald-500/25 border-emerald-400 text-emerald-300'
+                : 'bg-rose-500/25 border-rose-400 text-rose-300'
             }`}
-            title={isAudioEnabled ? "Ovoz tizimi faol" : "Ovozni yoqish uchun bosing"}
+            title={isAudioEnabled ? "Ovoz tizimi faol (Meneger ruxsat bergan)" : "Ovoz o'chirilgan (Meneger paneli orqali yoqiladi)"}
           >
             {isAudioEnabled ? (
-              <Volume2 className="w-5 h-5" />
+              <>
+                <Volume2 className="w-4 h-4 text-emerald-300 animate-pulse" />
+                <span>Ovoz: Faol</span>
+              </>
             ) : (
               <>
-                <VolumeX className="w-5 h-5" />
-                <span className="text-[11px] font-bold hidden md:inline">Ovozni yoqish</span>
+                <VolumeX className="w-4 h-4 text-rose-300" />
+                <span>Ovoz: O'chirilgan</span>
               </>
             )}
           </button>
@@ -500,8 +541,8 @@ const numberToUzbekOrdinal = (n: number | string): string => {
                 </span>
               ) : (
                 <div className="text-center">
-                  <span className="text-white font-black text-6xl md:text-7xl tracking-wider drop-shadow-md">
-                    SADAF
+                  <span className="text-white font-black text-5xl md:text-6xl tracking-wider drop-shadow-md">
+                    klinika-admin
                   </span>
                   <div className="text-emerald-200 text-xs font-semibold mt-2">
                     {upcomingQueue.length > 0 ? `${upcomingQueue.length} ta bemor navbatda` : 'Elektron navbat tizimi'}

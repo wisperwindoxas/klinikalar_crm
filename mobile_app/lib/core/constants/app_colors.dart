@@ -1,6 +1,23 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
+  // Signature Medical Brand Colors
+  static const Color medicalBlue = Color(0xFF0A84FF);
+  static const Color medicalBlueDark = Color(0xFF0061D5);
+  static const Color medicalTurquoise = Color(0xFF00E0C3);
+  static const Color medicalTurquoiseDark = Color(0xFF00A88F);
+
+  // Signature Medical Gradient (135deg: #0061D5 0%, #0A84FF 50%, #00E0C3 100%)
+  static const LinearGradient medicalGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFF0061D5), // 0%
+      Color(0xFF0A84FF), // 50%
+      Color(0xFF00E0C3), // 100%
+    ],
+  );
+
   // Brand Teals
   static const Color primary = Color(0xFF0D7A70);
   static const Color primaryDark = Color(0xFF08544D);

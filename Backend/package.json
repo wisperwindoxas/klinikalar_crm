@@ -1,7 +1,7 @@
 {
-  "name": "sadaf-saas-backend",
+  "name": "klinika-admin-backend",
   "version": "1.0.0",
-  "description": "SADAF Clinic Management Platform - Multi-Tenant SaaS Backend Engine",
+  "description": "klinika-admin Platform - Multi-Tenant SaaS Backend Engine",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

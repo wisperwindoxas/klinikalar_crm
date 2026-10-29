@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Building2, Search, CheckCircle, AlertTriangle, ShieldAlert, RefreshCw } from 'lucide-react';
+import { X, Building2, Search, CheckCircle, AlertTriangle, ShieldAlert, RefreshCw, Sliders, ExternalLink } from 'lucide-react';
 import { ApiClient } from '../api/client';
+import { ClinicDetailModal } from './ClinicDetailModal';
 
 interface ClinicsListModalProps {
   isOpen: boolean;
@@ -12,6 +13,8 @@ export const ClinicsListModal: React.FC<ClinicsListModalProps> = ({ isOpen, onCl
   const [clinics, setClinics] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
+  const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -60,8 +63,8 @@ export const ClinicsListModal: React.FC<ClinicsListModalProps> = ({ isOpen, onCl
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden border border-slate-100">
         <div className="px-6 py-5 bg-gradient-to-r from-teal-700 to-teal-800 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Building2 className="w-6 h-6 text-teal-200" />
@@ -109,9 +112,19 @@ export const ClinicsListModal: React.FC<ClinicsListModalProps> = ({ isOpen, onCl
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {filtered.map(c => (
-                <tr key={c.id} className="hover:bg-slate-50 transition">
+                <tr
+                  key={c.id}
+                  onClick={() => {
+                    setSelectedClinicId(c.id);
+                    setIsDetailModalOpen(true);
+                  }}
+                  className="hover:bg-teal-50/60 transition cursor-pointer group"
+                >
                   <td className="py-3 px-3">
-                    <div className="font-bold text-slate-800">{c.name}</div>
+                    <div className="font-bold text-slate-800 group-hover:text-teal-800 transition flex items-center gap-1.5">
+                      <span>{c.name}</span>
+                      <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-teal-700 opacity-0 group-hover:opacity-100 transition" />
+                    </div>
                     <div className="text-[10px] text-slate-400 font-mono">{c.code}</div>
                   </td>
                   <td className="py-3 px-3 text-slate-600">{c.phone || '-'}</td>
@@ -120,13 +133,14 @@ export const ClinicsListModal: React.FC<ClinicsListModalProps> = ({ isOpen, onCl
                       {c.branchCount} filial, {c.doctorCount} shifokor
                     </span>
                   </td>
-                  <td className="py-3 px-3">
+                  <td className="py-3 px-3" onClick={e => e.stopPropagation()}>
                     <select
                       value={c.planCode}
                       onChange={e => handlePlanChange(c.id, e.target.value)}
-                      className="text-[11px] font-bold py-1 px-2 rounded-lg border border-slate-200 bg-white text-teal-800 focus:outline-none"
+                      className="text-[11px] font-bold py-1 px-2 rounded-lg border border-slate-200 bg-white text-teal-800 focus:outline-none cursor-pointer"
                     >
                       <option value="STARTER">STARTER</option>
+                      <option value="STANDARD">STANDARD</option>
                       <option value="PRO">PRO</option>
                       <option value="BUSINESS">BUSINESS</option>
                       <option value="ENTERPRISE">ENTERPRISE</option>
@@ -147,7 +161,17 @@ export const ClinicsListModal: React.FC<ClinicsListModalProps> = ({ isOpen, onCl
                       {c.status}
                     </span>
                   </td>
-                  <td className="py-3 px-3 text-right space-x-1">
+                  <td className="py-3 px-3 text-right space-x-1" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => {
+                        setSelectedClinicId(c.id);
+                        setIsDetailModalOpen(true);
+                      }}
+                      className="px-2.5 py-1 bg-teal-800 text-white rounded-lg text-[10px] font-bold hover:bg-teal-900 transition inline-flex items-center gap-1"
+                    >
+                      <Sliders className="w-3 h-3" />
+                      <span>Boshqarish</span>
+                    </button>
                     {c.status !== 'ACTIVE' && (
                       <button
                         onClick={() => handleStatusChange(c.id, 'ACTIVE')}
@@ -179,6 +203,19 @@ export const ClinicsListModal: React.FC<ClinicsListModalProps> = ({ isOpen, onCl
           </table>
         </div>
       </div>
+
+      <ClinicDetailModal
+        clinicId={selectedClinicId}
+        isOpen={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setSelectedClinicId(null);
+        }}
+        onClinicUpdated={() => {
+          loadClinics();
+          onUpdate();
+        }}
+      />
     </div>
   );
 };

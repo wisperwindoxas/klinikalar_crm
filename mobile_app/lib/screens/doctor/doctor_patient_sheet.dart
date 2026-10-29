@@ -7,15 +7,30 @@ import '../../services/api_service.dart';
 class DoctorPatientSheet extends StatefulWidget {
   final TicketModel ticket;
   final VoidCallback onUpdated;
+  final String? doctorId;
 
-  const DoctorPatientSheet({Key? key, required this.ticket, required this.onUpdated}) : super(key: key);
+  const DoctorPatientSheet({
+    Key? key,
+    required this.ticket,
+    required this.onUpdated,
+    this.doctorId,
+  }) : super(key: key);
 
-  static void show(BuildContext context, {required TicketModel ticket, required VoidCallback onUpdated}) {
+  static void show(
+    BuildContext context, {
+    required TicketModel ticket,
+    required VoidCallback onUpdated,
+    String? doctorId,
+  }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DoctorPatientSheet(ticket: ticket, onUpdated: onUpdated),
+      builder: (_) => DoctorPatientSheet(
+        ticket: ticket,
+        onUpdated: onUpdated,
+        doctorId: doctorId,
+      ),
     );
   }
 
@@ -296,7 +311,9 @@ class _DoctorPatientSheetState extends State<DoctorPatientSheet> {
 
                           await ApiService().completeTicket(
                             widget.ticket.id,
+                            doctorId: widget.doctorId ?? widget.ticket.doctorId,
                             notes: combinedNotes,
+                            conclusion: conclusion,
                           );
                           setState(() => _isSaving = false);
                           if (!mounted) return;

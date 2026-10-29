@@ -12,7 +12,7 @@ export const SmsManagementPage: React.FC = () => {
     apiUrl: 'https://notify.eskiz.uz/api',
     email: 'admin@sadafclinic.uz',
     apiToken: '',
-    senderName: 'SadafMed',
+    senderName: 'KlinikaAdmin',
     balance: 12450,
     isActive: true
   });
@@ -23,7 +23,7 @@ export const SmsManagementPage: React.FC = () => {
   // Test SMS Modal
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
   const [testPhone, setTestPhone] = useState('+998 90 123 45 67');
-  const [testMessage, setTestMessage] = useState('Hurmatli bemor, bu Sadaf Klinika tizimidan sinov SMS xabaridir.');
+  const [testMessage, setTestMessage] = useState('Hurmatli bemor, bu klinika-admin tizimidan sinov SMS xabaridir.');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -45,7 +45,7 @@ export const SmsManagementPage: React.FC = () => {
           apiUrl: setRes.data.api_url || 'https://notify.eskiz.uz/api',
           email: setRes.data.email || '',
           apiToken: setRes.data.api_token || '',
-          senderName: setRes.data.sender_name || 'SadafMed',
+          senderName: setRes.data.sender_name || 'KlinikaAdmin',
           balance: setRes.data.balance || 0,
           isActive: setRes.data.is_active ?? true
         });
@@ -444,7 +444,7 @@ export const SmsManagementPage: React.FC = () => {
 
       {/* MODAL: SEND TEST SMS */}
       {isTestModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-slate-950/70 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="px-6 py-5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white flex items-center justify-between">
               <div className="flex items-center gap-3">

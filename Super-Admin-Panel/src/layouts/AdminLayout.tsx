@@ -15,21 +15,8 @@ export const AdminLayout: React.FC = () => {
   const [activeEffect, setActiveEffect] = useState<NavEffect>(NAV_EFFECTS[0]);
   const [triggerKey, setTriggerKey] = useState<string>('init');
 
-  // Idle state: triggers playful letter dance if active menu stays idle for 3 seconds
-  const [isIdle, setIsIdle] = useState<boolean>(false);
-
-  useEffect(() => {
-    setIsIdle(false);
-    const timer = setTimeout(() => {
-      setIsIdle(true);
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, [location.pathname]);
-
   const handleSelectEffect = (targetPath: string) => {
     if (location.pathname !== targetPath) {
-      setIsIdle(false);
       let nextIdx = Math.floor(Math.random() * NAV_EFFECTS.length);
       if (NAV_EFFECTS[nextIdx].id === activeEffect.id) {
         nextIdx = (nextIdx + 1) % NAV_EFFECTS.length;
@@ -66,15 +53,12 @@ export const AdminLayout: React.FC = () => {
         {/* Brand Header */}
         <div className="p-5 flex items-center justify-between border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-800 flex items-center justify-center text-white shadow-md shadow-teal-700/20">
-              <svg className="w-6 h-6 fill-current text-white" viewBox="0 0 24 24">
-                <path d="M12 2C7.58 2 4 5.58 4 10c0 2.5 1.15 4.74 2.95 6.22.42.35.68.87.68 1.42V19c0 1.66 1.34 3 3 3h.5c.83 0 1.5-.67 1.5-1.5v-3.5h.74v3.5c0 .83.67 1.5 1.5 1.5h.5c1.66 0 3-1.34 3-3v-1.36c0-.55.26-1.07.68-1.42C20.85 14.74 22 12.5 22 10c0-4.42-3.58-8-8-8zm-2 15h-.5c-.83 0-1.5-.67-1.5-1.5v-.5h2v2zm6 0h-.5v-2h2v.5c0 .83-.67 1.5-1.5 1.5z"/>
-              </svg>
+            <div className="w-12 h-12 bg-transparent flex items-center justify-center flex-shrink-0 filter drop-shadow-md">
+              <img src="/logo.png" alt="klinika-admin Logo" className="w-full h-full object-contain bg-transparent" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-black text-lg tracking-tight text-slate-800">SADAF</span>
-                <span className="text-[10px] font-extrabold text-teal-700 uppercase tracking-widest px-1.5 py-0.5 bg-teal-50 rounded">SaaS</span>
+                <span className="font-black text-lg tracking-tight text-slate-800">klinika-admin</span>
               </div>
               <span className="inline-block mt-0.5 px-2 py-0.5 bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-800 border border-teal-200/80 rounded-full text-[9px] font-black uppercase tracking-wider">
                 Super Admin
@@ -100,50 +84,27 @@ export const AdminLayout: React.FC = () => {
                   <LiquidNavPill effect={activeEffect} triggerKey={triggerKey} />
                 )}
 
-                {/* Animated Icon: Larger (22px) and Bolder (strokeWidth 2.6) + Idle Floating */}
+                {/* Animated Icon */}
                 <motion.div
-                  whileHover={{ scale: 1.18, rotate: [0, -4, 4, 0] }}
-                  whileTap={{ scale: 0.88 }}
-                  animate={
-                    isActive && isIdle
-                      ? {
-                          y: [0, -4, 2, -2, 0],
-                          rotate: [0, -6, 6, -3, 0],
-                          scale: [1, 1.12, 0.96, 1],
-                        }
-                      : {}
-                  }
-                  transition={{
-                    type: 'spring',
-                    stiffness: 450,
-                    damping: 18,
-                    ...(isActive && isIdle
-                      ? {
-                          duration: 1.4,
-                          repeat: Infinity,
-                          repeatDelay: 1.2,
-                          ease: 'easeInOut',
-                        }
-                      : {}),
-                  }}
+                  whileHover={{ scale: 1.15 }}
+                  whileTap={{ scale: 0.92 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 25 }}
                   className="relative z-10 flex items-center justify-center flex-shrink-0"
                 >
                   <Icon
                     className={`w-[22px] h-[22px] transition-all duration-200 ${
                       isActive
                         ? 'text-teal-100 drop-shadow-[0_2px_10px_rgba(45,212,191,0.7)]'
-                        : 'text-slate-400 group-hover:text-teal-700 group-hover:scale-110'
+                        : 'text-slate-400 group-hover:text-teal-700'
                     }`}
                     strokeWidth={isActive ? 2.6 : 2.2}
                   />
                 </motion.div>
 
-                {/* Dancing Letters on Active Idle (after 3 seconds) */}
+                {/* Menu Text */}
                 <DancingMenuText
                   text={item.label}
                   isActive={isActive}
-                  isIdle={isIdle}
-                  MenuIcon={Icon}
                 />
               </NavLink>
             );
@@ -176,7 +137,7 @@ export const AdminLayout: React.FC = () => {
       {/* 2. MAIN CONTENT AREA */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Top Navbar (Floating Card with spacing from sidebar and content) */}
-        <header className="h-16 bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-sm rounded-2xl px-6 flex items-center justify-between sticky top-3.5 z-10 mb-3.5">
+        <header className="h-16 bg-white border border-slate-200/90 shadow-sm rounded-2xl px-6 flex items-center justify-between sticky top-3.5 z-10 mb-3.5">
           {/* Search bar */}
           <div className="relative w-96">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />

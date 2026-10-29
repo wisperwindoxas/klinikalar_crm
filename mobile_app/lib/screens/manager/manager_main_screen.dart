@@ -7,8 +7,11 @@ import '../../models/ticket_model.dart';
 import '../../models/service_model.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/security_service.dart';
 import '../../widgets/responsive_frame.dart';
+import '../../widgets/user_profile_sheet.dart';
 import '../auth/login_screen.dart';
+import '../auth/pin_setup_sheet.dart';
 import 'manager_doctor_sheet.dart';
 import 'manager_patient_detail_sheet.dart';
 
@@ -28,6 +31,23 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
   List<PatientModel> _patients = [];
   List<ServiceModel> _services = [];
   Map<String, dynamic> _dashboardStats = {};
+
+  Map<String, dynamic> get _statsData {
+    if (_dashboardStats.containsKey('data') && _dashboardStats['data'] is Map<String, dynamic>) {
+      return _dashboardStats['data'] as Map<String, dynamic>;
+    }
+    return _dashboardStats;
+  }
+
+  double get _todayRevenue {
+    final raw = _statsData['todayRevenue'] ?? _statsData['totalRevenue'] ?? 0;
+    return Formatters.parseDouble(raw);
+  }
+
+  double get _monthlyRevenue {
+    final raw = _statsData['monthlyRevenue'] ?? 0;
+    return Formatters.parseDouble(raw);
+  }
 
   final _patientSearchController = TextEditingController();
   int _visiblePatientsCount = 15;
@@ -75,24 +95,41 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
           automaticallyImplyLeading: false,
           title: Row(
             children: [
-              CircleAvatar(
-                radius: 19,
-                backgroundColor: AppColors.mintLight,
-                child: const Icon(Icons.admin_panel_settings_rounded, color: AppColors.primary, size: 22),
+              InkWell(
+                onTap: () => UserProfileSheet.show(context),
+                borderRadius: BorderRadius.circular(20),
+                child: CircleAvatar(
+                  radius: 19,
+                  backgroundColor: AppColors.mintLight,
+                  child: const Icon(Icons.admin_panel_settings_rounded, color: AppColors.primary, size: 22),
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      user?.fullName ?? 'Boshqaruv Markazi',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                    ),
-                    const Text('SADAF CLINIC • Menejer Paneli', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                  ],
+                child: InkWell(
+                  onTap: () => UserProfileSheet.show(context),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        user?.fullName ?? 'Boshqaruv Markazi',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
+                      const Text('SADAF CLINIC • Menejer Paneli', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                    ],
+                  ),
                 ),
+              ),
+              IconButton(
+                icon: Icon(
+                  SecurityService().hasPin ? Icons.lock_outline_rounded : Icons.lock_open_rounded,
+                  color: AppColors.primary,
+                  size: 21,
+                ),
+                tooltip: 'PIN va Biometriya',
+                onPressed: () => PinSetupSheet.show(context),
               ),
               IconButton(
                 icon: const Icon(Icons.refresh_rounded, color: AppColors.textSecondary),
@@ -161,57 +198,155 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
           ),
           const SizedBox(height: 18),
 
-          // 2. Real-time clinic load indicator
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              gradient: AppColors.primaryGradient,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withOpacity(0.35),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Klinika Umumiy Yuklamasi', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(10)),
-                      child: Text(
-                        'Normal (${_dashboardStats['occupancy'] ?? '68%'})',
-                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
+          // 2. Real-time Daily & Monthly Revenue Cards (Bugungi va Oylik Tushum)
+          Row(
+            children: [
+              // Bugungi Tushum Card
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: const LinearProgressIndicator(
-                    value: 0.68,
-                    backgroundColor: Colors.white24,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    minHeight: 8,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF2563EB).withOpacity(0.32),
+                        blurRadius: 14,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 18),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.22),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text('Bugun', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Bugungi Tushum',
+                        style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          Formatters.formatMoney(_todayRevenue),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${_statsData['completedCount'] ?? 0} ta qabul yakunlandi',
+                        style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 10.5),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('18 ta shifokor qabulda', style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12)),
-                    Text('O‘rtacha kutish: 14 daq', style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12)),
-                  ],
+              ),
+              const SizedBox(width: 12),
+              // Bir Oylik Tushum Card
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF065F46), Color(0xFF10B981)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF10B981).withOpacity(0.32),
+                        blurRadius: 14,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.calendar_month_rounded, color: Colors.white, size: 18),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.22),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text('Bu oy', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Bir Oylik Tushum',
+                        style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          Formatters.formatMoney(_monthlyRevenue),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Jami oylik tushum',
+                        style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 10.5),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
           const SizedBox(height: 22),
 
@@ -582,10 +717,14 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
             ),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: AppColors.mintLight,
-                  child: const Icon(Icons.admin_panel_settings_rounded, color: AppColors.primary, size: 30),
+                SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.admin_panel_settings_rounded, color: AppColors.medicalBlue, size: 30),
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -594,7 +733,7 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
                     children: [
                       Text(user?.fullName ?? 'Menejer', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
                       const SizedBox(height: 2),
-                      Text('Roli: ${user?.role ?? "MANAGER"} • ${user?.clinicName ?? "SADAF CLINIC"}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      Text('Roli: ${user?.role ?? "MANAGER"} • ${user?.clinicName ?? "klinika-admin"}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                       const SizedBox(height: 2),
                       Text('Aloqa: ${user?.phone ?? "Biriktirilmagan"}', style: const TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600)),
                     ],

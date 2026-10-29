@@ -13,7 +13,7 @@ export const UserLayout: React.FC = () => {
   const navigate = useNavigate();
   const [selectedBranch, setSelectedBranch] = useState('branch_sadaf_main');
   const [currentTime, setCurrentTime] = useState('12:34');
-  const [clinicName, setClinicName] = useState('SADAF KLINIKA');
+  const [clinicName, setClinicName] = useState('klinika-admin');
   const [isNewPatientModalOpen, setIsNewPatientModalOpen] = useState(false);
 
   useEffect(() => {

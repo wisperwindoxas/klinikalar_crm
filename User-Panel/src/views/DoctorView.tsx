@@ -664,12 +664,12 @@ export const DoctorView: React.FC = () => {
         <div>
           {/* Logo Header */}
           <div className="p-6 flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-[#00897B] flex items-center justify-center text-white shadow-md shadow-[#00897B]/20 flex-shrink-0">
-              <HeartPulse className="w-7 h-7 stroke-[2.4]" />
+            <div className="w-12 h-12 bg-transparent flex items-center justify-center flex-shrink-0 filter drop-shadow-md">
+              <img src="/logo.png" alt="klinika-admin Logo" className="w-full h-full object-contain bg-transparent" />
             </div>
             <div>
-              <div className="font-black text-lg tracking-tight leading-tight text-[#172B4D]">Klinika</div>
-              <div className="text-xs text-slate-500 font-medium">Navbat Tizimi</div>
+              <div className="font-black text-lg tracking-tight leading-tight text-[#172B4D]">klinika-admin</div>
+              <div className="text-xs text-slate-500 font-medium">Shifokor Paneli</div>
             </div>
           </div>
 
@@ -684,7 +684,7 @@ export const DoctorView: React.FC = () => {
                   onClick={() => handleTabChange(item.id)}
                   className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-[13px] font-semibold transition text-left cursor-pointer ${
                     isActive
-                      ? 'bg-[#00897B] text-white shadow-lg shadow-[#00897B]/25 font-bold'
+                      ? 'bg-medical-blue text-white shadow-lg shadow-medical-blue/30 font-bold'
                       : 'text-slate-600 hover:text-[#172B4D] hover:bg-slate-100'
                   }`}
                 >
@@ -698,11 +698,11 @@ export const DoctorView: React.FC = () => {
 
         {/* Clean Clinic Badge at Bottom (Zero Postgres/database text) */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/70 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-teal-500/10 text-[#00897B] flex items-center justify-center flex-shrink-0 font-bold">
-            <ShieldCheck className="w-5 h-5 text-[#00897B]" />
+          <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-medical-blue flex items-center justify-center flex-shrink-0 font-bold">
+            <ShieldCheck className="w-5 h-5 text-medical-blue" />
           </div>
           <div className="min-w-0">
-            <div className="text-xs font-bold text-[#172B4D] truncate">SADAF Clinic</div>
+            <div className="text-xs font-bold text-[#172B4D] truncate">klinika-admin</div>
             <div className="text-[10px] text-slate-400 font-medium">Shifokor Tizimi v2.4</div>
           </div>
         </div>
@@ -1573,7 +1573,7 @@ export const DoctorView: React.FC = () => {
                     </div>
                     <div className="flex items-center justify-between text-xs py-1 border-t border-slate-100">
                       <span className="text-slate-500">Aloqa markazi:</span>
-                      <span className="font-bold text-slate-700">SADAF Support</span>
+                      <span className="font-bold text-slate-700">klinika-admin Support</span>
                     </div>
                     <div className="pt-2">
                       <button

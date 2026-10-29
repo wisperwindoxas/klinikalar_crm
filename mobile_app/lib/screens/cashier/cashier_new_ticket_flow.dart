@@ -98,11 +98,38 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
 
       _selectedGender = (p.gender?.toLowerCase() == 'female') ? 'female' : 'male';
 
-      if (p.region != null && UzbekistanRegionsData.regions.contains(p.region)) {
-        _selectedRegion = p.region!;
+      // Smart address matching for region and district
+      String? foundRegion = p.region;
+      String? foundDistrict = p.district;
+
+      if ((foundRegion == null || foundRegion.isEmpty) && p.address != null) {
+        for (final r in UzbekistanRegionsData.regions) {
+          final cleanR = r.replaceAll(' viloyati', '').replaceAll(' shahri', '');
+          if (p.address!.toLowerCase().contains(cleanR.toLowerCase())) {
+            foundRegion = r;
+            break;
+          }
+        }
+      }
+
+      if (foundRegion != null && UzbekistanRegionsData.regions.contains(foundRegion)) {
+        _selectedRegion = foundRegion;
       }
       final districts = UzbekistanRegionsData.getDistricts(_selectedRegion);
-      if (districts.isNotEmpty) {
+
+      if ((foundDistrict == null || foundDistrict.isEmpty) && p.address != null) {
+        for (final d in districts) {
+          final cleanD = d.replaceAll(' tumani', '').replaceAll(' shahri', '');
+          if (p.address!.toLowerCase().contains(cleanD.toLowerCase())) {
+            foundDistrict = d;
+            break;
+          }
+        }
+      }
+
+      if (foundDistrict != null && districts.contains(foundDistrict)) {
+        _selectedDistrict = foundDistrict;
+      } else if (districts.isNotEmpty) {
         _selectedDistrict = districts.first;
       }
 
@@ -117,29 +144,457 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         final searchCtrl = TextEditingController();
-        List<PatientModel> searchResults = [];
-        bool searching = false;
+        List<PatientModel> allPatients = [];
+        List<PatientModel> displayedPatients = [];
+        bool isLoading = true;
+        bool hasLoadedOnce = false;
 
         return StatefulBuilder(
           builder: (context, setModalState) {
-            void performSearch(String q) async {
-              if (q.trim().length < 2) {
-                setModalState(() => searchResults = []);
+            if (!hasLoadedOnce) {
+              hasLoadedOnce = true;
+              ApiService().getPatients().then((list) {
+                setModalState(() {
+                  allPatients = list;
+                  displayedPatients = list;
+                  isLoading = false;
+                });
+              }).catchError((_) {
+                setModalState(() {
+                  isLoading = false;
+                });
+              });
+            }
+
+            void filterPatients(String q) async {
+              final query = q.trim().toLowerCase();
+              if (query.isEmpty) {
+                setModalState(() {
+                  displayedPatients = allPatients;
+                });
                 return;
               }
-              setModalState(() => searching = true);
-              final res = await ApiService().getPatients(search: q.trim());
+
+              // Fast instant local filter
+              final localMatches = allPatients.where((p) {
+                final nameMatch = p.fullName.toLowerCase().contains(query);
+                final phoneMatch = p.phone.replaceAll(RegExp(r'\D'), '').contains(query.replaceAll(RegExp(r'\D'), ''));
+                final cardMatch = (p.patientNumber ?? '').toLowerCase().contains(query);
+                final addrMatch = (p.address ?? '').toLowerCase().contains(query);
+                return nameMatch || phoneMatch || cardMatch || addrMatch;
+              }).toList();
+
               setModalState(() {
-                searchResults = res;
-                searching = false;
+                displayedPatients = localMatches;
+              });
+
+              // Query remote backend if query has >= 2 chars
+              if (query.length >= 2) {
+                final remote = await ApiService().getPatients(search: q.trim());
+                if (searchCtrl.text.trim().toLowerCase() == query) {
+                  final map = {for (var p in localMatches) p.id: p};
+                  for (var p in remote) {
+                    map[p.id] = p;
+                  }
+                  setModalState(() {
+                    displayedPatients = map.values.toList();
+                  });
+                }
+              }
+            }
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.82,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              padding: EdgeInsets.fromLTRB(20, 14, 20, MediaQuery.of(context).viewInsets.bottom + 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            'Mavjud bemorlar',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                          ),
+                          if (!isLoading && displayedPatients.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '${displayedPatients.length}',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 22, color: AppColors.textMuted),
+                        onPressed: () => Navigator.pop(context),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: searchCtrl,
+                    onChanged: filterPatients,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary),
+                      hintText: 'Ism, telefon yoki karta raqami...',
+                      suffixIcon: searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 18),
+                              onPressed: () {
+                                searchCtrl.clear();
+                                filterPatients('');
+                              },
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (isLoading)
+                    const Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(color: AppColors.primary),
+                            SizedBox(height: 12),
+                            Text('Bemorlar ro‘yxati yuklanmoqda...', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
+                          ],
+                        ),
+                      ),
+                    )
+                  else if (displayedPatients.isEmpty)
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.person_search_rounded, size: 52, color: AppColors.textMuted),
+                            const SizedBox(height: 10),
+                            Text(
+                              searchCtrl.text.isEmpty
+                                  ? 'Ro‘yxatda hali bemorlar mavjud emas'
+                                  : 'So‘rov bo‘yicha bemor topilmadi',
+                              style: const TextStyle(fontSize: 14, color: AppColors.textMuted, fontWeight: FontWeight.w500),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.separated(
+                        itemCount: displayedPatients.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, idx) {
+                          final p = displayedPatients[idx];
+                          final isFemale = (p.gender ?? '').toLowerCase() == 'female';
+
+                          return InkWell(
+                            onTap: () {
+                              _selectExistingPatient(p);
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Bemor ma‘lumotlari to‘ldirildi: ${p.fullName}'),
+                                  backgroundColor: AppColors.success,
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(16),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor: isFemale ? const Color(0xFFFCE7F3) : const Color(0xFFEFF6FF),
+                                    child: Icon(
+                                      isFemale ? Icons.female_rounded : Icons.male_rounded,
+                                      color: isFemale ? const Color(0xFFDB2777) : const Color(0xFF2563EB),
+                                      size: 22,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                p.fullName,
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                                              ),
+                                            ),
+                                            if (p.patientNumber != null && p.patientNumber!.isNotEmpty)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFF1F5F9),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  '#${p.patientNumber}',
+                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.phone_rounded, size: 12, color: AppColors.textMuted),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              Formatters.formatPhone(p.phone),
+                                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                            ),
+                                            if (p.totalVisits > 0) ...[
+                                              const SizedBox(width: 8),
+                                              Text('• ${p.totalVisits} tashrif', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                                            ],
+                                          ],
+                                        ),
+                                        if (p.address != null && p.address!.isNotEmpty) ...[
+                                          const SizedBox(height: 3),
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.location_on_outlined, size: 12, color: AppColors.textMuted),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  p.address!,
+                                                  style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.textMuted),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ==================== BOTTOM SHEETS FOR GENDER, REGION, DISTRICT ====================
+
+  void _showGenderBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Jinsni tanlang', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 20, color: AppColors.textMuted),
+                  onPressed: () => Navigator.pop(ctx),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Erkak
+            InkWell(
+              onTap: () {
+                setState(() => _selectedGender = 'male');
+                Navigator.pop(ctx);
+              },
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: _selectedGender == 'male' ? const Color(0xFFEFF6FF) : AppColors.background,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _selectedGender == 'male' ? const Color(0xFF2563EB) : AppColors.border,
+                    width: _selectedGender == 'male' ? 1.8 : 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDBEAFE),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.male_rounded, color: Color(0xFF2563EB), size: 26),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Erkak', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                          SizedBox(height: 2),
+                          Text('Bemor jinsi: Erkak kishi', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                        ],
+                      ),
+                    ),
+                    if (_selectedGender == 'male')
+                      const Icon(Icons.check_circle_rounded, color: Color(0xFF2563EB), size: 22)
+                    else
+                      const Icon(Icons.radio_button_unchecked_rounded, color: AppColors.textMuted, size: 20),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Ayol
+            InkWell(
+              onTap: () {
+                setState(() => _selectedGender = 'female');
+                Navigator.pop(ctx);
+              },
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: _selectedGender == 'female' ? const Color(0xFFFDF2F8) : AppColors.background,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _selectedGender == 'female' ? const Color(0xFFDB2777) : AppColors.border,
+                    width: _selectedGender == 'female' ? 1.8 : 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFCE7F3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.female_rounded, color: Color(0xFFDB2777), size: 26),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Ayol', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                          SizedBox(height: 2),
+                          Text('Bemor jinsi: Ayol kishi', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                        ],
+                      ),
+                    ),
+                    if (_selectedGender == 'female')
+                      const Icon(Icons.check_circle_rounded, color: Color(0xFFDB2777), size: 22)
+                    else
+                      const Icon(Icons.radio_button_unchecked_rounded, color: AppColors.textMuted, size: 20),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showRegionBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final searchCtrl = TextEditingController();
+        List<String> displayedRegions = List.from(UzbekistanRegionsData.regions);
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            void filter(String q) {
+              final query = q.trim().toLowerCase();
+              setModalState(() {
+                if (query.isEmpty) {
+                  displayedRegions = List.from(UzbekistanRegionsData.regions);
+                } else {
+                  displayedRegions = UzbekistanRegionsData.regions
+                      .where((r) => r.toLowerCase().contains(query))
+                      .toList();
+                }
               });
             }
 
             return Container(
-              height: MediaQuery.of(context).size.height * 0.75,
+              height: MediaQuery.of(context).size.height * 0.78,
               decoration: const BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
               ),
               padding: EdgeInsets.fromLTRB(20, 14, 20, MediaQuery.of(context).viewInsets.bottom + 16),
               child: Column(
@@ -157,118 +612,253 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Mavjud bemorni tanlash',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                        'Viloyatni tanlang',
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close, size: 20, color: AppColors.textMuted),
-                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded, size: 22, color: AppColors.textMuted),
+                        onPressed: () => Navigator.pop(ctx),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: searchCtrl,
-                    autofocus: true,
-                    onChanged: performSearch,
+                    onChanged: filter,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary),
-                      hintText: 'Bemor ismi yoki telefon raqami...',
+                      hintText: 'Viloyat nomi bo‘yicha qidirish...',
                       suffixIcon: searchCtrl.text.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear, size: 18),
+                              icon: const Icon(Icons.clear_rounded, size: 18),
                               onPressed: () {
                                 searchCtrl.clear();
-                                setModalState(() => searchResults = []);
+                                filter('');
                               },
                             )
                           : null,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  if (searching)
-                    const Padding(
-                      padding: EdgeInsets.all(20),
-                      child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
-                    )
-                  else if (searchResults.isEmpty)
-                    Expanded(
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.person_search_rounded, size: 48, color: AppColors.textMuted),
-                            const SizedBox(height: 10),
-                            Text(
-                              searchCtrl.text.isEmpty
-                                  ? 'Bemorni topish uchun ism yoki telefon raqamini yozing'
-                                  : 'Bemor topilmadi',
-                              style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
-                              textAlign: TextAlign.center,
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: displayedRegions.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 6),
+                      itemBuilder: (context, idx) {
+                        final region = displayedRegions[idx];
+                        final isSel = region == _selectedRegion;
+
+                        return InkWell(
+                          onTap: () {
+                            setState(() {
+                              _selectedRegion = region;
+                              final districts = UzbekistanRegionsData.getDistricts(region);
+                              _selectedDistrict = districts.isNotEmpty ? districts.first : '';
+                            });
+                            Navigator.pop(ctx);
+                          },
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                            decoration: BoxDecoration(
+                              color: isSel ? const Color(0xFFEFF6FF) : AppColors.background,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isSel ? AppColors.primary : AppColors.border,
+                                width: isSel ? 1.5 : 1,
+                              ),
                             ),
-                          ],
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: isSel ? AppColors.primary.withOpacity(0.15) : Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    Icons.location_on_outlined,
+                                    size: 19,
+                                    color: isSel ? AppColors.primary : AppColors.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    region,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                                      color: isSel ? AppColors.primary : AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                if (isSel)
+                                  const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showDistrictBottomSheet() {
+    final allDistricts = UzbekistanRegionsData.getDistricts(_selectedRegion);
+    if (allDistricts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ushbu viloyat uchun tumanlar mavjud emas'), backgroundColor: AppColors.warning),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final searchCtrl = TextEditingController();
+        List<String> displayedDistricts = List.from(allDistricts);
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            void filter(String q) {
+              final query = q.trim().toLowerCase();
+              setModalState(() {
+                if (query.isEmpty) {
+                  displayedDistricts = List.from(allDistricts);
+                } else {
+                  displayedDistricts = allDistricts
+                      .where((d) => d.toLowerCase().contains(query))
+                      .toList();
+                }
+              });
+            }
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.78,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              padding: EdgeInsets.fromLTRB(20, 14, 20, MediaQuery.of(context).viewInsets.bottom + 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '$_selectedRegion tumanlari',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    )
-                  else
-                    Expanded(
-                      child: ListView.separated(
-                        itemCount: searchResults.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (context, idx) {
-                          final p = searchResults[idx];
-                          final isFemale = (p.gender ?? '').toLowerCase() == 'female';
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 22, color: AppColors.textMuted),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: searchCtrl,
+                    onChanged: filter,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary),
+                      hintText: 'Tuman / shahar bo‘yicha qidirish...',
+                      suffixIcon: searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 18),
+                              onPressed: () {
+                                searchCtrl.clear();
+                                filter('');
+                              },
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: displayedDistricts.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 6),
+                      itemBuilder: (context, idx) {
+                        final dist = displayedDistricts[idx];
+                        final isSel = dist == _selectedDistrict;
 
-                          return InkWell(
-                            onTap: () {
-                              _selectExistingPatient(p);
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(this.context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Bemor ma‘lumotlari to‘ldirildi: ${p.fullName}'),
-                                  backgroundColor: AppColors.success,
-                                ),
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(14),
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: AppColors.border),
-                              ),
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor: isFemale ? const Color(0xFFFCE7F3) : const Color(0xFFEFF6FF),
-                                    child: Icon(
-                                      isFemale ? Icons.face_3_rounded : Icons.face_6_rounded,
-                                      color: isFemale ? const Color(0xFFDB2777) : const Color(0xFF2563EB),
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(p.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                        const SizedBox(height: 2),
-                                        Text(Formatters.formatPhone(p.phone), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                                        if (p.address != null && p.address!.isNotEmpty)
-                                          Text(p.address!, style: const TextStyle(fontSize: 11, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                      ],
-                                    ),
-                                  ),
-                                  const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.textMuted),
-                                ],
+                        return InkWell(
+                          onTap: () {
+                            setState(() {
+                              _selectedDistrict = dist;
+                            });
+                            Navigator.pop(ctx);
+                          },
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                            decoration: BoxDecoration(
+                              color: isSel ? const Color(0xFFEFF6FF) : AppColors.background,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isSel ? AppColors.primary : AppColors.border,
+                                width: isSel ? 1.5 : 1,
                               ),
                             ),
-                          );
-                        },
-                      ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: isSel ? AppColors.primary.withOpacity(0.15) : Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    Icons.apartment_rounded,
+                                    size: 19,
+                                    color: isSel ? AppColors.primary : AppColors.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    dist,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                                      color: isSel ? AppColors.primary : AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                if (isSel)
+                                  const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
+                  ),
                 ],
               ),
             );
@@ -322,7 +912,7 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
         final pRes = await ApiService().createPatient({
           'fullName': fullName,
           'phone': cleanPhone,
-          'gender': _selectedGender,
+          'gender': _selectedGender.toUpperCase(),
           'address': fullAddress,
           'region': _selectedRegion,
         });
@@ -355,7 +945,6 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
       if (_selectedDoctor != null) {
         items.add({
           'doctorId': _selectedDoctor!.id,
-          if (_cart.isNotEmpty) 'serviceId': _cart.first.id,
           'price': _selectedDoctor!.consultationPrice,
           'paymentMethod': _paymentMethod,
           'serviceName': 'Konsultatsiya: ${_selectedDoctor!.specialty}',
@@ -364,7 +953,7 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
 
       for (var s in _cart) {
         items.add({
-          'doctorId': _selectedDoctor?.id ?? (_doctors.isNotEmpty ? _doctors.first.id : 'doc-1'),
+          'doctorId': _selectedDoctor?.id ?? (_doctors.isNotEmpty ? _doctors.first.id : 'doc_01'),
           'serviceId': s.id,
           'price': s.price,
           'paymentMethod': _paymentMethod,
@@ -382,7 +971,7 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
 
       final receivedText = _receivedCashController.text.replaceAll(RegExp(r'\D'), '');
       final double receivedAmount = double.tryParse(receivedText) ?? _totalPrice;
-      final double paidAmount = receivedAmount > 0 ? receivedAmount : _totalPrice;
+      final double paidAmount = (_paymentMethod != 'CASH' || receivedAmount <= 0) ? _totalPrice : receivedAmount;
 
       final regRes = await ApiService().multiRegister(
         patientId: patientId,
@@ -403,14 +992,25 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
         final tickets = (rawTickets is List) ? rawTickets : [];
         final firstTicket = tickets.isNotEmpty && tickets.first is Map ? tickets.first : {};
 
+        final ticketNumber = firstTicket['full_number'] ?? firstTicket['ticketNumber'] ?? firstTicket['number'] ?? 'T-001';
+        final patientDisplayName = firstTicket['patient_name'] ?? fullName;
+        final rawDocName = firstTicket['doctor_name'] ?? _selectedDoctor?.fullName;
+        final doctorDisplayName = (rawDocName != null && rawDocName.toString().trim().isNotEmpty)
+            ? rawDocName.toString().trim()
+            : 'Shifokor';
+        final rawRoom = firstTicket['cabinet_number'] ?? _selectedDoctor?.roomNumber;
+        final roomDisplayName = (rawRoom != null && rawRoom.toString().trim().isNotEmpty)
+            ? rawRoom.toString().trim()
+            : '1';
+
         CashierTicketSheet.show(
           context,
           ticketData: {
-            'ticketNumber': firstTicket['full_number'] ?? firstTicket['ticketNumber'] ?? firstTicket['number'] ?? 'T-001',
-            'patientName': firstTicket['patient_name'] ?? fullName,
-            'doctorName': firstTicket['doctor_name'] ?? _selectedDoctor?.fullName ?? 'Shifokor',
-            'roomNumber': firstTicket['cabinet_number'] ?? _selectedDoctor?.roomNumber ?? '104',
-            'serviceName': _cart.isNotEmpty ? _cart.first.name : 'Konsultatsiya',
+            'ticketNumber': ticketNumber,
+            'patientName': patientDisplayName,
+            'doctorName': doctorDisplayName,
+            'roomNumber': roomDisplayName,
+            'serviceName': _cart.isNotEmpty ? _cart.first.name : 'Konsultatsiya (${_selectedDoctor?.specialty ?? "Umumiy"})',
             'amount': _totalPrice,
           },
           onDone: widget.onFinished,
@@ -506,6 +1106,9 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
                           const SnackBar(content: Text('Kamida bitta shifokor yoki xizmat tanlang')),
                         );
                         return;
+                      }
+                      if (_receivedCashController.text.trim().isEmpty) {
+                        _receivedCashController.text = _totalPrice.toInt().toString();
                       }
                       setState(() => _currentStep = 2);
                     } else {
@@ -727,7 +1330,7 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
           ),
           const SizedBox(height: 12),
 
-          // Gender and Region
+          // Gender and Region (Modern Bottom Sheet Selectors)
           Row(
             children: [
               Expanded(
@@ -736,24 +1339,32 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
                   children: [
                     const Text('Jinsi', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
                     const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedGender,
-                          isExpanded: true,
-                          items: const [
-                            DropdownMenuItem(value: 'male', child: Text('Erkak', style: TextStyle(fontSize: 12))),
-                            DropdownMenuItem(value: 'female', child: Text('Ayol', style: TextStyle(fontSize: 12))),
+                    InkWell(
+                      onTap: _showGenderBottomSheet,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _selectedGender == 'female' ? Icons.female_rounded : Icons.male_rounded,
+                              color: _selectedGender == 'female' ? const Color(0xFFDB2777) : const Color(0xFF2563EB),
+                              size: 19,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _selectedGender == 'female' ? 'Ayol' : 'Erkak',
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                              ),
+                            ),
+                            const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textMuted, size: 20),
                           ],
-                          onChanged: (val) {
-                            if (val != null) setState(() => _selectedGender = val);
-                          },
                         ),
                       ),
                     ),
@@ -767,34 +1378,29 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
                   children: [
                     const Text('Viloyat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
                     const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: UzbekistanRegionsData.regions.contains(_selectedRegion)
-                              ? _selectedRegion
-                              : UzbekistanRegionsData.regions.first,
-                          isExpanded: true,
-                          items: UzbekistanRegionsData.regions
-                              .map((r) => DropdownMenuItem(
-                                    value: r,
-                                    child: Text(r, style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis),
-                                  ))
-                              .toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() {
-                                _selectedRegion = val;
-                                final districts = UzbekistanRegionsData.getDistricts(val);
-                                _selectedDistrict = districts.isNotEmpty ? districts.first : '';
-                              });
-                            }
-                          },
+                    InkWell(
+                      onTap: _showRegionBottomSheet,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.location_on_outlined, color: AppColors.primary, size: 18),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                _selectedRegion.isNotEmpty ? _selectedRegion : 'Viloyatni tanlang',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textMuted, size: 20),
+                          ],
                         ),
                       ),
                     ),
@@ -805,34 +1411,35 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
           ),
           const SizedBox(height: 12),
 
-          // District Dropdown (dynamically populated based on selected region)
+          // District Bottom Sheet Selector
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('Tuman / Shahar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
               const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: availableDistricts.contains(_selectedDistrict)
-                        ? _selectedDistrict
-                        : (availableDistricts.isNotEmpty ? availableDistricts.first : null),
-                    isExpanded: true,
-                    items: availableDistricts
-                        .map((d) => DropdownMenuItem(
-                              value: d,
-                              child: Text(d, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
-                            ))
-                        .toList(),
-                    onChanged: (val) {
-                      if (val != null) setState(() => _selectedDistrict = val);
-                    },
+              InkWell(
+                onTap: _showDistrictBottomSheet,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.apartment_rounded, color: AppColors.primary, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _selectedDistrict.isNotEmpty ? _selectedDistrict : 'Tuman / shaharni tanlang',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textMuted, size: 20),
+                    ],
                   ),
                 ),
               ),
@@ -1018,6 +1625,9 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
 
   // ==================== STEP 2: PAYMENT ====================
   Widget _buildPaymentStep() {
+    final receivedNum = double.tryParse(_receivedCashController.text.replaceAll(RegExp(r'\D'), '')) ?? _totalPrice;
+    final change = (receivedNum > _totalPrice) ? (receivedNum - _totalPrice) : 0.0;
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1036,7 +1646,7 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
                 const Text('To‘lov hisob-kitobi', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
                 const SizedBox(height: 10),
                 if (_selectedDoctor != null)
-                  _buildPaymentLine('Konsultatsiya (${_selectedDoctor!.specialty})', _selectedDoctor!.consultationPrice),
+                  _buildPaymentLine('Konsultatsiya (${_selectedDoctor!.fullName.isNotEmpty ? _selectedDoctor!.fullName : _selectedDoctor!.specialty})', _selectedDoctor!.consultationPrice),
                 ..._cart.map((s) => _buildPaymentLine(s.name, s.price)),
                 const Divider(height: 16, color: AppColors.border),
                 Row(
@@ -1069,16 +1679,112 @@ class _CashierNewTicketFlowState extends State<CashierNewTicketFlow> {
           const SizedBox(height: 18),
 
           if (_paymentMethod == 'CASH') ...[
-            const Text('Qabul qilingan naqd pul:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Qabul qilingan naqd pul:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _receivedCashController.text = _totalPrice.toInt().toString();
+                    });
+                  },
+                  child: const Text('Aniq summa', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                ),
+              ],
+            ),
             const SizedBox(height: 6),
             TextFormField(
               controller: _receivedCashController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(hintText: '200 000 so\'m'),
+              decoration: InputDecoration(
+                hintText: '${Formatters.formatNumber(_totalPrice)} so‘m',
+                suffixText: 'so‘m',
+              ),
               onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 10),
+
+            // Quick sum chips
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildQuickCashChip(_totalPrice.toInt()),
+                if (_totalPrice < 100000) _buildQuickCashChip(100000),
+                if (_totalPrice < 200000) _buildQuickCashChip(200000),
+                if (_totalPrice < 500000) _buildQuickCashChip(500000),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            if (change > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.successLight.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.success.withOpacity(0.5)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Qaytim:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.success)),
+                    Text(
+                      Formatters.formatCurrency(change),
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.success),
+                    ),
+                  ],
+                ),
+              ),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.mintLight.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary.withOpacity(0.4)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_outline_rounded, color: AppColors.primary, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _paymentMethod == 'CARD'
+                          ? 'Terminal orqali ${Formatters.formatCurrency(_totalPrice)} to‘lov qilinadi'
+                          : 'Online (Click/Payme) orqali ${Formatters.formatCurrency(_totalPrice)} to‘lov qilinadi',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildQuickCashChip(int amount) {
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _receivedCashController.text = amount.toString();
+        });
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Text(
+          Formatters.formatCurrency(amount.toDouble()),
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+        ),
       ),
     );
   }

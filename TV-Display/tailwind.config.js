@@ -7,6 +7,10 @@ export default {
   theme: {
     extend: {
       colors: {
+        'medical-blue': '#0A84FF',
+        'medical-blue-dark': '#0061D5',
+        'medical-turquoise': '#00E0C3',
+        'medical-turquoise-dark': '#00A88F',
         teal: {
           50: '#F0FDFA',
           100: '#CCFBF1',
@@ -23,6 +27,9 @@ export default {
           800: '#1E293B',
           900: '#0F172A',
         }
+      },
+      backgroundImage: {
+        'medical-gradient': 'linear-gradient(135deg, #0061D5 0%, #0A84FF 50%, #00E0C3 100%)',
       }
     },
   },

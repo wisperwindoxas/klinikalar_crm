@@ -40,7 +40,7 @@ app.get('/health', (req, res) => {
     status: 'OK',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    service: 'SADAF Clinic Management Platform (Multi-Tenant SaaS)'
+    service: 'klinika-admin Platform (Multi-Tenant SaaS)'
   });
 });
 
@@ -54,14 +54,22 @@ apiRouter.get('/auth/me', authenticateJwt, AuthController.getMe);
 // 2. Super Admin Endpoints (Restricted to SUPER_ADMIN)
 apiRouter.get('/super-admin/dashboard', SuperAdminController.getDashboard);
 apiRouter.get('/super-admin/clinics', SuperAdminController.getClinics);
+apiRouter.get('/super-admin/clinics/:id/details', SuperAdminController.getClinicDetails);
+apiRouter.patch('/super-admin/clinics/:id', SuperAdminController.updateClinic);
+apiRouter.delete('/super-admin/clinics/:id', SuperAdminController.deleteClinic);
 apiRouter.patch('/super-admin/clinics/:id/status', SuperAdminController.updateClinicStatus);
 apiRouter.patch('/super-admin/clinics/:id/plan', SuperAdminController.updateClinicPlan);
+apiRouter.post('/super-admin/clinics/:id/users', SuperAdminController.createClinicUser);
+apiRouter.put('/super-admin/clinics/:id/users/:userId', SuperAdminController.updateClinicUser);
+apiRouter.delete('/super-admin/clinics/:id/users/:userId', SuperAdminController.deleteClinicUser);
+apiRouter.patch('/super-admin/clinics/:id/users/:userId/status', SuperAdminController.toggleClinicUserStatus);
 apiRouter.get('/super-admin/audit-logs', SuperAdminController.getAuditLogs);
 
 // Real Subscriptions & Plans
 apiRouter.get('/super-admin/subscriptions', SuperAdminController.getSubscriptions);
 apiRouter.post('/super-admin/subscriptions/:id/extend', SuperAdminController.extendSubscription);
 apiRouter.patch('/super-admin/subscriptions/:id/status', SuperAdminController.updateSubscriptionStatus);
+apiRouter.patch('/super-admin/subscriptions/:id/sms', SuperAdminController.updateSubscriptionSms);
 apiRouter.post('/super-admin/subscriptions/:id/change-plan', SuperAdminController.changeSubscriptionPlan);
 apiRouter.get('/super-admin/plans', SuperAdminController.getPlans);
 apiRouter.put('/super-admin/plans/:code', SuperAdminController.updatePlan);
@@ -177,6 +185,7 @@ apiRouter.post('/tv/test-call', ClinicQueueController.testCall);
 apiRouter.get('/reports/manager-dashboard', ClinicQueueController.getManagerDashboard);
 apiRouter.get('/clinic/settings', ClinicQueueController.getSettings);
 apiRouter.patch('/clinic/settings', ClinicQueueController.updateSettings);
+apiRouter.get('/clinic/subscription', ClinicQueueController.getSubscription);
 apiRouter.get('/clinic/audit-logs', ClinicQueueController.getAuditLogs);
 
 // 11. Users & Shifts Management
@@ -194,7 +203,7 @@ app.use('/api/v1', apiRouter);
 
 server.listen(config.port, () => {
   console.log(`====================================================`);
-  console.log(`  SADAF SAAS BACKEND ENGINE RUNNING ON PORT ${config.port}`);
+  console.log(`  klinika-admin SAAS BACKEND ENGINE RUNNING ON PORT ${config.port}`);
   console.log(`  Health Check: http://localhost:${config.port}/health`);
   console.log(`  API Base: http://localhost:${config.port}/api/v1`);
   console.log(`====================================================`);

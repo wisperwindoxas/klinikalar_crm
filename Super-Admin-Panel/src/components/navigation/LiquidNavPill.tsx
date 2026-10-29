@@ -278,27 +278,20 @@ export const LiquidNavPill: React.FC<LiquidNavPillProps> = ({ effect, triggerKey
         ))}
       </AnimatePresence>
 
-      {/* Continuous soft fluid water wave shimmer */}
+      {/* Soft fluid water wave shimmer on active switch */}
       <motion.div
         className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12"
         initial={{ x: '-100%' }}
         animate={{ x: '200%' }}
         transition={{
-          repeat: Infinity,
-          duration: 2.6,
-          ease: 'easeInOut',
-          repeatDelay: 2.2,
+          duration: 0.6,
+          ease: 'easeOut',
         }}
       />
 
-      {/* Right droplet indicator with pulse */}
-      <motion.div
-        className="absolute right-2.5 top-1/2 -translate-y-1/2 w-2 h-4 rounded-full bg-white/70 blur-[0.8px] shadow-sm shadow-white"
-        animate={{
-          scaleY: [1, 1.4, 0.9, 1],
-          opacity: [0.7, 1, 0.7],
-        }}
-        transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
+      {/* Right droplet indicator */}
+      <div
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 w-2 h-4 rounded-full bg-white/70 shadow-sm shadow-white"
       />
     </motion.div>
   );

@@ -77,11 +77,18 @@ export class PostgresService {
   // --- DOCTORS ---
   public async getDoctors(specialtyId?: string) {
     let sql = `
-      SELECT d.*, s.name as specialty_name, s.prefix as specialty_prefix,
+      SELECT d.*, 
+             d.display_name as full_name,
+             d.display_name as "fullName",
+             s.name as specialty_name,
+             s.name as specialty,
+             s.prefix as specialty_prefix,
              COALESCE(c.name, d.room_number || '-kabinet') as cabinet_name,
              COALESCE(c.number, d.room_number) as cabinet_number,
              u.username as login,
              u.username,
+             u.raw_password as password,
+             u.raw_password,
              u.phone as user_phone
       FROM doctors d
       LEFT JOIN specialties s ON d.specialty_id = s.id
@@ -101,12 +108,23 @@ export class PostgresService {
 
   public async getDoctorById(id: string) {
     const res = await this.query(`
-      SELECT d.*, s.name as specialty_name, s.prefix as specialty_prefix,
+      SELECT d.*, 
+             d.display_name as full_name,
+             d.display_name as "fullName",
+             s.name as specialty_name,
+             s.name as specialty,
+             s.prefix as specialty_prefix,
              COALESCE(c.name, d.room_number || '-kabinet') as cabinet_name,
-             COALESCE(c.number, d.room_number) as cabinet_number
+             COALESCE(c.number, d.room_number) as cabinet_number,
+             u.username as login,
+             u.username,
+             u.raw_password as password,
+             u.raw_password,
+             u.phone as user_phone
       FROM doctors d
       LEFT JOIN specialties s ON d.specialty_id = s.id
       LEFT JOIN cabinets c ON (d.cabinet_id = c.id OR d.room_number = c.number)
+      LEFT JOIN users u ON d.user_id = u.id
       WHERE d.id = $1
     `, [id]);
     return res.rows[0] || null;
@@ -114,7 +132,12 @@ export class PostgresService {
 
   public async getDoctorByUserId(userId: string) {
     const res = await this.query(`
-      SELECT d.*, s.name as specialty_name, s.prefix as specialty_prefix,
+      SELECT d.*, 
+             d.display_name as full_name,
+             d.display_name as "fullName",
+             s.name as specialty_name,
+             s.name as specialty,
+             s.prefix as specialty_prefix,
              COALESCE(c.name, d.room_number || '-kabinet') as cabinet_name,
              COALESCE(c.number, d.room_number) as cabinet_number
       FROM doctors d
@@ -330,6 +353,12 @@ export class PostgresService {
     // 3. Clean birthDate to avoid invalid date syntax with empty strings
     const cleanBirthDate = data.birthDate && data.birthDate.trim() ? data.birthDate.trim() : null;
 
+    // 4. Normalize gender safely to UPPERCASE ('MALE' | 'FEMALE' | 'OTHER')
+    let cleanGender = data.gender ? String(data.gender).trim().toUpperCase() : 'MALE';
+    if (cleanGender !== 'MALE' && cleanGender !== 'FEMALE' && cleanGender !== 'OTHER') {
+      cleanGender = (cleanGender.startsWith('F') || cleanGender.includes('AYOL')) ? 'FEMALE' : 'MALE';
+    }
+
     const res = await this.query(`
       INSERT INTO patients (id, patient_number, full_name, phone, birth_date, gender, address, notes)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -340,7 +369,7 @@ export class PostgresService {
       data.fullName.trim(),
       data.phone ? data.phone.trim() : null,
       cleanBirthDate,
-      data.gender || 'MALE',
+      cleanGender,
       data.address || null,
       data.notes || null
     ]);
@@ -411,7 +440,7 @@ export class PostgresService {
     if (!patient) throw new Error('Bemor topilmadi.');
 
     // 3. Get Service info
-    const srvRes = await client.query(`SELECT * FROM services WHERE id = $1`, [data.serviceId]);
+    const srvRes = data.serviceId ? await client.query(`SELECT * FROM services WHERE id = $1`, [data.serviceId]) : { rows: [] };
     const service = srvRes.rows[0];
 
     const todayStr = new Date().toISOString().split('T')[0];
@@ -434,6 +463,15 @@ export class PostgresService {
     const countAhead = parseInt(waitRes.rows[0].count, 10);
     const estimatedWait = countAhead * (doctor.avg_consultation_minutes || 15);
 
+    // Verify creator exists in users table to prevent FK constraint failure
+    let validCreatedBy: string | null = null;
+    if (data.createdBy) {
+      const uCheck = await client.query('SELECT id FROM users WHERE id = $1', [data.createdBy]);
+      if (uCheck.rows.length > 0) {
+        validCreatedBy = data.createdBy;
+      }
+    }
+
     // 6. Create appointment record
     const appointmentId = `apt_${uuidv4().substring(0, 8)}`;
     await client.query(`
@@ -446,8 +484,8 @@ export class PostgresService {
       service?.id || null,
       doctor.resolved_cabinet_id || null,
       data.paymentStatus || (service?.payment_policy === 'FREE_OR_EXEMPT' ? 'EXEMPT' : 'UNPAID'),
-      service?.price || (data as any).price || doctor.consultation_price || 0,
-      data.createdBy || null
+      service?.price || (data as any).price || 150000,
+      validCreatedBy || null
     ]);
 
     // 7. Insert queue ticket
@@ -468,18 +506,18 @@ export class PostgresService {
       patient.id,
       service?.id || null,
       doctor.resolved_cabinet_id || null,
-      doctor.display_name,
-      doctor.specialty_name,
-      patient.full_name,
-      patient.phone,
-      doctor.cabinet_number,
+      doctor.display_name || 'Shifokor',
+      doctor.specialty_name || 'Umumiy',
+      patient.full_name || 'Bemor',
+      patient.phone || null,
+      doctor.cabinet_number || doctor.room_number || '1',
       todayStr,
       prefix,
       nextSeq,
       fullNumber,
       data.paymentStatus || (service?.payment_policy === 'FREE_OR_EXEMPT' ? 'EXEMPT' : 'UNPAID'),
       estimatedWait,
-      data.createdBy || null
+      validCreatedBy || null
     ]);
 
     return ticketRes.rows[0];
@@ -490,7 +528,8 @@ export class PostgresService {
     patientId: string;
     items: Array<{
       doctorId: string;
-      serviceId: string;
+      serviceId?: string;
+      price?: number;
     }>;
     payment?: {
       method: string;
@@ -503,6 +542,19 @@ export class PostgresService {
       const shiftRes = await client.query(`SELECT * FROM cash_shifts WHERE status = 'OPEN' LIMIT 1`);
       const activeShift = shiftRes.rows[0];
 
+      // Validate cashier user ID against users table
+      let validCashierId: string | null = null;
+      if (data.cashierId) {
+        const uCheck = await client.query('SELECT id FROM users WHERE id = $1', [data.cashierId]);
+        if (uCheck.rows.length > 0) {
+          validCashierId = data.cashierId;
+        }
+      }
+      if (!validCashierId) {
+        const defaultCashier = await client.query("SELECT id FROM users WHERE role_id = 'role_cashier' LIMIT 1");
+        validCashierId = defaultCashier.rows[0]?.id || null;
+      }
+
       const createdTickets: any[] = [];
       let totalCost = 0;
 
@@ -512,7 +564,7 @@ export class PostgresService {
         const srv = srvRes.rows[0];
         const docRes = await client.query(`SELECT * FROM doctors WHERE id = $1`, [item.doctorId]);
         const doc = docRes.rows[0];
-        const price = Number(srv?.price || (item as any).price || doc?.consultation_price || 0);
+        const price = Number(srv?.price || (item as any).price || 150000);
         totalCost += price;
 
         let paymentStatus = 'UNPAID';
@@ -527,8 +579,8 @@ export class PostgresService {
         const ticket = await this.createTicketAtomic(client, {
           patientId: data.patientId,
           doctorId: item.doctorId,
-          serviceId: item.serviceId,
-          createdBy: data.cashierId,
+          serviceId: item.serviceId || '',
+          createdBy: validCashierId || undefined,
           paymentStatus,
           price
         } as any);
@@ -539,7 +591,7 @@ export class PostgresService {
       let paymentRecord = null;
       if (data.payment && data.payment.amountPaid > 0) {
         const paymentId = `pay_${uuidv4().substring(0, 8)}`;
-        const receiptNumber = `RCP-${Date.now().toString().slice(-6)}`;
+        const receiptNumber = `RCP-${Date.now()}-${uuidv4().substring(0, 4).toUpperCase()}`;
         const payRes = await client.query(`
           INSERT INTO payments (id, patient_id, cashier_id, cash_shift_id, receipt_number, amount, method, status, notes)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -547,7 +599,7 @@ export class PostgresService {
         `, [
           paymentId,
           data.patientId,
-          data.cashierId || null,
+          validCashierId,
           activeShift?.id || null,
           receiptNumber,
           data.payment.amountPaid,
@@ -820,7 +872,7 @@ export class PostgresService {
     `, [todayStr]);
 
     return {
-      clinicName: settings?.clinic_name || 'SADAF TIBBIYOT MARKAZI',
+      clinicName: settings?.clinic_name || 'klinika-admin',
       voiceLanguage: settings?.voice_language || 'uz-UZ',
       settings: settings || null,
       currentCalled: calledRes.rows,
@@ -905,6 +957,14 @@ export class PostgresService {
     const cardPay = parseFloat(pb?.card_sum || '0');
     const onlinePay = parseFloat(pb?.online_sum || '0');
 
+    // Monthly payment total from payments table
+    const monthPayRes = await this.query(`
+      SELECT COALESCE(SUM(amount), 0) as monthly_sum
+      FROM payments
+      WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+    `);
+    const monthlyRevenue = parseFloat(monthPayRes.rows[0]?.monthly_sum || '0');
+
     const stats = statsRes.rows[0];
     const todayTicketsCount = parseInt(stats?.total_today || '0', 10);
     const waitingCount = parseInt(stats?.waiting_count || '0', 10);
@@ -920,6 +980,8 @@ export class PostgresService {
       completedCount,
       cancelledCount,
       totalRevenue: totalPay,
+      todayRevenue: totalPay,
+      monthlyRevenue,
       hourlyTraffic,
       paymentBreakdown: {
         total: totalPay,
@@ -984,9 +1046,9 @@ export class PostgresService {
     // 3. Create user record in users table
     const userId = `usr_${id}`;
     await this.query(`
-      INSERT INTO users (id, full_name, username, password_hash, role_id, phone, is_active)
-      VALUES ($1, $2, $3, $4, 'role_doctor', $5, true)
-    `, [userId, data.displayName, username, passwordHash, data.phone || null]);
+      INSERT INTO users (id, full_name, username, password_hash, raw_password, role_id, phone, is_active)
+      VALUES ($1, $2, $3, $4, $5, 'role_doctor', $6, true)
+    `, [userId, data.displayName, username, passwordHash, rawPassword, data.phone || null]);
 
     // 4. Create doctor record linked to user_id
     const res = await this.query(`
@@ -1047,11 +1109,11 @@ export class PostgresService {
       const passwordHash = bcrypt.hashSync(rawPassword, 10);
 
       await this.query(`
-        INSERT INTO users (id, full_name, username, password_hash, role_id, phone, is_active)
-        VALUES ($1, $2, $3, $4, 'role_doctor', $5, true)
+        INSERT INTO users (id, full_name, username, password_hash, raw_password, role_id, phone, is_active)
+        VALUES ($1, $2, $3, $4, $5, 'role_doctor', $6, true)
         ON CONFLICT (username) DO UPDATE 
-        SET full_name = EXCLUDED.full_name, password_hash = EXCLUDED.password_hash, phone = EXCLUDED.phone
-      `, [userId, data.displayName || docRow?.display_name, username, passwordHash, data.phone || docRow?.phone]);
+        SET full_name = EXCLUDED.full_name, password_hash = EXCLUDED.password_hash, raw_password = EXCLUDED.raw_password, phone = EXCLUDED.phone
+      `, [userId, data.displayName || docRow?.display_name, username, passwordHash, rawPassword, data.phone || docRow?.phone]);
     } else {
       // Update existing user
       let userUpdateSql = 'UPDATE users SET updated_at = CURRENT_TIMESTAMP';
@@ -1073,8 +1135,8 @@ export class PostgresService {
       }
       if (data.password && data.password.trim()) {
         const pHash = bcrypt.hashSync(data.password.trim(), 10);
-        userUpdateSql += `, password_hash = $${pIdx++}`;
-        userParams.push(pHash);
+        userUpdateSql += `, password_hash = $${pIdx++}, raw_password = $${pIdx++}`;
+        userParams.push(pHash, data.password.trim());
       }
       if (data.isActive !== undefined) {
         userUpdateSql += `, is_active = $${pIdx++}`;
@@ -1197,6 +1259,11 @@ export class PostgresService {
 
   // --- PATIENT CRUD ---
   public async updatePatient(id: string, data: { fullName?: string; phone?: string; birthDate?: string; gender?: string; address?: string; notes?: string }) {
+    let cleanGender = data.gender ? String(data.gender).trim().toUpperCase() : undefined;
+    if (cleanGender && cleanGender !== 'MALE' && cleanGender !== 'FEMALE' && cleanGender !== 'OTHER') {
+      cleanGender = (cleanGender.startsWith('F') || cleanGender.includes('AYOL')) ? 'FEMALE' : 'MALE';
+    }
+
     const res = await this.query(`
       UPDATE patients
       SET full_name = COALESCE($1, full_name),
@@ -1208,7 +1275,7 @@ export class PostgresService {
           updated_at = CURRENT_TIMESTAMP
       WHERE id = $7
       RETURNING *
-    `, [data.fullName, data.phone, data.birthDate, data.gender, data.address, data.notes, id]);
+    `, [data.fullName, data.phone, data.birthDate, cleanGender, data.address, data.notes, id]);
     return res.rows[0];
   }
 
@@ -1283,13 +1350,20 @@ export class PostgresService {
       tv_instruction_2: 'tv_instruction_2',
       tvInstruction3: 'tv_instruction_3',
       tv_instruction_3: 'tv_instruction_3',
+      tvSoundEnabled: 'tv_sound_enabled',
+      tv_sound_enabled: 'tv_sound_enabled',
+      printerSettings: 'printer_settings',
+      printer_settings: 'printer_settings',
     };
 
     const seenCols = new Set<string>();
     for (const [key, col] of Object.entries(mapping)) {
       if (data[key] !== undefined && !seenCols.has(col)) {
         fields.push(`${col} = $${idx++}`);
-        values.push(data[key]);
+        const val = (col === 'printer_settings' && typeof data[key] === 'object' && data[key] !== null)
+          ? JSON.stringify(data[key])
+          : data[key];
+        values.push(val);
         seenCols.add(col);
       }
     }
@@ -1674,6 +1748,31 @@ export class PostgresService {
     return res.rows[0];
   }
 
+  public async updateSubscriptionSms(id: string, smsBalance: number, smsEnabled: boolean = true) {
+    const res = await this.query(`
+      UPDATE clinic_subscriptions
+      SET sms_balance = $1,
+          sms_enabled = $2,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+      RETURNING *
+    `, [smsBalance, smsEnabled, id]);
+    return res.rows[0];
+  }
+
+  public async getClinicSubscription(clinicId: string = 'tenant_sadaf_01') {
+    const res = await this.query(`
+      SELECT cs.*, p.name as plan_name, p.price as plan_price, p.billing_cycle, p.features,
+             (cs.end_date - CURRENT_DATE)::int as days_remaining
+      FROM clinic_subscriptions cs
+      LEFT JOIN plans p ON cs.plan_code = p.code
+      WHERE cs.clinic_id = $1 OR cs.id = 'sub_sadaf'
+      ORDER BY cs.created_at DESC
+      LIMIT 1
+    `, [clinicId]);
+    return res.rows[0];
+  }
+
   public async changeSubscriptionPlan(id: string, planCode: string) {
     const planRes = await this.query(`SELECT * FROM plans WHERE code = $1`, [planCode]);
     const plan = planRes.rows[0];
@@ -1758,7 +1857,7 @@ export class PostgresService {
     const res = await this.query(`
       SELECT u.id, u.full_name as name, u.username as email, u.phone,
              COALESCE(r.code, 'ADMIN') as role, u.is_active, u.created_at,
-             'SADAF Markaziy Klinika' as clinic_name
+             'klinika-admin Markaziy Klinika' as clinic_name
       FROM users u
       LEFT JOIN roles r ON u.role_id = r.id
       ORDER BY u.created_at DESC
@@ -1776,7 +1875,7 @@ export class PostgresService {
       VALUES ($1, $2, $3, 'hash_default_secret', $4, $5, true, CURRENT_TIMESTAMP)
       RETURNING id, full_name as name, username as email, phone, is_active, created_at
     `, [id, data.name, username, roleId, data.phone || null]);
-    return { ...res.rows[0], role: data.role, clinic_name: data.clinicName || 'SADAF Markaziy Klinika' };
+    return { ...res.rows[0], role: data.role, clinic_name: data.clinicName || 'klinika-admin Markaziy Klinika' };
   }
 
   public async toggleUserStatus(id: string, isActive: boolean) {

@@ -14,7 +14,7 @@ export const ApiKeysPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    clinicName: 'Sadaf Tibbiyot Markazi',
+    clinicName: 'klinika-admin Markaziy Filiali',
     permissions: 'READ,WRITE'
   });
 
@@ -47,7 +47,7 @@ export const ApiKeysPage: React.FC = () => {
       if (res.data) {
         setKeys([res.data, ...keys]);
         setShowAddModal(false);
-        setForm({ clinicName: 'Sadaf Tibbiyot Markazi', permissions: 'READ,WRITE' });
+        setForm({ clinicName: 'klinika-admin Markaziy Filiali', permissions: 'READ,WRITE' });
       }
     } catch (e: any) {
       alert(e.message || 'Kalit yaratishda xatolik');
@@ -214,7 +214,7 @@ export const ApiKeysPage: React.FC = () => {
 
       {/* Add Key Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 animate-fade-in">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 p-6 space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <h3 className="text-base font-black text-slate-900">Yangi API Kaliti Yaratish</h3>

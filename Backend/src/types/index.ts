@@ -95,9 +95,12 @@ export interface Clinic {
   phone: string;
   email: string;
   address: string;
+  region?: string;
+  district?: string;
   queuePrefix: string;
   settings: Record<string, any>;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Branch {
@@ -245,6 +248,7 @@ export interface Subscription {
   trialEndDate?: string;
   gracePeriodDays: number;
   autoRenew: boolean;
+  createdAt?: string;
 }
 
 export interface Invoice {

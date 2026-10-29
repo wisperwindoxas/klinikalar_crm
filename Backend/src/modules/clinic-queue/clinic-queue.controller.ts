@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
+import { config } from '../../config';
 import { PostgresService } from '../../database/postgres.service';
+import { DatabaseService } from '../../database/database.service';
 import { WebSocketGateway } from '../../websocket/websocket.gateway';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { VoiceService } from '../voice/voice.service';
@@ -189,7 +192,18 @@ export class ClinicQueueController {
         return;
       }
 
-      const cashierId = req.user?.userId || 'usr_cashier1';
+      let cashierId = req.user?.userId;
+      if (!cashierId && req.headers.authorization) {
+        try {
+          const token = req.headers.authorization.replace(/^Bearer\s+/i, '').trim();
+          const decoded: any = jwt.verify(token, config.jwtSecret);
+          cashierId = decoded?.userId;
+        } catch (e) {}
+      }
+      if (!cashierId) {
+        cashierId = 'usr_cashier1';
+      }
+
       const result = await ClinicQueueController.pg.createMultiTicketRegistration({
         patientId,
         items,
@@ -439,6 +453,39 @@ export class ClinicQueueController {
       const updated = await ClinicQueueController.pg.updateSettings(req.body);
       ClinicQueueController.ws.emitTvSettingsUpdated('tenant_sadaf_01', 'branch_sadaf_main', updated);
       res.json({ success: true, message: 'Sozlamalar yangilandi va TV tablosi jonli yangilandi.', data: updated });
+    } catch (e: any) {
+      res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  public static async getSubscription(req: Request, res: Response): Promise<void> {
+    try {
+      const tenantId = (req.query.tenantId as string) || (req.headers['x-tenant-id'] as string) || 'tenant_sadaf_01';
+      let data = await ClinicQueueController.pg.getClinicSubscription(tenantId);
+      if (!data) {
+        const db = DatabaseService.getInstance();
+        const sub = db.getSubscriptionByTenant(tenantId);
+        if (sub) {
+          const clinic = db.getClinicByTenant(tenantId);
+          data = {
+            id: sub.id,
+            clinic_id: sub.tenantId,
+            clinic_name: clinic?.name || 'Klinika',
+            plan_code: sub.planCode,
+            status: sub.status,
+            start_date: sub.startDate,
+            end_date: sub.endDate,
+            days_remaining: Math.ceil((new Date(sub.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
+            plan_name: sub.planCode,
+            plan_price: '0',
+            sms_balance: 1000,
+            sms_enabled: true
+          };
+        } else {
+          data = await ClinicQueueController.pg.getClinicSubscription('tenant_sadaf_01');
+        }
+      }
+      res.json({ success: true, data });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
     }

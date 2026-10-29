@@ -4,17 +4,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiConstants {
   // Default development backend URL
   // On Web: localhost:5001
-  // On Android/Mobile APK: 192.168.100.20:5001 (host machine Wi-Fi IP)
+  // On Android/Mobile APK: 192.168.1.2:5001 (host machine Wi-Fi IP)
   static String baseUrl = kIsWeb 
       ? 'http://localhost:5001/api/v1' 
-      : 'http://192.168.100.20:5001/api/v1';
+      : 'http://192.168.1.2:5001/api/v1';
 
   static Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     final savedUrl = prefs.getString('custom_server_url');
     if (savedUrl != null && savedUrl.isNotEmpty) {
-      if (!kIsWeb && (savedUrl.contains('localhost') || savedUrl.contains('127.0.0.1') || savedUrl.contains('192.168.1.7'))) {
-        baseUrl = 'http://192.168.100.20:5001/api/v1';
+      if (!kIsWeb && (savedUrl.contains('localhost') || savedUrl.contains('127.0.0.1') || savedUrl.contains('192.168.100.20') || savedUrl.contains('192.168.1.7'))) {
+        baseUrl = 'http://192.168.1.2:5001/api/v1';
         await prefs.setString('custom_server_url', baseUrl);
       } else {
         baseUrl = savedUrl;

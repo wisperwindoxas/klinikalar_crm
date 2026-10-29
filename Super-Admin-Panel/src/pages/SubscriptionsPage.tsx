@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   CreditCard, Search, RefreshCw, Calendar, CheckCircle2, AlertTriangle,
   Clock, ShieldAlert, Sparkles, ArrowUpRight, Zap, Check, X, ChevronRight,
-  Filter, MoreHorizontal, Layers, Building2
+  Filter, MoreHorizontal, Layers, Building2, MessageSquare, Shield, Pause, Play, Lock, Unlock
 } from 'lucide-react';
 import { ApiClient } from '../api/client';
 
@@ -18,6 +18,12 @@ export const SubscriptionsPage: React.FC = () => {
   const [extendMonths, setExtendMonths] = useState(1);
   const [changePlanSub, setChangePlanSub] = useState<any | null>(null);
   const [selectedPlanCode, setSelectedPlanCode] = useState('STANDARD');
+  
+  // SMS Modal
+  const [smsModalSub, setSmsModalSub] = useState<any | null>(null);
+  const [smsBalanceInput, setSmsBalanceInput] = useState<number>(1000);
+  const [smsEnabledInput, setSmsEnabledInput] = useState<boolean>(true);
+
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -75,6 +81,19 @@ export const SubscriptionsPage: React.FC = () => {
     try {
       const res = await ApiClient.updateSubscriptionStatus(id, status);
       showToast(res.message || `Holat yangilandi: ${status}`);
+      loadData();
+    } catch (err: any) {
+      showToast(err.message || 'Xatolik yuz berdi');
+    }
+  };
+
+  const handleSaveSms = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!smsModalSub) return;
+    try {
+      const res = await ApiClient.updateSubscriptionSms(smsModalSub.id, smsBalanceInput, smsEnabledInput);
+      showToast(res.message || 'SMS balansi muvaffaqiyatli yangilandi');
+      setSmsModalSub(null);
       loadData();
     } catch (err: any) {
       showToast(err.message || 'Xatolik yuz berdi');
@@ -245,6 +264,7 @@ export const SubscriptionsPage: React.FC = () => {
                 <th className="py-3.5 px-4">Joriy Tarif</th>
                 <th className="py-3.5 px-4">Amal Qilish Muddati</th>
                 <th className="py-3.5 px-4">Qolgan Vaqt</th>
+                <th className="py-3.5 px-4">SMS Balansi</th>
                 <th className="py-3.5 px-4">Holati</th>
                 <th className="py-3.5 px-4 text-right">Amallar</th>
               </tr>
@@ -252,7 +272,7 @@ export const SubscriptionsPage: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
                     <Building2 className="w-10 h-10 mx-auto text-slate-300 mb-2 stroke-1" />
                     <span className="font-bold text-slate-600">Mos keluvchi obuna topilmadi</span>
                   </td>
@@ -308,27 +328,57 @@ export const SubscriptionsPage: React.FC = () => {
                         )}
                       </td>
 
+                      {/* SMS Balansi */}
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-800 text-xs font-mono">
+                            {Number(sub.sms_balance ?? 1000).toLocaleString()} <span className="text-[10px] text-slate-400 font-sans">SMS</span>
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            sub.sms_enabled !== false ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'bg-slate-100 text-slate-500'
+                          }`}>
+                            {sub.sms_enabled !== false ? 'Yoqilgan' : 'O‘chirilgan'}
+                          </span>
+                        </div>
+                      </td>
+
                       <td className="py-4 px-4 whitespace-nowrap">
                         <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
                           sub.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' :
-                          sub.status === 'TRIAL' ? 'bg-amber-100 text-amber-800' :
-                          sub.status === 'EXPIRED' ? 'bg-rose-100 text-rose-800' :
+                          sub.status === 'SUSPENDED' ? 'bg-amber-100 text-amber-800' :
+                          sub.status === 'TRIAL' ? 'bg-blue-100 text-blue-800' :
+                          sub.status === 'BLOCKED' ? 'bg-rose-100 text-rose-800 font-black' :
                           'bg-slate-200 text-slate-700'
                         }`}>
                           {sub.status === 'ACTIVE' ? 'FAOL' :
+                           sub.status === 'SUSPENDED' ? 'TO‘XTATILGAN' :
                            sub.status === 'TRIAL' ? 'SINOV (14 KUN)' :
-                           sub.status === 'EXPIRED' ? 'MUDDATI O‘TGAN' : 'BLOKLANGAN'}
+                           sub.status === 'BLOCKED' ? 'QULFLANGAN' : 'MUDDATI O‘TGAN'}
                         </span>
                       </td>
 
                       <td className="py-4 px-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* SMS Button */}
+                          <button
+                            onClick={() => {
+                              setSmsModalSub(sub);
+                              setSmsBalanceInput(sub.sms_balance ?? 1000);
+                              setSmsEnabledInput(sub.sms_enabled !== false);
+                            }}
+                            className="px-2.5 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                            title="SMS balansini boshqarish"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>SMS</span>
+                          </button>
+
                           <button
                             onClick={() => {
                               setExtendModalSub(sub);
                               setExtendMonths(1);
                             }}
-                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                            className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
                             title="Obunani uzaytirish"
                           >
                             <Calendar className="w-3.5 h-3.5" />
@@ -340,29 +390,59 @@ export const SubscriptionsPage: React.FC = () => {
                               setChangePlanSub(sub);
                               setSelectedPlanCode(sub.plan_code || 'STANDARD');
                             }}
-                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                            className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
                             title="Tarifni o‘zgartirish"
                           >
                             <Layers className="w-3.5 h-3.5" />
                             <span>Tarif</span>
                           </button>
 
-                          {sub.status === 'ACTIVE' ? (
-                            <button
-                              onClick={() => handleUpdateStatus(sub.id, 'BLOCKED')}
-                              className="px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold transition cursor-pointer"
-                              title="Klinikani bloklash"
-                            >
-                              Bloklash
-                            </button>
-                          ) : (
+                          {/* 100% Real To'xtatish & Qulflash amallari */}
+                          {sub.status === 'BLOCKED' ? (
                             <button
                               onClick={() => handleUpdateStatus(sub.id, 'ACTIVE')}
-                              className="px-2.5 py-1.5 text-emerald-600 hover:bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold transition cursor-pointer"
-                              title="Faollashtirish"
+                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-xs"
+                              title="Qulfdan chiqarish va faollashtirish"
                             >
-                              Faol qilish
+                              <Unlock className="w-3.5 h-3.5" />
+                              <span>Qulfdan ochish</span>
                             </button>
+                          ) : sub.status === 'SUSPENDED' ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleUpdateStatus(sub.id, 'ACTIVE')}
+                                className="px-2 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-bold transition cursor-pointer"
+                                title="Qayta faollashtirish"
+                              >
+                                Faollashtirish
+                              </button>
+                              <button
+                                onClick={() => handleUpdateStatus(sub.id, 'BLOCKED')}
+                                className="px-2 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-xl text-xs font-bold transition cursor-pointer"
+                                title="Qulflash"
+                              >
+                                Qulflash
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleUpdateStatus(sub.id, 'SUSPENDED')}
+                                className="px-2 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                                title="Xizmatni vaqtincha to'xtatish"
+                              >
+                                <Pause className="w-3 h-3" />
+                                <span>To'xtatish</span>
+                              </button>
+                              <button
+                                onClick={() => handleUpdateStatus(sub.id, 'BLOCKED')}
+                                className="px-2 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                                title="Klinikani 100% qulflash"
+                              >
+                                <Lock className="w-3 h-3" />
+                                <span>Qulflash</span>
+                              </button>
+                            </div>
                           )}
                         </div>
                       </td>
@@ -377,7 +457,7 @@ export const SubscriptionsPage: React.FC = () => {
 
       {/* MODAL: EXTEND SUBSCRIPTION */}
       {extendModalSub && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-slate-950/70 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="px-6 py-5 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -449,7 +529,7 @@ export const SubscriptionsPage: React.FC = () => {
 
       {/* MODAL: CHANGE PLAN */}
       {changePlanSub && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-slate-950/70 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="px-6 py-5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -509,6 +589,107 @@ export const SubscriptionsPage: React.FC = () => {
                 >
                   <Check className="w-4 h-4" />
                   <span>Tarifni Yangilash</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: SMS MANAGEMENT & BALANCE */}
+      {smsModalSub && (
+        <div className="fixed inset-0 bg-slate-950/70 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-5 bg-gradient-to-r from-teal-600 to-cyan-700 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black">Klinika SMS Balansi</h3>
+                  <p className="text-xs text-teal-100">{smsModalSub.clinic_name}</p>
+                </div>
+              </div>
+              <button onClick={() => setSmsModalSub(null)} className="p-1.5 hover:bg-white/15 rounded-xl text-white/80 hover:text-white transition">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSms} className="p-6 space-y-4">
+              {/* Current Balance Display */}
+              <div className="p-4 bg-teal-50 border border-teal-200 rounded-2xl flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-semibold text-teal-800">Joriy SMS Balansi</div>
+                  <div className="text-2xl font-black text-teal-900 font-mono">
+                    {Number(smsModalSub.sms_balance ?? 1000).toLocaleString()} <span className="text-xs font-bold font-sans">dona</span>
+                  </div>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-teal-500/20 text-teal-700 flex items-center justify-center">
+                  <MessageSquare className="w-6 h-6" />
+                </div>
+              </div>
+
+              {/* Set Balance Input */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Yangi SMS Balansi (dona):</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="100"
+                  value={smsBalanceInput}
+                  onChange={e => setSmsBalanceInput(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-700 transition"
+                />
+              </div>
+
+              {/* Quick Add Buttons */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 mb-1.5">Tezkor to‘ldirish:</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[500, 1000, 2500, 5000].map(addCount => (
+                    <button
+                      key={addCount}
+                      type="button"
+                      onClick={() => setSmsBalanceInput(prev => prev + addCount)}
+                      className="py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition cursor-pointer"
+                    >
+                      +{addCount}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Toggle SMS service enabled */}
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-slate-800">SMS xabarnomalar xizmati</div>
+                  <div className="text-[11px] text-slate-400">Klinika bemorlariga SMS yuborish huquqi</div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={smsEnabledInput}
+                    onChange={e => setSmsEnabledInput(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                </label>
+              </div>
+
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setSmsModalSub(null)}
+                  className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl shadow-md shadow-teal-600/20 flex items-center gap-2 transition cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Saqlash va Yangilash</span>
                 </button>
               </div>
             </form>

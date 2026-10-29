@@ -16,7 +16,7 @@ export const BranchesPage: React.FC = () => {
   const [form, setForm] = useState({
     name: '',
     code: '',
-    clinicName: 'Sadaf Tibbiyot Markazi',
+    clinicName: 'klinika-admin Markaziy Filiali',
     address: '',
     phone: '',
     doctorCount: 5
@@ -54,7 +54,7 @@ export const BranchesPage: React.FC = () => {
         setForm({
           name: '',
           code: '',
-          clinicName: 'Sadaf Tibbiyot Markazi',
+          clinicName: 'klinika-admin Markaziy Filiali',
           address: '',
           phone: '',
           doctorCount: 5
@@ -201,7 +201,7 @@ export const BranchesPage: React.FC = () => {
 
       {/* Add Branch Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 animate-fade-in">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 p-6 space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2">
@@ -222,7 +222,7 @@ export const BranchesPage: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder="Masalan: SADAF Yunusobod filiali"
+                  placeholder="Masalan: Yunusobod filiali"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 focus:outline-none"

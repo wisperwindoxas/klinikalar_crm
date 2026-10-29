@@ -46,6 +46,14 @@ class UserModel {
       role.toUpperCase().contains('VRACH') ||
       (!isCashier && !isManager);
 
+  String get roleTitle {
+    if (isManager) return 'Menejer';
+    if (isCashier) return 'Kassir';
+    return specialtyName != null && specialtyName!.isNotEmpty
+        ? 'Shifokor ($specialtyName)'
+        : 'Shifokor';
+  }
+
   factory UserModel.fromJson(Map<String, dynamic> json) {
     String rawRole = (json['role'] ??
             json['role_code'] ??
