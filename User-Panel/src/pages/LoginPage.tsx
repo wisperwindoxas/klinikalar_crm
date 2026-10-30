@@ -65,18 +65,17 @@ export const LoginPage: React.FC = () => {
     let res = '+998';
     if (digits.length > 0) {
       res += ` (${digits.slice(0, 2)}`;
-      if (digits.length >= 2) {
+      if (digits.length > 2) {
+        res += `) ${digits.slice(2, 5)}`;
+        if (digits.length > 5) {
+          res += `-${digits.slice(5, 7)}`;
+        }
+        if (digits.length > 7) {
+          res += `-${digits.slice(7, 9)}`;
+        }
+      } else if (digits.length === 2) {
         res += `) `;
       }
-    }
-    if (digits.length > 2) {
-      res += digits.slice(2, 5);
-    }
-    if (digits.length > 5) {
-      res += `-${digits.slice(5, 7)}`;
-    }
-    if (digits.length > 7) {
-      res += `-${digits.slice(7, 9)}`;
     }
     return res;
   };
@@ -87,15 +86,26 @@ export const LoginPage: React.FC = () => {
     setError('');
 
     // If empty
-    if (!val) {
+    if (!val || val.trim() === '') {
       setIdentifier('');
+      setInputMode('smart');
       return;
     }
 
     // Check if input is likely a phone number
-    const isPhoneLike = val.startsWith('+') || /^\d/.test(val) || val.startsWith('998');
+    const isPhoneLike = val.startsWith('+') || /^\d/.test(val) || val.startsWith('998') || val.startsWith('(');
 
     if (isPhoneLike) {
+      const rawDigits = val.replace(/\D/g, '');
+      const phoneDigits = rawDigits.startsWith('998') ? rawDigits.slice(3) : rawDigits;
+
+      // Agar raqamlar qolmagan bo'lsa, to'liq tozalaymiz
+      if (phoneDigits.length === 0) {
+        setIdentifier('');
+        setInputMode('smart');
+        return;
+      }
+
       const formatted = formatUzbekPhone(val);
       setIdentifier(formatted);
       setInputMode('phone');
@@ -106,7 +116,54 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  // Caps lock detection
+  // Backspace and Caps lock handling
+  const handleIdentifierKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.getModifierState && e.getModifierState('CapsLock')) {
+      setCapsLockActive(true);
+    } else {
+      setCapsLockActive(false);
+    }
+
+    // Smart Backspace handling for masked phone inputs
+    if (e.key === 'Backspace') {
+      const input = e.currentTarget;
+      const { selectionStart, selectionEnd } = input;
+
+      // Agar butun maydon belgilangan bo'lsa
+      if (selectionStart === 0 && selectionEnd === identifier.length) {
+        setIdentifier('');
+        setInputMode('smart');
+        return;
+      }
+
+      // Agar bitta kursor joylashgan bo'lsa
+      if (selectionStart !== null && selectionStart === selectionEnd && selectionStart > 0) {
+        const charBefore = identifier[selectionStart - 1];
+
+        // Agar kursor oldidagi belgi raqam bo'lmasa (masalan ')', ' ', '-', '(')
+        if (/\D/.test(charBefore)) {
+          e.preventDefault();
+
+          const allDigits = identifier.replace(/\D/g, '');
+          const localDigits = allDigits.startsWith('998') ? allDigits.slice(3) : allDigits;
+
+          if (localDigits.length <= 1) {
+            setIdentifier('');
+            setInputMode('smart');
+            return;
+          }
+
+          // Oxirgi bitta raqamni o'chiramiz va qayta formatlaymiz
+          const remainingDigits = localDigits.slice(0, -1);
+          const formatted = formatUzbekPhone(remainingDigits);
+          setIdentifier(formatted);
+          return;
+        }
+      }
+    }
+  };
+
+  // General key down (e.g. for Caps Lock on password field)
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.getModifierState && e.getModifierState('CapsLock')) {
       setCapsLockActive(true);
@@ -325,7 +382,7 @@ export const LoginPage: React.FC = () => {
                     type="text"
                     value={identifier}
                     onChange={handleIdentifierChange}
-                    onKeyDown={handleKeyDown}
+                    onKeyDown={handleIdentifierKeyDown}
                     placeholder="Masalan: +998 (90) 123-45-67 yoki admin"
                     className={`w-full ${inputMode === 'phone' ? 'pl-16' : 'pl-10'
                       } pr-4 py-3 bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-teal-500 rounded-2xl text-xs sm:text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-teal-500/15 transition-all shadow-sm`}

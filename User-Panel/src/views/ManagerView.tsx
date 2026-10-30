@@ -20,6 +20,7 @@ import { UzbekistanAddressSelect } from '../components/UzbekistanAddressSelect';
 import { TicketIssuedModal } from '../components/TicketIssuedModal';
 import { ElectronDisplaySelector } from '../components/ElectronDisplaySelector';
 import { AppUpdateModal } from '../components/AppUpdateModal';
+import { DateRangeFilter, DatePreset, isDateInRange } from '../components/DateRangeFilter';
 import { APP_LOGO, APP_VERSION } from '../utils/brand';
 import { printThermalTicket } from '../utils/thermalPrinter';
 import * as XLSX from 'xlsx';
@@ -213,6 +214,19 @@ export const ManagerView: React.FC = () => {
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
   const [paymentSearch, setPaymentSearch] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('ALL');
+
+  // Date Range Filters for Bemorlar, Hisobotlar, and To'lovlar
+  const [patientDatePreset, setPatientDatePreset] = useState<DatePreset>('all');
+  const [patientStartDate, setPatientStartDate] = useState('');
+  const [patientEndDate, setPatientEndDate] = useState('');
+
+  const [reportDatePreset, setReportDatePreset] = useState<DatePreset>('all');
+  const [reportStartDate, setReportStartDate] = useState('');
+  const [reportEndDate, setReportEndDate] = useState('');
+
+  const [paymentDatePreset, setPaymentDatePreset] = useState<DatePreset>('all');
+  const [paymentStartDate, setPaymentStartDate] = useState('');
+  const [paymentEndDate, setPaymentEndDate] = useState('');
 
   // Cabinet Edit / Create Modal
   const [isCabinetModalOpen, setIsCabinetModalOpen] = useState(false);
@@ -747,7 +761,8 @@ export const ManagerView: React.FC = () => {
           (p.notes && p.notes.toLowerCase().includes(paymentSearch.toLowerCase())) ||
           (Array.isArray(p.related_tickets) && p.related_tickets.some((t: any) => t.doctor_name?.toLowerCase().includes(paymentSearch.toLowerCase())));
         const matchesMethod = paymentMethodFilter === 'ALL' || p.method === paymentMethodFilter;
-        return matchesSearch && matchesMethod;
+        const matchesDate = isDateInRange(p.created_at, paymentDatePreset, paymentStartDate, paymentEndDate);
+        return matchesSearch && matchesMethod && matchesDate;
       });
 
       const dataToExport = filtered.map((p: any, index: number) => {
@@ -1117,12 +1132,14 @@ export const ManagerView: React.FC = () => {
 
   const exportPatientsToExcel = () => {
     try {
-      const filtered = patientsList.filter(p => 
-        !patientSearch || 
-        p.full_name?.toLowerCase().includes(patientSearch.toLowerCase()) || 
-        p.phone?.includes(patientSearch) ||
-        p.patient_number?.includes(patientSearch)
-      );
+      const filtered = patientsList.filter(p => {
+        const matchesSearch = !patientSearch || 
+          p.full_name?.toLowerCase().includes(patientSearch.toLowerCase()) || 
+          p.phone?.includes(patientSearch) ||
+          p.patient_number?.includes(patientSearch);
+        const matchesDate = isDateInRange(p.created_at, patientDatePreset, patientStartDate, patientEndDate);
+        return matchesSearch && matchesDate;
+      });
 
       const dataToExport = filtered.map((p, index) => {
         const lastDoc = p.last_visit ? `${p.last_visit.doctor_name} (${p.last_visit.specialty_name || ''})` : 'Tashrif yo\'q';
@@ -2911,144 +2928,166 @@ export const ManagerView: React.FC = () => {
           })()}
 
           {/* TAB 3: BEMORLAR (PATIENTS CRUD & VISIT/PAYMENT ANALYTICS) */}
-          {activeTab === 'BEMORLAR' && (
-            <div className="space-y-6">
-              {/* TOP STATS CARDS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                    <Users className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-slate-500">Jami Bemorlar</span>
-                    <h4 className="text-xl font-black text-slate-800">{patientsList.length} <span className="text-xs font-medium text-slate-400">nafar</span></h4>
-                    <span className="text-[11px] text-emerald-600 font-bold">EMR kartasi mavjud</span>
-                  </div>
-                </div>
+          {activeTab === 'BEMORLAR' && (() => {
+            const filteredPatients = patientsList.filter(p => {
+              const matchesSearch = !patientSearch || 
+                p.full_name?.toLowerCase().includes(patientSearch.toLowerCase()) || 
+                p.phone?.includes(patientSearch) ||
+                p.patient_number?.includes(patientSearch);
+              const matchesDate = isDateInRange(p.created_at, patientDatePreset, patientStartDate, patientEndDate);
+              return matchesSearch && matchesDate;
+            });
 
-                <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                    <Stethoscope className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-slate-500">Jami Qabullar (Tashriflar)</span>
-                    <h4 className="text-xl font-black text-slate-800">
-                      {patientsList.reduce((acc, p) => acc + Number(p.total_visits || 0), 0)}{' '}
-                      <span className="text-xs font-medium text-slate-400">marta</span>
-                    </h4>
-                    <span className="text-[11px] text-indigo-600 font-bold">Barcha shifokorlar qabuli</span>
-                  </div>
-                </div>
+            const totalVisitsCount = filteredPatients.reduce((acc, p) => acc + Number(p.total_visits || 0), 0);
+            const totalRevenueCount = filteredPatients.reduce((acc, p) => acc + Number(p.total_paid || 0), 0);
+            const activePatientsCount = filteredPatients.filter(p => Number(p.total_visits || 0) > 0).length;
 
-                <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                    <Wallet className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-slate-500">Jami To'lovlar (Klinika Kirimi)</span>
-                    <h4 className="text-lg font-black text-emerald-600 font-mono">
-                      {patientsList.reduce((acc, p) => acc + Number(p.total_paid || 0), 0).toLocaleString()}{' '}
-                      <span className="text-xs font-sans text-slate-500 font-semibold">so'm</span>
-                    </h4>
-                    <span className="text-[11px] text-emerald-700 font-bold">Bemorlar to'lovlari</span>
-                  </div>
-                </div>
+            return (
+              <div className="space-y-6">
+                {/* DATE RANGE FILTER (Bugun, Kecha, 1 hafta, 1 oy, Barchasi) */}
+                <DateRangeFilter
+                  preset={patientDatePreset}
+                  startDate={patientStartDate}
+                  endDate={patientEndDate}
+                  onPresetChange={setPatientDatePreset}
+                  onDateChange={(start, end) => {
+                    setPatientStartDate(start);
+                    setPatientEndDate(end);
+                  }}
+                  totalCount={filteredPatients.length}
+                  countLabel="nafar bemor"
+                />
 
-                <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                    <Activity className="w-6 h-6" />
+                {/* TOP STATS CARDS */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                      <Users className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-semibold text-slate-500">Jami Bemorlar</span>
+                      <h4 className="text-xl font-black text-slate-800">{filteredPatients.length} <span className="text-xs font-medium text-slate-400">nafar</span></h4>
+                      <span className="text-[11px] text-emerald-600 font-bold">EMR kartasi mavjud</span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-xs font-semibold text-slate-500">Qabulda Bo'lgan Bemorlar</span>
-                    <h4 className="text-xl font-black text-slate-800">
-                      {patientsList.filter(p => Number(p.total_visits || 0) > 0).length}{' '}
-                      <span className="text-xs font-medium text-slate-400">ta</span>
-                    </h4>
-                    <span className="text-[11px] text-purple-600 font-bold">
-                      {patientsList.length > 0
-                        ? `${Math.round((patientsList.filter(p => Number(p.total_visits || 0) > 0).length / patientsList.length) * 100)}% faollik`
-                        : '0% faollik'}
-                    </span>
-                  </div>
-                </div>
-              </div>
 
-              {/* TABLE CONTAINER */}
-              <div className="space-y-4 bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-bold text-[#172B4D]">Bemorlar Bazasi (EMR)</h3>
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700">
-                        {patientsList.length} bemor
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                      <Stethoscope className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-semibold text-slate-500">Jami Qabullar (Tashriflar)</span>
+                      <h4 className="text-xl font-black text-slate-800">
+                        {totalVisitsCount}{' '}
+                        <span className="text-xs font-medium text-slate-400">marta</span>
+                      </h4>
+                      <span className="text-[11px] text-indigo-600 font-bold">Barcha shifokorlar qabuli</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                      <Wallet className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-semibold text-slate-500">Jami To'lovlar (Klinika Kirimi)</span>
+                      <h4 className="text-lg font-black text-emerald-600 font-mono">
+                        {totalRevenueCount.toLocaleString()}{' '}
+                        <span className="text-xs font-sans text-slate-500 font-semibold">so'm</span>
+                      </h4>
+                      <span className="text-[11px] text-emerald-700 font-bold">Bemorlar to'lovlari</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                      <Activity className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-semibold text-slate-500">Qabulda Bo'lgan Bemorlar</span>
+                      <h4 className="text-xl font-black text-slate-800">
+                        {activePatientsCount}{' '}
+                        <span className="text-xs font-medium text-slate-400">ta</span>
+                      </h4>
+                      <span className="text-[11px] text-purple-600 font-bold">
+                        {filteredPatients.length > 0
+                          ? `${Math.round((activePatientsCount / filteredPatients.length) * 100)}% faollik`
+                          : '0% faollik'}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Bemorga bosing: qaysi shifokorda necha marta bo'lganligi, to'lovlari va oxirgi qabuli to'liq chiqadi
-                    </p>
-                  </div>
-
-                  <div className="flex items-center flex-wrap gap-2.5">
-                    <div className="relative">
-                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                      <input
-                        type="text"
-                        placeholder="Ism, telefon yoki karta №..."
-                        value={patientSearch}
-                        onChange={e => setPatientSearch(e.target.value)}
-                        className="pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium w-64 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
-                      />
-                    </div>
-                    <button
-                      onClick={exportPatientsToExcel}
-                      className="px-3.5 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-xs font-bold rounded-xl flex items-center gap-2 transition cursor-pointer"
-                      title="Barcha bemorlar ro'yxatini Excel (.xlsx) formatida yuklab olish"
-                    >
-                      <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                      <span>Excelga yuklash</span>
-                    </button>
-                    <button
-                      onClick={() => setIsNewPatientModalOpen(true)}
-                      className="px-4 py-2 bg-[#0084FF] text-white text-xs font-bold rounded-xl flex items-center gap-2 hover:bg-blue-600 transition shadow-xs cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Yangi bemor</span>
-                    </button>
                   </div>
                 </div>
 
-                <div 
-                  className="overflow-x-auto rounded-2xl border border-slate-100 max-h-[620px] overflow-y-auto"
-                  onScroll={(e) => {
-                    const target = e.currentTarget;
-                    if (target.scrollTop + target.clientHeight >= target.scrollHeight - 60) {
-                      setVisibleManagerPatientsCount(prev => prev + 15);
-                    }
-                  }}
-                >
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold uppercase tracking-wider sticky top-0 z-10">
-                        <th className="py-3 px-3.5">Karta №</th>
-                        <th className="py-3 px-3.5">Bemor F.I.Sh.</th>
-                        <th className="py-3 px-3.5">Telefon</th>
-                        <th className="py-3 px-3.5">Oxirgi Shifokor Ko'rigi</th>
-                        <th className="py-3 px-3.5 text-center">Qabullar</th>
-                        <th className="py-3 px-3.5 text-right">Jami To'lov</th>
-                        <th className="py-3 px-3.5">Yashash Manzili</th>
-                        <th className="py-3 px-3.5 text-right">Amallar</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {patientsList
-                        .filter(p => 
-                          !patientSearch || 
-                          p.full_name?.toLowerCase().includes(patientSearch.toLowerCase()) || 
-                          p.phone?.includes(patientSearch) ||
-                          p.patient_number?.includes(patientSearch)
-                        )
-                        .slice(0, visibleManagerPatientsCount)
-                        .map((p: any) => {
+                {/* TABLE CONTAINER */}
+                <div className="space-y-4 bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-[#172B4D]">Bemorlar Bazasi (EMR)</h3>
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700">
+                          {filteredPatients.length} bemor
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Bemorga bosing: qaysi shifokorda necha marta bo'lganligi, to'lovlari va oxirgi qabuli to'liq chiqadi
+                      </p>
+                    </div>
+
+                    <div className="flex items-center flex-wrap gap-2.5">
+                      <div className="relative">
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                        <input
+                          type="text"
+                          placeholder="Ism, telefon yoki karta №..."
+                          value={patientSearch}
+                          onChange={e => setPatientSearch(e.target.value)}
+                          className="pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium w-64 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
+                        />
+                      </div>
+                      <button
+                        onClick={exportPatientsToExcel}
+                        className="px-3.5 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-xs font-bold rounded-xl flex items-center gap-2 transition cursor-pointer"
+                        title="Barcha bemorlar ro'yxatini Excel (.xlsx) formatida yuklab olish"
+                      >
+                        <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                        <span>Excelga yuklash</span>
+                      </button>
+                      <button
+                        onClick={() => setIsNewPatientModalOpen(true)}
+                        className="px-4 py-2 bg-[#0084FF] text-white text-xs font-bold rounded-xl flex items-center gap-2 hover:bg-blue-600 transition shadow-xs cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Yangi bemor</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div 
+                    className="overflow-x-auto rounded-2xl border border-slate-100 max-h-[620px] overflow-y-auto"
+                    onScroll={(e) => {
+                      const target = e.currentTarget;
+                      if (target.scrollTop + target.clientHeight >= target.scrollHeight - 60) {
+                        setVisibleManagerPatientsCount(prev => prev + 15);
+                      }
+                    }}
+                  >
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold uppercase tracking-wider sticky top-0 z-10">
+                          <th className="py-3 px-3.5">Karta №</th>
+                          <th className="py-3 px-3.5">Bemor F.I.Sh.</th>
+                          <th className="py-3 px-3.5">Telefon</th>
+                          <th className="py-3 px-3.5">Oxirgi Shifokor Ko'rigi</th>
+                          <th className="py-3 px-3.5 text-center">Qabullar</th>
+                          <th className="py-3 px-3.5 text-right">Jami To'lov</th>
+                          <th className="py-3 px-3.5">Yashash Manzili</th>
+                          <th className="py-3 px-3.5 text-right">Amallar</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredPatients
+                          .slice(0, visibleManagerPatientsCount)
+                          .map((p: any) => {
                           const lastDoc = p.last_visit;
                           const visitCount = Number(p.total_visits || 0);
                           const totalPaid = Number(p.total_paid || 0);
@@ -3156,20 +3195,21 @@ export const ManagerView: React.FC = () => {
                         })}
                     </tbody>
                   </table>
-                  {visibleManagerPatientsCount < patientsList.length && (
+                  {visibleManagerPatientsCount < filteredPatients.length && (
                     <div className="p-3 text-center border-t border-slate-100 bg-slate-50">
                       <button
                         onClick={() => setVisibleManagerPatientsCount(prev => prev + 15)}
                         className="px-4 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-xs font-semibold text-slate-600 transition shadow-sm"
                       >
-                        Qolgan bemorlarni yuklash ({visibleManagerPatientsCount} / {patientsList.length})
+                        Qolgan bemorlarni yuklash ({visibleManagerPatientsCount} / {filteredPatients.length})
                       </button>
                     </div>
                   )}
                 </div>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* TAB 4: SHIFOKORLAR (DOCTORS CRUD) */}
           {activeTab === 'SHIFOKORLAR' && (
@@ -3764,7 +3804,11 @@ export const ManagerView: React.FC = () => {
 
           {/* TAB 7: TO'LOVLAR (PAYMENTS JOURNAL WITH DOCTOR DETAIL & REAL XLSX EXPORT) */}
           {activeTab === 'TOLOVLAR' && (() => {
-            const filteredPayments = paymentsList.filter(p => {
+            const dateFilteredPayments = paymentsList.filter(p =>
+              isDateInRange(p.created_at, paymentDatePreset, paymentStartDate, paymentEndDate)
+            );
+
+            const filteredPayments = dateFilteredPayments.filter(p => {
               const matchesSearch = !paymentSearch || 
                 p.patient_name?.toLowerCase().includes(paymentSearch.toLowerCase()) ||
                 p.receipt_number?.toLowerCase().includes(paymentSearch.toLowerCase()) ||
@@ -3778,10 +3822,10 @@ export const ManagerView: React.FC = () => {
               return matchesSearch && matchesMethod;
             });
 
-            const totalSum = paymentsList.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
-            const cashPayments = paymentsList.filter(p => p.method === 'CASH');
+            const totalSum = dateFilteredPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+            const cashPayments = dateFilteredPayments.filter(p => p.method === 'CASH');
             const cashSum = cashPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
-            const cardPayments = paymentsList.filter(p => p.method === 'CARD');
+            const cardPayments = dateFilteredPayments.filter(p => p.method === 'CARD');
             const cardSum = cardPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
 
             return (
@@ -3812,11 +3856,25 @@ export const ManagerView: React.FC = () => {
                     </button>
 
                     <div className="px-5 py-2 bg-white/20 hover:bg-white/25 backdrop-blur-md rounded-2xl text-right border border-white/30 shadow-sm transition">
-                      <div className="text-[10px] text-white/90 font-bold uppercase tracking-wider">Jami tushum</div>
+                      <div className="text-[10px] text-white/90 font-bold uppercase tracking-wider">Tanlangan davr tushumi</div>
                       <div className="text-lg font-black text-white font-mono drop-shadow-xs">{totalSum.toLocaleString()} so'm</div>
                     </div>
                   </div>
                 </div>
+
+                {/* DATE RANGE FILTER (Bugun, Kecha, 1 hafta, 1 oy, Barchasi) */}
+                <DateRangeFilter
+                  preset={paymentDatePreset}
+                  startDate={paymentStartDate}
+                  endDate={paymentEndDate}
+                  onPresetChange={setPaymentDatePreset}
+                  onDateChange={(start, end) => {
+                    setPaymentStartDate(start);
+                    setPaymentEndDate(end);
+                  }}
+                  totalCount={filteredPayments.length}
+                  countLabel="ta to'lov"
+                />
 
                 {/* 4 Financial KPI Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -3862,7 +3920,7 @@ export const ManagerView: React.FC = () => {
                     </div>
                     <div>
                       <div className="text-[11px] font-bold text-slate-400">Jami cheklar soni</div>
-                      <div className="text-xl font-black text-slate-800">{paymentsList.length} ta chek</div>
+                      <div className="text-xl font-black text-slate-800">{dateFilteredPayments.length} ta chek</div>
                     </div>
                   </div>
                 </div>
@@ -4258,73 +4316,138 @@ export const ManagerView: React.FC = () => {
           )}
 
           {/* TAB 9: HISOBOTLAR (100% REAL METRICS FROM POSTGRESQL) */}
-          {activeTab === 'HISOBOTLAR' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-bold text-[#172B4D]">Klinika Umumiy Hisobotlari</h3>
-                <p className="text-xs text-slate-500">Bugungi tibbiy, moliyaviy va shifokorlar bo'yicha real ko'rsatkichlar</p>
-              </div>
+          {activeTab === 'HISOBOTLAR' && (() => {
+            const reportFilteredTickets = allTicketsList.filter(t => 
+              isDateInRange(t.created_at || t.queue_date, reportDatePreset, reportStartDate, reportEndDate)
+            );
 
-              {/* 4 Summary Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <div className="p-5 bg-white border border-slate-200/90 rounded-3xl shadow-sm">
-                  <div className="text-xs font-bold text-blue-600">Bugungi umumiy qabullar</div>
-                  <div className="text-3xl font-black text-[#172B4D] mt-1 font-mono">{todayTotal} ta</div>
-                  <div className="text-[11px] text-slate-400 mt-1">Barcha shifokorlarga</div>
-                </div>
+            const reportFilteredPayments = paymentsList.filter(p => 
+              isDateInRange(p.created_at, reportDatePreset, reportStartDate, reportEndDate)
+            );
 
-                <div className="p-5 bg-white border border-slate-200/90 rounded-3xl shadow-sm">
-                  <div className="text-xs font-bold text-amber-600">Kutilayotgan navbatlar</div>
-                  <div className="text-3xl font-black text-amber-600 mt-1 font-mono">{waitingTotal} ta</div>
-                  <div className="text-[11px] text-slate-400 mt-1">Zalda kutmoqda</div>
-                </div>
+            const reportTotal = reportFilteredTickets.length;
+            const reportWaiting = reportFilteredTickets.filter(t => t.status === 'WAITING').length;
+            const reportCompleted = reportFilteredTickets.filter(t => t.status === 'COMPLETED').length;
 
-                <div className="p-5 bg-white border border-slate-200/90 rounded-3xl shadow-sm">
-                  <div className="text-xs font-bold text-purple-600">Qabul yakunlangan</div>
-                  <div className="text-3xl font-black text-purple-600 mt-1 font-mono">{completedTotal} ta</div>
-                  <div className="text-[11px] text-slate-400 mt-1">Xizmat ko'rsatildi</div>
-                </div>
+            const repTotalSum = reportFilteredPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+            const repCashSum = reportFilteredPayments.filter(p => p.method === 'CASH').reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+            const repCardSum = reportFilteredPayments.filter(p => p.method === 'CARD').reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
 
-                <div className="p-5 bg-white border border-slate-200/90 rounded-3xl shadow-sm">
-                  <div className="text-xs font-bold text-emerald-600">Jami tushum (Kassa)</div>
-                  <div className="text-3xl font-black text-emerald-700 mt-1 font-mono">
-                    {Number(pb.total).toLocaleString()} so'm
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-1">
-                    Naqd: {Number(pb.cash).toLocaleString()} | Karta: {Number(pb.card).toLocaleString()}
-                  </div>
-                </div>
-              </div>
+            const doctorPerformanceList = (doctorsList || []).map((doc: any) => {
+              const docTickets = reportFilteredTickets.filter((t: any) => 
+                t.doctor_id === doc.id || 
+                t.doctor_name?.toLowerCase() === doc.display_name?.toLowerCase() ||
+                t.doctor_name?.toLowerCase() === doc.fullName?.toLowerCase()
+              );
+              const waiting = docTickets.filter((t: any) => t.status === 'WAITING').length;
+              const inProgress = docTickets.filter((t: any) => t.status === 'IN_PROGRESS' || t.status === 'CALLED').length;
+              const completed = docTickets.filter((t: any) => t.status === 'COMPLETED').length;
 
-              {/* Doctors Performance Table */}
-              <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              const docPayments = reportFilteredPayments.filter((p: any) => {
+                if (p.doctor_id === doc.id) return true;
+                if (Array.isArray(p.related_tickets)) {
+                  return p.related_tickets.some((rt: any) => 
+                    rt.doctor_id === doc.id || 
+                    rt.doctor_name?.toLowerCase() === doc.display_name?.toLowerCase()
+                  );
+                }
+                return false;
+              });
+              const totalRev = docPayments.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
+
+              return {
+                ...doc,
+                waiting,
+                in_progress: inProgress,
+                completed,
+                total_tickets: docTickets.length,
+                total_revenue: totalRev
+              };
+            });
+
+            return (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <h4 className="text-sm font-bold text-[#172B4D]">Shifokorlar ish yuki, qabullar va tushumlar hisoboti</h4>
-                    <p className="text-xs text-slate-500">Ixtiyoriy shifokor ustiga bosing: uning kutayotgan bemorlari, qabul qilganlari, tushumi va bemorlar jurnali ochiladi</p>
+                    <h3 className="text-lg font-bold text-[#172B4D]">Klinika Umumiy Hisobotlari</h3>
+                    <p className="text-xs text-slate-500">Tibbiy, moliyaviy va shifokorlar bo'yicha real vaqt ko'rsatkichlari</p>
                   </div>
-                  <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100 flex items-center gap-1.5 self-start">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Real vaqt statistikasi</span>
-                  </span>
                 </div>
 
-                <div className="overflow-x-auto rounded-2xl border border-slate-100">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
-                        <th className="py-3 px-4">Shifokor F.I.Sh.</th>
-                        <th className="py-3 px-4">Mutaxassislik</th>
-                        <th className="py-3 px-4">Kabinet</th>
-                        <th className="py-3 px-4">Kutayotganlar</th>
-                        <th className="py-3 px-4">Qabuldagilar</th>
-                        <th className="py-3 px-4">Qabul qilganlar</th>
-                        <th className="py-3 px-4">Shu shifokordan tushum</th>
-                        <th className="py-3 px-4 text-right">Batafsil</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {(dashboardData?.doctorsLoad || doctorsList).map((doc: any) => {
+                {/* DATE RANGE FILTER (Bugun, Kecha, 1 hafta, 1 oy, Barchasi) */}
+                <DateRangeFilter
+                  preset={reportDatePreset}
+                  startDate={reportStartDate}
+                  endDate={reportEndDate}
+                  onPresetChange={setReportDatePreset}
+                  onDateChange={(start, end) => {
+                    setReportStartDate(start);
+                    setReportEndDate(end);
+                  }}
+                  totalCount={reportTotal}
+                  countLabel="ta qabul"
+                />
+
+                {/* 4 Summary Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="p-5 bg-white border border-slate-200/90 rounded-3xl shadow-sm">
+                    <div className="text-xs font-bold text-blue-600">Umumiy qabullar</div>
+                    <div className="text-3xl font-black text-[#172B4D] mt-1 font-mono">{reportTotal} ta</div>
+                    <div className="text-[11px] text-slate-400 mt-1">Barcha shifokorlarga</div>
+                  </div>
+
+                  <div className="p-5 bg-white border border-slate-200/90 rounded-3xl shadow-sm">
+                    <div className="text-xs font-bold text-amber-600">Kutilayotgan navbatlar</div>
+                    <div className="text-3xl font-black text-amber-600 mt-1 font-mono">{reportWaiting} ta</div>
+                    <div className="text-[11px] text-slate-400 mt-1">Zalda kutmoqda</div>
+                  </div>
+
+                  <div className="p-5 bg-white border border-slate-200/90 rounded-3xl shadow-sm">
+                    <div className="text-xs font-bold text-purple-600">Qabul yakunlangan</div>
+                    <div className="text-3xl font-black text-purple-600 mt-1 font-mono">{reportCompleted} ta</div>
+                    <div className="text-[11px] text-slate-400 mt-1">Xizmat ko'rsatildi</div>
+                  </div>
+
+                  <div className="p-5 bg-white border border-slate-200/90 rounded-3xl shadow-sm">
+                    <div className="text-xs font-bold text-emerald-600">Jami tushum (Kassa)</div>
+                    <div className="text-3xl font-black text-emerald-700 mt-1 font-mono">
+                      {repTotalSum.toLocaleString()} so'm
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-1">
+                      Naqd: {repCashSum.toLocaleString()} | Karta: {repCardSum.toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Doctors Performance Table */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-sm font-bold text-[#172B4D]">Shifokorlar ish yuki, qabullar va tushumlar hisoboti</h4>
+                      <p className="text-xs text-slate-500">Ixtiyoriy shifokor ustiga bosing: uning kutayotgan bemorlari, qabul qilganlari, tushumi va bemorlar jurnali ochiladi</p>
+                    </div>
+                    <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100 flex items-center gap-1.5 self-start">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Real vaqt statistikasi</span>
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                          <th className="py-3 px-4">Shifokor F.I.Sh.</th>
+                          <th className="py-3 px-4">Mutaxassislik</th>
+                          <th className="py-3 px-4">Kabinet</th>
+                          <th className="py-3 px-4">Kutayotganlar</th>
+                          <th className="py-3 px-4">Qabuldagilar</th>
+                          <th className="py-3 px-4">Qabul qilganlar</th>
+                          <th className="py-3 px-4">Shu shifokordan tushum</th>
+                          <th className="py-3 px-4 text-right">Batafsil</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {doctorPerformanceList.map((doc: any) => {
                         const waiting = Number(doc.waiting || 0);
                         const inProgress = Number(doc.in_progress || 0);
                         const completed = Number(doc.completed || 0);
@@ -4407,7 +4530,8 @@ export const ManagerView: React.FC = () => {
                 </div>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* TAB 10: TV TABLOSI VA OVOZLI E'LON SOZLAMALARI (TO'LIQ BOSHQARUV) */}
           {activeTab === 'TV_TABLOSI' && (
