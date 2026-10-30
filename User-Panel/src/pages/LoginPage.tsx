@@ -17,7 +17,8 @@ import {
   HeartPulse,
   Sparkles,
   Building2,
-  LockKeyhole
+  LockKeyhole,
+  X
 } from 'lucide-react';
 import { UserApiClient } from '../api/client';
 import { APP_LOGO } from '../utils/brand';
@@ -59,7 +60,7 @@ export const LoginPage: React.FC = () => {
     digits = digits.slice(0, 9);
 
     if (digits.length === 0) {
-      return '';
+      return '+998 ';
     }
 
     let res = '+998';
@@ -87,22 +88,27 @@ export const LoginPage: React.FC = () => {
 
     // If empty
     if (!val || val.trim() === '') {
+      if (inputMode === 'phone') {
+        // Telefon rejimida bo'lsa +998 o'chmasin
+        setIdentifier('+998 ');
+        return;
+      }
       setIdentifier('');
       setInputMode('smart');
       return;
     }
 
     // Check if input is likely a phone number
-    const isPhoneLike = val.startsWith('+') || /^\d/.test(val) || val.startsWith('998') || val.startsWith('(');
+    const isPhoneLike = val.startsWith('+') || /^\d/.test(val) || val.startsWith('998') || val.startsWith('(') || inputMode === 'phone';
 
     if (isPhoneLike) {
       const rawDigits = val.replace(/\D/g, '');
       const phoneDigits = rawDigits.startsWith('998') ? rawDigits.slice(3) : rawDigits;
 
-      // Agar raqamlar qolmagan bo'lsa, to'liq tozalaymiz
+      // Agar raqamlar qolmagan bo'lsa ham +998 saqlanadi
       if (phoneDigits.length === 0) {
-        setIdentifier('');
-        setInputMode('smart');
+        setIdentifier('+998 ');
+        setInputMode('phone');
         return;
       }
 
@@ -116,7 +122,7 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  // Backspace and Caps lock handling
+  // Backspace, Delete and Caps lock handling
   const handleIdentifierKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.getModifierState && e.getModifierState('CapsLock')) {
       setCapsLockActive(true);
@@ -124,39 +130,55 @@ export const LoginPage: React.FC = () => {
       setCapsLockActive(false);
     }
 
-    // Smart Backspace handling for masked phone inputs
-    if (e.key === 'Backspace') {
+    // Telefon rejimida +998 o'chib ketishidan himoyalash
+    if (inputMode === 'phone') {
       const input = e.currentTarget;
       const { selectionStart, selectionEnd } = input;
 
-      // Agar butun maydon belgilangan bo'lsa
-      if (selectionStart === 0 && selectionEnd === identifier.length) {
-        setIdentifier('');
-        setInputMode('smart');
-        return;
-      }
-
-      // Agar bitta kursor joylashgan bo'lsa
-      if (selectionStart !== null && selectionStart === selectionEnd && selectionStart > 0) {
-        const charBefore = identifier[selectionStart - 1];
-
-        // Agar kursor oldidagi belgi raqam bo'lmasa (masalan ')', ' ', '-', '(')
-        if (/\D/.test(charBefore)) {
+      // 1. Backspace bosilganda
+      if (e.key === 'Backspace') {
+        // Agar butun maydon belgilangan bo'lsa, uni to'liq o'chirmasdan +998 ga qaytaradi
+        if (selectionStart === 0 && selectionEnd === identifier.length) {
           e.preventDefault();
+          setIdentifier('+998 ');
+          return;
+        }
 
-          const allDigits = identifier.replace(/\D/g, '');
-          const localDigits = allDigits.startsWith('998') ? allDigits.slice(3) : allDigits;
+        // Agar kursor +998 qismida (0-5 indeksda) bo'lsa, o'chirish taqiqlanadi
+        if (selectionStart !== null && selectionStart <= 5 && selectionEnd !== null && selectionEnd <= 5) {
+          e.preventDefault();
+          return;
+        }
 
-          if (localDigits.length <= 1) {
-            setIdentifier('');
-            setInputMode('smart');
+        // Agar kursor bitta nuqtada tursa
+        if (selectionStart !== null && selectionStart === selectionEnd && selectionStart > 0) {
+          const charBefore = identifier[selectionStart - 1];
+
+          // Agar kursor oldidagi belgi raqam bo'lmasa (masalan ')', ' ', '-', '(')
+          if (/\D/.test(charBefore)) {
+            e.preventDefault();
+
+            const allDigits = identifier.replace(/\D/g, '');
+            const localDigits = allDigits.startsWith('998') ? allDigits.slice(3) : allDigits;
+
+            if (localDigits.length <= 1) {
+              setIdentifier('+998 ');
+              return;
+            }
+
+            // Oxirgi bitta raqamni o'chiramiz va qayta formatlaymiz
+            const remainingDigits = localDigits.slice(0, -1);
+            const formatted = formatUzbekPhone(remainingDigits);
+            setIdentifier(formatted);
             return;
           }
+        }
+      }
 
-          // Oxirgi bitta raqamni o'chiramiz va qayta formatlaymiz
-          const remainingDigits = localDigits.slice(0, -1);
-          const formatted = formatUzbekPhone(remainingDigits);
-          setIdentifier(formatted);
+      // 2. Delete bosilsa va kursor +998 qismida bo'lsa (0-4)
+      if (e.key === 'Delete') {
+        if (selectionStart !== null && selectionStart < 5 && selectionEnd !== null && selectionEnd <= 5) {
+          e.preventDefault();
           return;
         }
       }
@@ -177,10 +199,20 @@ export const LoginPage: React.FC = () => {
     e.preventDefault();
 
     const cleanIdentifier = identifier.trim();
-    if (!cleanIdentifier) {
+    if (!cleanIdentifier || cleanIdentifier === '+998') {
       setError('Telefon raqam yoki loginni kiriting');
       return;
     }
+
+    if (inputMode === 'phone') {
+      const rawDigits = cleanIdentifier.replace(/\D/g, '');
+      const localDigits = rawDigits.startsWith('998') ? rawDigits.slice(3) : rawDigits;
+      if (localDigits.length < 9) {
+        setError('Telefon raqamini to‘liq kiriting (masalan: +998 90 123-45-67)');
+        return;
+      }
+    }
+
     if (!password.trim()) {
       setError('Parolni kiriting');
       return;
@@ -361,9 +393,22 @@ export const LoginPage: React.FC = () => {
                     )}
                   </label>
                   {inputMode === 'phone' && (
-                    <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200/60">
-                      🇺🇿 O'zbekiston (+998)
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200/60">
+                        🇺🇿 O'zbekiston (+998)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIdentifier('');
+                          setInputMode('username');
+                          setError('');
+                        }}
+                        className="text-[11px] font-semibold text-teal-600 hover:text-teal-700 hover:underline cursor-pointer"
+                      >
+                        Loginga o'tish
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -385,8 +430,23 @@ export const LoginPage: React.FC = () => {
                     onKeyDown={handleIdentifierKeyDown}
                     placeholder="Masalan: +998 (90) 123-45-67 yoki admin"
                     className={`w-full ${inputMode === 'phone' ? 'pl-16' : 'pl-10'
-                      } pr-4 py-3 bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-teal-500 rounded-2xl text-xs sm:text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-teal-500/15 transition-all shadow-sm`}
+                      } pr-10 py-3 bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-teal-500 rounded-2xl text-xs sm:text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-teal-500/15 transition-all shadow-sm`}
                   />
+
+                  {identifier && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIdentifier('');
+                        setInputMode('smart');
+                        setError('');
+                      }}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 rounded-full transition cursor-pointer"
+                      title="Tozalash"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
 
