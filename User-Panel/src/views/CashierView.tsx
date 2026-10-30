@@ -168,6 +168,7 @@ export const CashierView: React.FC = () => {
   const [isXReportModalOpen, setIsXReportModalOpen] = useState(false);
   const [issuedResult, setIssuedResult] = useState<any>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [settingsSubTab, setSettingsSubTab] = useState<'all' | 'display' | 'update' | 'profile'>('all');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -2497,13 +2498,74 @@ export const CashierView: React.FC = () => {
         {/* TAB 6: SOZLAMALAR - TV TABLO TESTI VA KASSIR PROFILI */}
         {currentTab === 'sozlamalar' && (
           <main className="p-8 flex-1 space-y-6">
-            <div className="max-w-4xl space-y-6">
+            <div className="max-w-4xl mx-auto space-y-6">
               
+              {/* Centered Sozlamalar Navigation Menu */}
+              <div className="flex flex-col items-center justify-center space-y-3 text-center">
+                <div className="inline-flex items-center gap-1.5 p-1.5 bg-white border border-slate-200/90 rounded-2xl shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() => setSettingsSubTab('all')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                      settingsSubTab === 'all'
+                        ? 'bg-medical-blue text-white shadow-md shadow-medical-blue/20'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>Barchasi</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSettingsSubTab('display')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                      settingsSubTab === 'display'
+                        ? 'bg-medical-blue text-white shadow-md shadow-medical-blue/20'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Tv className="w-3.5 h-3.5" />
+                    <span>TV Tablo & Ekran</span>
+                  </button>
+
+                  {isElectron && (
+                    <button
+                      type="button"
+                      onClick={() => setSettingsSubTab('update')}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                        settingsSubTab === 'update'
+                          ? 'bg-medical-blue text-white shadow-md shadow-medical-blue/20'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Dastur Yangilanishi</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setSettingsSubTab('profile')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                      settingsSubTab === 'profile'
+                        ? 'bg-medical-blue text-white shadow-md shadow-medical-blue/20'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    <User className="w-3.5 h-3.5" />
+                    <span>Kassir Profili & Parol</span>
+                  </button>
+                </div>
+              </div>
+
               {/* BLOCK 0: ELECTRON DISPLAY & HDMI TV CHOOSER */}
-              <ElectronDisplaySelector onNotification={showNotification} />
+              {(settingsSubTab === 'all' || settingsSubTab === 'display') && (
+                <ElectronDisplaySelector onNotification={showNotification} />
+              )}
 
               {/* BLOCK 0.5: DASTUR YANGILANISHI (FAQAT ELECTRON JS DASTURIDA) */}
-              {isElectron && (
+              {isElectron && (settingsSubTab === 'all' || settingsSubTab === 'update') && (
                 <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -2536,83 +2598,86 @@ export const CashierView: React.FC = () => {
               )}
 
               {/* BLOCK 1: TV TABLONI TEST QILISH (OVOZLI TEST: "Ovoz chiqishi test qilindi") */}
-              <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-5">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-black text-[#172B4D] flex items-center gap-2">
-                      <Tv className="w-5 h-5 text-[#1677FF]" />
-                      <span>TV Tablo va Ovoz Tizimini Sinash</span>
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      Katta ekrandagi TV Tabloga ovozli test xabari yuborish va dinamiklar ishlashini tekshirish
+              {(settingsSubTab === 'all' || settingsSubTab === 'display') && (
+                <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-5">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg font-black text-[#172B4D] flex items-center gap-2">
+                        <Tv className="w-5 h-5 text-[#1677FF]" />
+                        <span>TV Tablo va Ovoz Tizimini Sinash</span>
+                      </h2>
+                      <p className="text-xs text-slate-500">
+                        Katta ekrandagi TV Tabloga ovozli test xabari yuborish va dinamiklar ishlashini tekshirish
+                      </p>
+                    </div>
+
+                    <a
+                      href="http://localhost:3002"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 self-start md:self-auto cursor-pointer"
+                    >
+                      <span>TV Tablo (3002)</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+
+                  {/* Status banner */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#1677FF] text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <Volume2 className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-800">
+                          Ovozli xabar: <span className="text-[#1677FF] font-black">"{tvTestText || "Ovoz chiqishi test qilindi"}"</span>
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          Tabiiy sun'iy intellekt suxandoni (Microsoft Azure Neural Uzbek Voice) orqali e'lon qilinadi
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-xs font-bold text-emerald-800">TV Tablo Aloqasi Faol</span>
+                    </div>
+                  </div>
+
+                  {/* Input for custom test text & action */}
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-slate-700 block">
+                      TV Tabloga yuboriladigan test so'zi:
+                    </label>
+                    <div className="flex flex-col sm:flex-row items-center gap-3">
+                      <input
+                        type="text"
+                        value={tvTestText}
+                        onChange={e => setTvTestText(e.target.value)}
+                        placeholder="Ovoz chiqishi test qilindi"
+                        className="w-full sm:flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#1677FF]/20"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={handleTestTvSound}
+                        disabled={isTvTesting}
+                        className="w-full sm:w-auto px-6 py-3 bg-[#1677FF] hover:bg-[#0958D9] disabled:bg-blue-300 text-white rounded-xl text-xs font-black shadow-md transition flex items-center justify-center gap-2 cursor-pointer shrink-0"
+                      >
+                        <Volume2 className={`w-4 h-4 ${isTvTesting ? 'animate-bounce' : ''}`} />
+                        <span>{isTvTesting ? 'Ovoz yuborilmoqda...' : 'TV Tabloda Ovozni Test Qilish'}</span>
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Tugmani bosganingizda TV Tabloga real vaqt rejimida «Ovoz chiqishi test qilindi» ovozi va ekranda chaqiruv xabari yuboriladi.
                     </p>
                   </div>
-
-                  <a
-                    href="http://localhost:3002"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 self-start md:self-auto cursor-pointer"
-                  >
-                    <span>TV Tablo (3002)</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
                 </div>
-
-                {/* Status banner */}
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[#1677FF] text-white flex items-center justify-center shrink-0 shadow-xs">
-                      <Volume2 className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-800">
-                        Ovozli xabar: <span className="text-[#1677FF] font-black">"{tvTestText || "Ovoz chiqishi test qilindi"}"</span>
-                      </div>
-                      <div className="text-[11px] text-slate-500">
-                        Tabiiy sun'iy intellekt suxandoni (Microsoft Azure Neural Uzbek Voice) orqali e'lon qilinadi
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-xs font-bold text-emerald-800">TV Tablo Aloqasi Faol</span>
-                  </div>
-                </div>
-
-                {/* Input for custom test text & action */}
-                <div className="space-y-3">
-                  <label className="text-xs font-bold text-slate-700 block">
-                    TV Tabloga yuboriladigan test so'zi:
-                  </label>
-                  <div className="flex flex-col sm:flex-row items-center gap-3">
-                    <input
-                      type="text"
-                      value={tvTestText}
-                      onChange={e => setTvTestText(e.target.value)}
-                      placeholder="Ovoz chiqishi test qilindi"
-                      className="w-full sm:flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#1677FF]/20"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={handleTestTvSound}
-                      disabled={isTvTesting}
-                      className="w-full sm:w-auto px-6 py-3 bg-[#1677FF] hover:bg-[#0958D9] disabled:bg-blue-300 text-white rounded-xl text-xs font-black shadow-md transition flex items-center justify-center gap-2 cursor-pointer shrink-0"
-                    >
-                      <Volume2 className={`w-4 h-4 ${isTvTesting ? 'animate-bounce' : ''}`} />
-                      <span>{isTvTesting ? 'Ovoz yuborilmoqda...' : 'TV Tabloda Ovozni Test Qilish'}</span>
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-slate-400">
-                    Tugmani bosganingizda TV Tabloga real vaqt rejimida «Ovoz chiqishi test qilindi» ovozi va ekranda chaqiruv xabari yuboriladi.
-                  </p>
-                </div>
-              </div>
+              )}
 
               {/* BLOCK 2: KASSIR PROFIL MA'LUMOTLARI */}
-              <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
+              {(settingsSubTab === 'all' || settingsSubTab === 'profile') && (
+                <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
                 <div>
                   <h2 className="text-lg font-black text-[#172B4D] flex items-center gap-2">
                     <User className="w-5 h-5 text-[#1677FF]" />
@@ -2732,6 +2797,7 @@ export const CashierView: React.FC = () => {
                   </form>
                 </div>
               </div>
+              )}
 
             </div>
           </main>
