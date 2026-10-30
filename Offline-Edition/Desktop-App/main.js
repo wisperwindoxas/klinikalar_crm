@@ -29,16 +29,29 @@ function startEmbeddedBackend() {
 
   if (fs.existsSync(backendEntry)) {
     console.log('[Offline Desktop] Starting embedded backend:', backendEntry);
+    const logFile = app.isPackaged
+      ? path.join(app.getPath('userData'), 'backend.log')
+      : path.resolve(__dirname, '../backend.log');
+    const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+
     backendProcess = fork(backendEntry, [], {
       env: {
         ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
         PORT: '5001',
         DATA_DIR: dataDir,
         OFFLINE_MODE: 'true',
         NODE_ENV: 'production'
       },
-      stdio: 'ignore'
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc']
     });
+
+    if (backendProcess.stdout) {
+      backendProcess.stdout.pipe(logStream);
+    }
+    if (backendProcess.stderr) {
+      backendProcess.stderr.pipe(logStream);
+    }
 
     backendProcess.on('exit', (code) => {
       console.log('[Offline Desktop] Backend process exited with code:', code);
@@ -105,8 +118,6 @@ function setupAppIcon() {
 }
 setupAppIcon();
 
-let mainWindow = null;
-let tvWindow = null;
 
 const isDev = process.argv.includes('--dev') || process.env.NODE_ENV === 'development' || !app.isPackaged;
 const USER_PANEL_DEV_URL = 'http://localhost:3001';
