@@ -1,0 +1,82 @@
+{
+  "name": "klinika-admin",
+  "version": "1.0.2",
+  "description": "Klinika-admin — Elektron Navbat va Boshqaruv Tizimi",
+  "main": "main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wisperwindoxas/klinikalar_crm.git"
+  },
+  "scripts": {
+    "start": "env -u ELECTRON_RUN_AS_NODE electron .",
+    "dev": "env -u ELECTRON_RUN_AS_NODE electron . --dev",
+    "copy:dist": "mkdir -p dist/user dist/tv && cp -R ../User-Panel/dist/* dist/user/ && cp -R ../TV-Display/dist/* dist/tv/",
+    "build:frontend": "npm --prefix ../User-Panel run build && npm --prefix ../TV-Display run build && npm run copy:dist",
+    "build:mac": "npm run build:frontend && electron-builder --mac",
+    "build:win": "npm run build:frontend && electron-builder --win",
+    "build:all": "npm run build:frontend && electron-builder --mac --win",
+    "release:mac": "npm run build:frontend && electron-builder --mac --publish always",
+    "release:win": "npm run build:frontend && electron-builder --win --publish always"
+  },
+  "build": {
+    "appId": "com.klinika.admin",
+    "productName": "Klinika-admin",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "wisperwindoxas",
+        "repo": "klinikalar_crm"
+      }
+    ],
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.cjs",
+      "dist/**/*",
+      "build/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../Backend/dist",
+        "to": "backend/dist",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../Backend/node_modules",
+        "to": "backend/node_modules",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "icon": "build/icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.medical"
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Klinika-admin",
+      "artifactName": "${productName} Setup ${version}.${ext}"
+    }
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  }
+}
