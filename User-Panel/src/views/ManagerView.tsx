@@ -123,9 +123,23 @@ export const ManagerView: React.FC = () => {
     return clean.slice(0, 2).toUpperCase();
   };
 
+  // Helpers for Clock & Date (DD.MM.YYYY format)
+  const getFormattedDate = (d: Date = new Date()) => {
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}.${month}.${year}`;
+  };
+
+  const getFormattedTime = (d: Date = new Date()) => {
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
   // Clock
-  const [time, setTime] = useState('14:25');
-  const [dateStr, setDateStr] = useState('10-iyun 2025, Seshanba');
+  const [time, setTime] = useState(() => getFormattedTime());
+  const [dateStr, setDateStr] = useState(() => getFormattedDate());
 
   // Backend Data (100% REAL FROM POSTGRESQL)
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -446,14 +460,13 @@ export const ManagerView: React.FC = () => {
 
   useEffect(() => {
     // Clock
-    const timer = setInterval(() => {
+    const updateClock = () => {
       const now = new Date();
-      setTime(now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }));
-      const d = now.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' }).replace(' г.', '');
-      const w = now.toLocaleDateString('uz-UZ', { weekday: 'long' });
-      const capW = w.charAt(0).toUpperCase() + w.slice(1);
-      setDateStr(`${d}, ${capW}`);
-    }, 1000);
+      setTime(getFormattedTime(now));
+      setDateStr(getFormattedDate(now));
+    };
+    updateClock();
+    const timer = setInterval(updateClock, 1000);
 
     loadManagerData();
     const interval = setInterval(loadManagerData, 10000);
@@ -1909,16 +1922,21 @@ export const ManagerView: React.FC = () => {
           </div>
 
           {/* Right Header Badges */}
-          <div className="flex items-center gap-4">
-            {/* Date Pill */}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600">
-              <Calendar className="w-4 h-4 text-slate-400" />
-              <span>{dateStr}</span>
+          <div className="flex items-center gap-3">
+            {/* Date Pill (Kattalashtirilgan va DD.MM.YYYY formatida) */}
+            <div className="flex items-center gap-2.5 px-4 py-2 bg-slate-50 border border-slate-200/90 rounded-xl shadow-2xs hover:bg-slate-100/60 transition">
+              <Calendar className="w-5 h-5 text-[#1677FF] flex-shrink-0" />
+              <span className="text-base font-bold text-slate-800 font-mono tracking-wide">
+                {dateStr}
+              </span>
             </div>
 
-            {/* Live Clock Pill */}
-            <div className="px-3.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-[#172B4D] font-mono">
-              {time}
+            {/* Live Clock Pill (Kattalashtirilgan va Clock ikonkali) */}
+            <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200/90 rounded-xl shadow-2xs hover:bg-slate-100/60 transition">
+              <Clock className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+              <span className="text-lg font-black text-[#172B4D] font-mono tracking-wider">
+                {time}
+              </span>
             </div>
 
             {/* User Profile Pill with Dropdown */}
