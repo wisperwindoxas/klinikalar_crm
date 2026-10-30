@@ -464,16 +464,25 @@ ipcMain.handle('download-update', async (event, { url, fileName }) => {
     return { success: false, message: "Noto'g'ri URL manzili" };
   }
 
-  // Only allow HTTPS from trusted GitHub release origins
-  const isAllowedHost = parsedUrl.protocol === 'https:' && (
-    parsedUrl.hostname === 'github.com' ||
-    parsedUrl.hostname.endsWith('.github.com') ||
-    parsedUrl.hostname === 'github-releases.githubusercontent.com' ||
-    parsedUrl.hostname === 'objects.githubusercontent.com'
+  // Allow HTTPS from trusted GitHub release origins OR local backend server
+  const isAllowedHost = (
+    (parsedUrl.protocol === 'https:' && (
+      parsedUrl.hostname === 'github.com' ||
+      parsedUrl.hostname.endsWith('.github.com') ||
+      parsedUrl.hostname === 'github-releases.githubusercontent.com' ||
+      parsedUrl.hostname === 'objects.githubusercontent.com'
+    )) ||
+    ((parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') && (
+      parsedUrl.hostname === 'localhost' ||
+      parsedUrl.hostname === '127.0.0.1' ||
+      parsedUrl.hostname.startsWith('192.168.') ||
+      parsedUrl.hostname.startsWith('10.') ||
+      parsedUrl.pathname.includes('/api/v1/app/download/')
+    ))
   );
 
   if (!isAllowedHost) {
-    return { success: false, message: "Faqat rasmiy GitHub relizlari orqali yangilashga ruxsat berilgan." };
+    return { success: false, message: "Faqat rasmiy relizlar yoki klinik server orqali yangilashga ruxsat berilgan." };
   }
 
   // Strictly sanitize fileName to prevent path traversal
@@ -511,12 +520,20 @@ ipcMain.handle('download-update', async (event, { url, fileName }) => {
         }
 
         // Validate redirect host
-        const isAllowedRedirect = curParsed.protocol === 'https:' && (
-          curParsed.hostname === 'github.com' ||
-          curParsed.hostname.endsWith('.github.com') ||
-          curParsed.hostname === 'github-releases.githubusercontent.com' ||
-          curParsed.hostname === 'objects.githubusercontent.com' ||
-          curParsed.hostname.endsWith('.amazonaws.com')
+        const isAllowedRedirect = (
+          (curParsed.protocol === 'https:' && (
+            curParsed.hostname === 'github.com' ||
+            curParsed.hostname.endsWith('.github.com') ||
+            curParsed.hostname === 'github-releases.githubusercontent.com' ||
+            curParsed.hostname === 'objects.githubusercontent.com' ||
+            curParsed.hostname.endsWith('.amazonaws.com')
+          )) ||
+          ((curParsed.protocol === 'http:' || curParsed.protocol === 'https:') && (
+            curParsed.hostname === 'localhost' ||
+            curParsed.hostname === '127.0.0.1' ||
+            curParsed.hostname.startsWith('192.168.') ||
+            curParsed.hostname.startsWith('10.')
+          ))
         );
 
         if (!isAllowedRedirect) {
@@ -525,7 +542,8 @@ ipcMain.handle('download-update', async (event, { url, fileName }) => {
           return resolve({ success: false, message: "Xavfsiz bo'lmagan manzilga yo'naltirish rad etildi." });
         }
 
-        https.get(currentUrl, (response) => {
+        const clientLib = curParsed.protocol === 'http:' ? http : https;
+        clientLib.get(currentUrl, (response) => {
           // Handle HTTP redirect (GitHub release assets redirect to AWS S3)
           if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
             return downloadWithRedirect(response.headers.location, redirectCount + 1);

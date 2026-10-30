@@ -1,5 +1,7 @@
 import express from 'express';
 import http from 'http';
+import path from 'path';
+import fs from 'fs';
 import cors from 'cors';
 import helmet from 'helmet';
 import { config } from './config';
@@ -216,7 +218,11 @@ apiRouter.get('/voice/speak', voiceRateLimiter, VoiceController.speak);
 apiRouter.get('/voice/voices', VoiceController.getVoices);
 
 // 13. Application Updates & Release Metadata (Public / Cross-platform)
-apiRouter.get('/app/latest-release', (_req, res) => {
+apiRouter.get('/app/latest-release', (req, res) => {
+  const host = req.get('host') || 'localhost:5001';
+  const protocol = req.protocol || 'http';
+  const baseUrl = `${protocol}://${host}/api/v1`;
+
   res.json({
     success: true,
     data: {
@@ -228,27 +234,43 @@ apiRouter.get('/app/latest-release', (_req, res) => {
       assets: [
         {
           name: 'Klinika-admin-1.0.1.dmg',
-          browser_download_url: 'https://github.com/wisperwindoxas/klinikalar_crm/releases/download/v1.0.1/Klinika-admin-1.0.1.dmg',
+          browser_download_url: `${baseUrl}/app/download/Klinika-admin-1.0.1.dmg`,
           size: 113622259
         },
         {
           name: 'Klinika-admin Setup 1.0.1.exe',
-          browser_download_url: 'https://github.com/wisperwindoxas/klinikalar_crm/releases/download/v1.0.1/Klinika-admin.Setup.1.0.1.exe',
+          browser_download_url: `${baseUrl}/app/download/Klinika-admin%20Setup%201.0.1.exe`,
           size: 94102295
         },
         {
           name: 'Klinika-admin-1.0.1-mac.zip',
-          browser_download_url: 'https://github.com/wisperwindoxas/klinikalar_crm/releases/download/v1.0.1/Klinika-admin-1.0.1-mac.zip',
+          browser_download_url: `${baseUrl}/app/download/Klinika-admin-1.0.1-mac.zip`,
           size: 108843437
         },
         {
           name: 'Klinika-admin-1.0.1-win.zip',
-          browser_download_url: 'https://github.com/wisperwindoxas/klinikalar_crm/releases/download/v1.0.1/Klinika-admin-1.0.1-win.zip',
+          browser_download_url: `${baseUrl}/app/download/Klinika-admin-1.0.1-win.zip`,
           size: 119411433
         }
       ]
     }
   });
+});
+
+apiRouter.get('/app/download/:filename', (req, res) => {
+  const rawFileName = req.params.filename;
+  const fileName = path.basename(decodeURIComponent(rawFileName));
+  const releaseDir = path.resolve(__dirname, '../../Desktop-App/release');
+  const filePath = path.join(releaseDir, fileName);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ success: false, message: `Fayl topilmadi: ${fileName}` });
+  }
+
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.setHeader('Content-Type', 'application/octet-stream');
+  const stream = fs.createReadStream(filePath);
+  stream.pipe(res);
 });
 
 app.use('/api/v1', apiRouter);

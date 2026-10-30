@@ -26,7 +26,10 @@ interface AppUpdateModalProps {
   autoCheck?: boolean;
 }
 
-const API_BASE_URL = 'http://localhost:5001/api/v1';
+const getApiBaseUrl = () => {
+  const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+  return `http://${host}:5001/api/v1`;
+};
 
 // Compare semantic versions (returns >0 if v1 > v2, <0 if v1 < v2, 0 if equal)
 const compareVersions = (v1: string, v2: string): number => {
@@ -58,7 +61,7 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({ isOpen, onClose,
     try {
       let data: GithubRelease | null = null;
       try {
-        const localRes = await fetch(`${API_BASE_URL}/app/latest-release`);
+        const localRes = await fetch(`${getApiBaseUrl()}/app/latest-release`);
         if (localRes.ok) {
           const json = await localRes.json();
           if (json.data && json.data.tag_name) {
