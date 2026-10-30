@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Download, RefreshCw, CheckCircle2, AlertCircle, ExternalLink,
+  Download, RefreshCw, CheckCircle2, AlertCircle,
   Sparkles, X, ShieldCheck, ArrowRight, Tag, Calendar, FileText, Play, Rocket
 } from 'lucide-react';
 import { APP_VERSION, GITHUB_REPO } from '../utils/brand';
@@ -83,11 +83,11 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({ isOpen, onClose,
 
         if (!res.ok) {
           if (res.status === 404) {
-            setError("GitHub'da hozircha rasmiy yangilanishlar (Releases) topilmadi.");
+            setError("Hozircha yangi rasmiy yangilanishlar topilmadi.");
             setHasUpdate(false);
             return;
           }
-          throw new Error(`GitHub javob bermadi (Status: ${res.status})`);
+          throw new Error(`Yangilanish serveri javob bermadi (Status: ${res.status})`);
         }
 
         data = await res.json();
@@ -105,7 +105,7 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({ isOpen, onClose,
       setHasUpdate(isNewer);
     } catch (err: any) {
       console.warn('Check update error:', err);
-      setError(err?.message || "Internet bilan aloqa yo'q yoki GitHub API mavjud emas");
+      setError(err?.message || "Internet bilan aloqa yo'q yoki server mavjud emas");
       setHasUpdate(false);
     } finally {
       setLoading(false);
@@ -174,7 +174,6 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({ isOpen, onClose,
         }
       } catch (e: any) {
         console.error('Desktop download error, fallback to browser link:', e);
-        // Fallback: direct download via browser anchor tag
         const a = document.createElement('a');
         a.href = relevantAsset.browser_download_url;
         a.download = relevantAsset.name;
@@ -245,7 +244,7 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({ isOpen, onClose,
           {loading ? (
             <div className="py-12 flex flex-col items-center justify-center gap-3 text-center">
               <RefreshCw className="w-9 h-9 text-medical-blue animate-spin" />
-              <p className="text-sm font-bold text-slate-700">GitHub Releases tekshirilmoqda...</p>
+              <p className="text-sm font-bold text-slate-700">Yangilanishlar tekshirilmoqda...</p>
               <p className="text-xs text-slate-400">Rasmiy yangilanishlar bazasi bilan solishtirilmoqda</p>
             </div>
           ) : error ? (
@@ -277,7 +276,7 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({ isOpen, onClose,
                 </p>
               </div>
               <div className="w-full pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                <span>Manba: Rasmiy GitHub Releases</span>
+                <span>Manba: Rasmiy yangilanish tizimi</span>
                 <button
                   onClick={checkUpdates}
                   className="text-medical-blue hover:underline font-bold flex items-center gap-1 cursor-pointer"
@@ -365,19 +364,6 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({ isOpen, onClose,
           </button>
 
           <div className="flex items-center gap-2">
-            {release?.html_url && (
-              <a
-                href={release.html_url}
-                target="_blank"
-                rel="noreferrer"
-                className="px-3.5 py-2.5 rounded-2xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs transition flex items-center gap-1.5"
-                title="GitHub sahifasini ochish"
-              >
-                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-                <span>GitHub</span>
-              </a>
-            )}
-
             {hasUpdate && downloadProgress !== 100 && (
               <button
                 onClick={handleDownload}

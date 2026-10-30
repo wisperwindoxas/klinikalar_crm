@@ -55,6 +55,7 @@ export const CashierView: React.FC = () => {
   });
   const [clinicSettings, setClinicSettings] = useState<any>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
 
   const getUserInitials = (name?: string) => {
     if (!name) return 'KA';
@@ -2501,36 +2502,38 @@ export const CashierView: React.FC = () => {
               {/* BLOCK 0: ELECTRON DISPLAY & HDMI TV CHOOSER */}
               <ElectronDisplaySelector onNotification={showNotification} />
 
-              {/* BLOCK 0.5: DASTUR YANGILANISHI (GITHUB RELEASES) */}
-              <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-medical-blue to-teal-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-medical-blue/20">
-                      <Sparkles className="w-5 h-5 text-yellow-300" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-base font-black text-[#172B4D]">Dastur Yangilanishi</h2>
-                        <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[#1677FF] border border-blue-200 text-[10px] font-black">
-                          v{APP_VERSION}
-                        </span>
+              {/* BLOCK 0.5: DASTUR YANGILANISHI (FAQAT ELECTRON JS DASTURIDA) */}
+              {isElectron && (
+                <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-medical-blue to-teal-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-medical-blue/20">
+                        <Sparkles className="w-5 h-5 text-yellow-300" />
                       </div>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        GitHub Releases orqali dasturning yangi versiyasini tekshirish va yangilash
-                      </p>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-base font-black text-[#172B4D]">Dastur Yangilanishi</h2>
+                          <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[#1677FF] border border-blue-200 text-[10px] font-black">
+                            v{APP_VERSION}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Dasturning yangi versiyasini tekshirish va avtomatik yangilash
+                        </p>
+                      </div>
                     </div>
-                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setIsUpdateModalOpen(true)}
-                    className="px-5 py-2.5 bg-gradient-to-r from-medical-blue to-teal-600 hover:opacity-95 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-md shadow-medical-blue/20 active:scale-95 cursor-pointer self-start sm:self-auto"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    <span>Yangilanishlarni tekshirish</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsUpdateModalOpen(true)}
+                      className="px-5 py-2.5 bg-gradient-to-r from-medical-blue to-teal-600 hover:opacity-95 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-md shadow-medical-blue/20 active:scale-95 cursor-pointer self-start sm:self-auto"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      <span>Yangilanishlarni tekshirish</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* BLOCK 1: TV TABLONI TEST QILISH (OVOZLI TEST: "Ovoz chiqishi test qilindi") */}
               <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-5">
