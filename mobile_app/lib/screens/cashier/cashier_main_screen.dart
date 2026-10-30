@@ -30,6 +30,7 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
   List<Map<String, dynamic>> _payments = [];
   List<PatientModel> _patients = [];
   Map<String, dynamic>? _currentShift;
+  Map<String, dynamic>? _shiftDetails;
 
   // Tickets tab filters
   final _ticketSearchCtrl = TextEditingController();
@@ -68,15 +69,55 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
       final patients = await ApiService().getPatients();
       final shiftRes = await ApiService().getCurrentShift();
 
+      final currentShift = (shiftRes['data'] is Map<String, dynamic>)
+          ? shiftRes['data']
+          : (shiftRes.isNotEmpty ? shiftRes : null);
+
+      Map<String, dynamic>? shiftDetails;
+      if (currentShift != null && currentShift['id'] != null) {
+        shiftDetails = await ApiService().getShiftDetails(currentShift['id'].toString());
+      }
+
       double cash = 0;
       double card = 0;
-      for (var p in payments) {
-        final amount = Formatters.parseDouble(p['amount']);
-        final method = (p['method'] ?? '').toString().toUpperCase();
-        if (method == 'CASH' || method == 'NAQD') {
-          cash += amount;
-        } else {
-          card += amount;
+
+      if (shiftDetails != null && shiftDetails['summary'] != null) {
+        final summary = shiftDetails['summary'];
+        cash = Formatters.parseDouble(summary['cashTotal']);
+        card = Formatters.parseDouble(summary['cardTotal']);
+      } else if (currentShift != null) {
+        final shiftId = currentShift['id'];
+        final openedAtStr = currentShift['opened_at'];
+        final openedAt = openedAtStr != null ? DateTime.tryParse(openedAtStr) : null;
+
+        for (var p in payments) {
+          final matchesShift = (p['cash_shift_id'] != null && p['cash_shift_id'] == shiftId);
+          final pDate = p['created_at'] != null ? DateTime.tryParse(p['created_at']) : null;
+          final matchesTime = (openedAt != null && pDate != null && (pDate.isAfter(openedAt) || pDate.isAtSameMomentAs(openedAt)));
+
+          if (matchesShift || (p['cash_shift_id'] == null && matchesTime)) {
+            final amount = Formatters.parseDouble(p['amount']);
+            final method = (p['method'] ?? '').toString().toUpperCase();
+            if (method == 'CASH' || method == 'NAQD') {
+              cash += amount;
+            } else {
+              card += amount;
+            }
+          }
+        }
+      } else {
+        final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+        for (var p in payments) {
+          final pDateStr = (p['created_at'] ?? '').toString();
+          if (pDateStr.startsWith(todayStr)) {
+            final amount = Formatters.parseDouble(p['amount']);
+            final method = (p['method'] ?? '').toString().toUpperCase();
+            if (method == 'CASH' || method == 'NAQD') {
+              cash += amount;
+            } else {
+              card += amount;
+            }
+          }
         }
       }
 
@@ -85,9 +126,8 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
         _tickets = tickets;
         _payments = payments;
         _patients = patients;
-        _currentShift = (shiftRes['data'] is Map<String, dynamic>)
-            ? shiftRes['data']
-            : (shiftRes.isNotEmpty ? shiftRes : null);
+        _currentShift = currentShift;
+        _shiftDetails = shiftDetails;
         _cashTotal = cash;
         _cardTotal = card;
         _isLoading = false;
@@ -316,85 +356,477 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
 
   Future<void> _closeShiftDialog() async {
     final shiftId = _currentShift?['id']?.toString() ?? '1';
-    final totalExpected = (_cashTotal + _cardTotal + Formatters.parseDouble(_currentShift?['opening_balance']));
-    final closingCtrl = TextEditingController(text: totalExpected.toInt().toString());
+    final user = AuthService().currentUser;
+    final openingBalance = Formatters.parseDouble(_currentShift?['opening_balance']);
+    final cashReceived = _cashTotal;
+    final cardReceived = _cardTotal;
+    final totalRevenue = cashReceived + cardReceived;
+    final expectedCashInDrawer = openingBalance + cashReceived;
+
+    final closingCtrl = TextEditingController(text: expectedCashInDrawer.toInt().toString());
+    final notesCtrl = TextEditingController();
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final enteredNum = double.tryParse(closingCtrl.text.replaceAll(RegExp(r'\D'), '')) ?? 0;
+          final diff = enteredNum - expectedCashInDrawer;
+
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.92,
+            ),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                Center(
+                  child: Container(width: 44, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
+                ),
+                const SizedBox(height: 14),
+
+                // Header
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFD97706), Color(0xFFB45309)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.lock_clock_rounded, color: Colors.white, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Kassa Smenasini Yopish', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                          Text('Z-Hisobot yakunlash • Smena #$shiftId', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                        ],
+                      ),
+                    ),
+                    IconButton(icon: const Icon(Icons.close_rounded, color: AppColors.textMuted), onPressed: () => Navigator.pop(ctx)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Divider(height: 1, color: AppColors.border),
+                const SizedBox(height: 12),
+
+                // Financial Overview Card
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildReceiptRow('Kassir:', _currentShift?['cashier_name'] ?? user?.fullName ?? 'Kassir'),
+                      _buildReceiptRow('Boshlang‘ich qoldiq:', Formatters.formatCurrency(openingBalance)),
+                      _buildReceiptRow('Naqd tushum (+):', Formatters.formatCurrency(cashReceived), color: const Color(0xFF16A34A), isBold: true),
+                      _buildReceiptRow('Karta tushum (+):', Formatters.formatCurrency(cardReceived), color: const Color(0xFF0284C7), isBold: true),
+                      _buildReceiptRow('Jami tushum:', Formatters.formatCurrency(totalRevenue), isBold: true),
+                      const Divider(height: 14, color: Color(0xFFCBD5E1)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Kassadagi kutilayotgan naqd pul:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                          Text(Formatters.formatCurrency(expectedCashInDrawer), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF0284C7))),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Actual Cash input
+                const Text('Kassir topshirayotgan haqiqiy naqd pul (so‘m):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: closingCtrl,
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => setModalState(() {}),
+                  decoration: InputDecoration(
+                    suffixText: 'UZS',
+                    filled: true,
+                    fillColor: Colors.white,
+                    prefixIcon: const Icon(Icons.point_of_sale_rounded, color: Color(0xFFD97706)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFD97706), width: 1.5)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Difference indicator badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: diff == 0
+                        ? const Color(0xFFDCFCE7)
+                        : (diff < 0 ? const Color(0xFFFEE2E2) : const Color(0xFFEFF6FF)),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: diff == 0
+                          ? const Color(0xFF86EFAC)
+                          : (diff < 0 ? const Color(0xFFFCA5A5) : const Color(0xFFBFDBFE)),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        diff == 0
+                            ? Icons.check_circle_rounded
+                            : (diff < 0 ? Icons.error_outline_rounded : Icons.info_outline_rounded),
+                        size: 16,
+                        color: diff == 0
+                            ? const Color(0xFF15803D)
+                            : (diff < 0 ? const Color(0xFFDC2626) : const Color(0xFF2563EB)),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          diff == 0
+                              ? 'Tafovut yo‘q: Kassa to‘liq mos keladi'
+                              : (diff < 0
+                                  ? 'Yetishmovchilik (Kamomat): -${Formatters.formatCurrency(diff.abs())}'
+                                  : 'Ortiqcha summa: +${Formatters.formatCurrency(diff)}'),
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: diff == 0
+                                ? const Color(0xFF15803D)
+                                : (diff < 0 ? const Color(0xFFDC2626) : const Color(0xFF2563EB)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Notes
+                const Text('Eslatma / Izoh:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: notesCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'Masalan: Smena yakunlandi, naqd pul inkassatsiya qilindi',
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Submit Button
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    setState(() => _isLoading = true);
+                    final res = await ApiService().closeShift(
+                      shiftId,
+                      closingBalance: enteredNum,
+                    );
+                    if (res['success'] != false) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Kassa smenasi muvaffaqiyatli yopildi va Z-Hisobot saqlandi!'),
+                          backgroundColor: AppColors.success,
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(res['message'] ?? 'Xatolik yuz berdi'), backgroundColor: AppColors.error),
+                      );
+                    }
+                    _fetchData();
+                  },
+                  icon: const Icon(Icons.check_circle_rounded, size: 18),
+                  label: const Text('Smenani Yopish va Z-Hisobotni Yakunlash', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD97706),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      ),
+    );
+  }
+
+  void _showXReportModal() {
+    final user = AuthService().currentUser;
+    final isShiftOpen = _currentShift != null && (_currentShift!['status'] == 'OPEN' || _currentShift!['status'] == 'active');
+    final shiftNumber = _currentShift?['id']?.toString() ?? '1';
+    final openedAt = _currentShift?['opened_at'];
+    final openingBalance = Formatters.parseDouble(_currentShift?['opening_balance']);
+    final cashTotal = _cashTotal;
+    final cardTotal = _cardTotal;
+    final totalRevenue = cashTotal + cardTotal;
+    final expectedCashInDrawer = openingBalance + cashTotal;
+    final now = DateTime.now();
+
+    final docs = (_shiftDetails?['doctorBreakdown'] as List?) ?? [];
+    final shiftPayments = (_shiftDetails?['payments'] as List?) ?? [];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.90,
+        ),
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
-        padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Center(
-              child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
+              child: Container(width: 44, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
             ),
-            const SizedBox(height: 16),
-            const Text('Kassa Smenasini Yopish (Z-Hisobot)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            const Text(
-              'Joriy smenadagi kassa qoldig‘i va umumiy hisobot yakunlanadi.',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(12)),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Jami hisoblangan tushum:', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                      Text(Formatters.formatCurrency(totalExpected), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Kassa X-Hisobot (Oraliq)',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
+                      Text(
+                        'Smena #$shiftNumber • ${isShiftOpen ? "Smena Ochiq" : "Yopiq"}',
+                        style: TextStyle(fontSize: 11, color: isShiftOpen ? AppColors.success : AppColors.error, fontWeight: FontWeight.bold),
+                      ),
                     ],
                   ),
-                ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: AppColors.textMuted),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Divider(height: 1, color: AppColors.border),
+            const SizedBox(height: 12),
+
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  children: [
+                    // Thermal Receipt Look Card
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        children: [
+                          const Text('SADAF KLINIKASI', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 1)),
+                          const SizedBox(height: 2),
+                          const Text('Kassa Oraliq Hisoboti (X-Hisobot)', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                          const SizedBox(height: 4),
+                          Text(Formatters.formatDateTime(now.toIso8601String()), style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                          const SizedBox(height: 10),
+                          const Divider(height: 1, color: Color(0xFFCBD5E1)),
+                          const SizedBox(height: 10),
+
+                          _buildReceiptRow('Kassir:', _currentShift?['cashier_name'] ?? user?.fullName ?? 'Kassir'),
+                          if (openedAt != null)
+                            _buildReceiptRow('Smena ochilgan:', Formatters.formatDateTime(openedAt)),
+                          _buildReceiptRow('Jami to‘lovlar (cheklar):', '${shiftPayments.isNotEmpty ? shiftPayments.length : _payments.length} ta'),
+                          _buildReceiptRow('Chiqarilgan talonlar:', '${_tickets.length} ta'),
+
+                          const SizedBox(height: 8),
+                          const Divider(height: 1, color: Color(0xFFCBD5E1)),
+                          const SizedBox(height: 8),
+
+                          _buildReceiptRow('Boshlang‘ich qoldiq:', Formatters.formatCurrency(openingBalance), isBold: true),
+                          _buildReceiptRow('Naqd pul tushumi (+):', Formatters.formatCurrency(cashTotal), color: const Color(0xFF16A34A), isBold: true),
+                          _buildReceiptRow('Karta / Payme tushumi (+):', Formatters.formatCurrency(cardTotal), color: const Color(0xFF0284C7), isBold: true),
+
+                          const SizedBox(height: 8),
+                          const Divider(height: 1, color: Color(0xFFCBD5E1)),
+                          const SizedBox(height: 8),
+
+                          _buildReceiptRow(
+                            'JAMI SMENA TUSHUMI:',
+                            Formatters.formatCurrency(totalRevenue),
+                            isBold: true,
+                            fontSize: 13,
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'KASSADA KUTILAYOTGAN NAQD:',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF)),
+                                ),
+                                Text(
+                                  Formatters.formatCurrency(expectedCashInDrawer),
+                                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: Color(0xFF1E40AF)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    if (docs.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.people_alt_outlined, size: 16, color: AppColors.primary),
+                                SizedBox(width: 6),
+                                Text('Shifokorlar Bo‘yicha Tushum Taqsimoti', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            ...docs.map((d) {
+                              final name = d['doctorName'] ?? 'Shifokor';
+                              final spec = d['specialtyName'] ?? '';
+                              final count = d['ticketCount'] ?? 0;
+                              final amt = Formatters.parseDouble(d['totalAmount']);
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text('$name ($spec)', style: const TextStyle(fontSize: 11.5, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    ),
+                                    Text('$count bemor • ${Formatters.formatCurrency(amt)}', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-            const Text('Yakuniy qoldiq (so‘m)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            TextFormField(
-              controller: closingCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                suffixText: 'UZS',
-                prefixIcon: Icon(Icons.point_of_sale_rounded, color: AppColors.warning),
-              ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                setState(() => _isLoading = true);
-                final res = await ApiService().closeShift(
-                  shiftId,
-                  closingBalance: double.tryParse(closingCtrl.text.replaceAll(RegExp(r'\D'), '')) ?? totalExpected,
-                );
-                if (res['success'] != false) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Kassa smenasi yopildi va hisobot saqlandi'), backgroundColor: AppColors.success),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(res['message'] ?? 'Xatolik yuz berdi'), backgroundColor: AppColors.error),
-                  );
-                }
-                _fetchData();
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.warning),
-              child: const Text('Smenani Yopish va Tasdiqlash'),
+
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('X-Hisobot printerga yuborildi (XP-80T / 58mm)!'),
+                          backgroundColor: AppColors.success,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.print_rounded, size: 18),
+                    label: const Text('Chop Etish (Printer)'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0284C7),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text('Yopish', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildReceiptRow(String label, String value, {bool isBold = false, Color? color, double fontSize = 11.5}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(fontSize: fontSize, color: AppColors.textSecondary, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+          Text(value, style: TextStyle(fontSize: fontSize, fontWeight: isBold ? FontWeight.bold : FontWeight.w600, color: color ?? AppColors.textPrimary)),
+        ],
       ),
     );
   }
@@ -495,44 +927,86 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
                       Text(
                         user?.fullName ?? 'Kassir',
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Row(
                         children: [
                           const Icon(Icons.check_circle_rounded, size: 10, color: AppColors.success),
                           const SizedBox(width: 4),
-                          Text(user?.phone != null ? 'Smena faol • ${user!.phone}' : 'Smena faol', style: const TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.bold)),
+                          Flexible(
+                            child: Text(
+                              user?.phone != null ? 'Smena faol • ${user!.phone}' : 'Smena faol',
+                              style: const TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ],
                       ),
                     ],
                   ),
                 ),
               ),
-              IconButton(
-                icon: Icon(
-                  SecurityService().hasPin ? Icons.lock_outline_rounded : Icons.lock_open_rounded,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-                tooltip: 'PIN va Biometriya',
-                onPressed: () => PinSetupSheet.show(context),
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded, color: AppColors.textSecondary),
-                tooltip: 'Yangilash',
-                onPressed: _fetchData,
-              ),
-              IconButton(
-                icon: const Icon(Icons.settings_outlined, color: AppColors.textMuted, size: 20),
-                tooltip: 'Server IP sozlamalari',
-                onPressed: _showServerConfigDialog,
-              ),
-              IconButton(
-                icon: const Icon(Icons.logout_rounded, color: AppColors.error, size: 20),
-                tooltip: 'Chiqish',
-                onPressed: _logoutConfirm,
-              ),
             ],
           ),
+          actions: [
+            IconButton(
+              icon: Icon(
+                SecurityService().hasPin ? Icons.lock_outline_rounded : Icons.lock_open_rounded,
+                color: AppColors.primary,
+                size: 20,
+              ),
+              tooltip: 'PIN va Biometriya',
+              onPressed: () => PinSetupSheet.show(context),
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, color: AppColors.textSecondary),
+              tooltip: 'Yangilash',
+              onPressed: _fetchData,
+            ),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert_rounded, color: AppColors.textSecondary),
+              tooltip: 'Ko‘proq',
+              onSelected: (val) {
+                if (val == 'server') _showServerConfigDialog();
+                if (val == 'profile') UserProfileSheet.show(context);
+                if (val == 'logout') _logoutConfirm();
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'profile',
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_outline_rounded, size: 18, color: AppColors.primary),
+                      SizedBox(width: 8),
+                      Text('Profil & Klinika'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'server',
+                  child: Row(
+                    children: [
+                      Icon(Icons.settings_outlined, size: 18, color: AppColors.textSecondary),
+                      SizedBox(width: 8),
+                      Text('Server IP sozlamalari'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'logout',
+                  child: Row(
+                    children: [
+                      Icon(Icons.logout_rounded, size: 18, color: AppColors.error),
+                      SizedBox(width: 8),
+                      Text('Hisobdan chiqish', style: TextStyle(color: AppColors.error)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
@@ -1244,17 +1718,20 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
     );
   }
 
-  // ==================== TAB 3: SMENA (REAL) ====================
+  // ==================== TAB 4: SMENA & HISOBOTLAR ====================
   Widget _buildShiftTab() {
     final user = AuthService().currentUser;
     final isShiftOpen = _currentShift != null && (_currentShift!['status'] == 'OPEN' || _currentShift!['status'] == 'active');
     final shiftNumber = _currentShift?['id']?.toString() ?? '1';
     final openedAt = _currentShift?['opened_at'];
     final openingBalance = Formatters.parseDouble(_currentShift?['opening_balance']);
-    final totalCashShift = Formatters.parseDouble(_currentShift?['total_received'] ?? _cashTotal);
-    final totalBalance = openingBalance + totalCashShift + _cardTotal;
+    final cashTotal = _cashTotal;
+    final cardTotal = _cardTotal;
+    final totalRevenue = cashTotal + cardTotal;
+    final expectedCashInDrawer = openingBalance + cashTotal;
 
     return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
@@ -1264,12 +1741,12 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+                  color: Colors.black.withOpacity(0.025),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
@@ -1279,23 +1756,42 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Kassa Smenasi #$shiftNumber',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    Flexible(
+                      child: Text(
+                        'Kassa Smenasi #${shiftNumber.length > 14 ? shiftNumber.substring(0, 12) + "..." : shiftNumber}',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isShiftOpen ? AppColors.mintLight : const Color(0xFFFEE2E2),
+                        color: isShiftOpen ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        isShiftOpen ? 'OCHIQ' : 'YOPIQ',
-                        style: TextStyle(
-                          color: isShiftOpen ? AppColors.success : AppColors.error,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 12,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: isShiftOpen ? const Color(0xFF16A34A) : AppColors.error,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            isShiftOpen ? 'OCHIQ' : 'YOPIQ',
+                            style: TextStyle(
+                              color: isShiftOpen ? const Color(0xFF15803D) : AppColors.error,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -1305,30 +1801,78 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
                 _buildShiftRow('Telefon:', user?.phone ?? 'Biriktirilmagan'),
                 if (openedAt != null)
                   _buildShiftRow('Ochilgan vaqti:', Formatters.formatDateTime(openedAt)),
-                _buildShiftRow('Boshlang‘ich qoldiq:', Formatters.formatCurrency(openingBalance)),
-                _buildShiftRow('Jami naqd tushum:', Formatters.formatCurrency(totalCashShift)),
-                _buildShiftRow('Jami karta tushum:', Formatters.formatCurrency(_cardTotal)),
+                const Divider(height: 16, color: Color(0xFFF1F5F9)),
+                _buildShiftRow('Boshlang‘ich naqd qoldiq:', Formatters.formatCurrency(openingBalance)),
+                _buildShiftRow('Smenadagi naqd tushum (+):', Formatters.formatCurrency(cashTotal), isBold: true),
+                _buildShiftRow('Smenadagi karta tushum (+):', Formatters.formatCurrency(cardTotal), isBold: true),
+                _buildShiftRow('Jami smena tushumi:', Formatters.formatCurrency(totalRevenue), isBold: true),
                 if (_currentShift?['notes'] != null && _currentShift!['notes'].toString().isNotEmpty)
                   _buildShiftRow('Izoh:', _currentShift!['notes'].toString()),
                 const Divider(height: 20, color: AppColors.border),
-                _buildShiftRow('Kassadagi jami summa:', Formatters.formatCurrency(totalBalance), isBold: true),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Kassadagi kutilayotgan naqd pul:',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF)),
+                      ),
+                      Text(
+                        Formatters.formatCurrency(expectedCashInDrawer),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF1E40AF)),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
 
-          // Actions
+          // Action Buttons: X-Hisobot & Close Shift
           if (isShiftOpen) ...[
+            // 1. X-Hisobot button
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: _showXReportModal,
+                icon: const Icon(Icons.receipt_long_rounded, size: 20),
+                label: const Text(
+                  'X-Hisobot (Oraliq hisobot ko‘rish & chop etish)',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0284C7),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 2,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // 2. Close Shift button (Z-Hisobot)
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
                 onPressed: _closeShiftDialog,
                 icon: const Icon(Icons.lock_clock_rounded, size: 20),
-                label: const Text('Smenani Yopish va X-Hisobot'),
+                label: const Text(
+                  'Smenani Yopish (Z-Hisobot)',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.warning,
+                  backgroundColor: const Color(0xFFD97706),
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 2,
                 ),
               ),
             ),
@@ -1339,10 +1883,15 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
               child: ElevatedButton.icon(
                 onPressed: _openShiftDialog,
                 icon: const Icon(Icons.point_of_sale_rounded, size: 20),
-                label: const Text('Yangi Smena Ochish'),
+                label: const Text(
+                  'Yangi Kassa Smenasini Ochish',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.success,
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 2,
                 ),
               ),
             ),
@@ -1402,7 +1951,15 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: TextStyle(fontSize: 12, color: isBold ? AppColors.textPrimary : AppColors.textSecondary, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
-          Text(value, style: TextStyle(fontSize: 12, fontWeight: isBold ? FontWeight.w900 : FontWeight.bold, color: isBold ? AppColors.primary : AppColors.textPrimary)),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              style: TextStyle(fontSize: 12, fontWeight: isBold ? FontWeight.w900 : FontWeight.bold, color: isBold ? AppColors.primary : AppColors.textPrimary),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

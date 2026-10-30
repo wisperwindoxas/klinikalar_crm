@@ -864,11 +864,13 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
                           ),
                         ),
                         const Text(' • ', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                        Text(
-                          '$room-xona ($docSpecialty)',
-                          style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w500),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Flexible(
+                          child: Text(
+                            '$room-xona ($docSpecialty)',
+                            style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w500),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),

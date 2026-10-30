@@ -9,7 +9,8 @@ FROM node:20-alpine
 WORKDIR /app
 COPY package*.json ./
 RUN npm install --only=production
-COPY --from=builder /app/dist ./dist
+COPY --from=builder --chown=node:node /app/dist ./dist
+USER node
 ENV PORT=5001
 ENV NODE_ENV=production
 EXPOSE 5001

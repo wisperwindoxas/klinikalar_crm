@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Volume2, VolumeX, Clock, Calendar, Stethoscope, DoorOpen, Users, Bell, FileText, HeartPulse } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { playChime } from './audio/chime';
+import appLogo from './assets/logo.png';
 
 const API_BASE_URL = 'http://localhost:5001/api/v1';
 const WS_BASE_URL = 'http://localhost:5001';
@@ -424,7 +425,7 @@ const numberToUzbekOrdinal = (n: number | string): string => {
         {/* Brand Left */}
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 bg-transparent flex items-center justify-center flex-shrink-0 filter drop-shadow-md">
-            <img src="/logo.png" alt="klinika-admin Logo" className="w-full h-full object-contain bg-transparent" />
+            <img src={data?.settings?.logo_url || appLogo} alt="klinika-admin Logo" className="w-full h-full object-contain bg-transparent" />
           </div>
           <div>
             <h1 className="text-2xl font-black tracking-tight leading-none text-white">

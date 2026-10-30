@@ -57,25 +57,45 @@ export class PostgresService {
   }
 
   // --- CLINIC SETTINGS ---
-  public async getSettings() {
-    const res = await this.query('SELECT * FROM clinic_settings LIMIT 1');
-    return res.rows[0];
+  public async getSettings(clinicId?: string) {
+    if (clinicId) {
+      const res = await this.query('SELECT * FROM clinic_settings WHERE clinic_id = $1 OR id = $1 LIMIT 1', [clinicId]);
+      if (res.rows.length > 0) return res.rows[0];
+    }
+    const res = await this.query('SELECT * FROM clinic_settings WHERE id = $1 OR clinic_id = $1 LIMIT 1', ['tenant_sadaf_01']);
+    if (res.rows.length > 0) return res.rows[0];
+    const fallback = await this.query('SELECT * FROM clinic_settings LIMIT 1');
+    return fallback.rows[0];
   }
 
   // --- SPECIALTIES ---
-  public async getSpecialties() {
-    const res = await this.query('SELECT * FROM specialties WHERE is_active = true ORDER BY name ASC');
+  public async getSpecialties(clinicId?: string) {
+    let sql = 'SELECT * FROM specialties WHERE is_active = true';
+    const params: any[] = [];
+    if (clinicId) {
+      params.push(clinicId);
+      sql += ' AND (clinic_id = $1 OR clinic_id = \'tenant_sadaf_01\' OR clinic_id IS NULL)';
+    }
+    sql += ' ORDER BY name ASC';
+    const res = await this.query(sql, params);
     return res.rows;
   }
 
   // --- CABINETS ---
-  public async getCabinets() {
-    const res = await this.query('SELECT * FROM cabinets WHERE is_active = true ORDER BY (number::int) ASC');
+  public async getCabinets(clinicId?: string) {
+    let sql = 'SELECT * FROM cabinets WHERE is_active = true';
+    const params: any[] = [];
+    if (clinicId) {
+      params.push(clinicId);
+      sql += ' AND (clinic_id = $1 OR clinic_id = \'tenant_sadaf_01\' OR clinic_id IS NULL)';
+    }
+    sql += ' ORDER BY (CASE WHEN number ~ \'^[0-9]+$\' THEN number::int ELSE 9999 END) ASC';
+    const res = await this.query(sql, params);
     return res.rows;
   }
 
   // --- DOCTORS ---
-  public async getDoctors(specialtyId?: string) {
+  public async getDoctors(specialtyId?: string, clinicId?: string) {
     let sql = `
       SELECT d.*, 
              d.display_name as full_name,
@@ -87,8 +107,6 @@ export class PostgresService {
              COALESCE(c.number, d.room_number) as cabinet_number,
              u.username as login,
              u.username,
-             u.raw_password as password,
-             u.raw_password,
              u.phone as user_phone
       FROM doctors d
       LEFT JOIN specialties s ON d.specialty_id = s.id
@@ -97,9 +115,14 @@ export class PostgresService {
       WHERE d.is_active = true
     `;
     const params: any[] = [];
+    let idx = 1;
+    if (clinicId) {
+      params.push(clinicId);
+      sql += ` AND (d.clinic_id = $${idx++} OR d.clinic_id IS NULL)`;
+    }
     if (specialtyId && specialtyId !== 'ALL' && specialtyId !== 'Barchasi') {
       params.push(specialtyId);
-      sql += ` AND d.specialty_id = $1`;
+      sql += ` AND d.specialty_id = $${idx++}`;
     }
     sql += ` ORDER BY d.display_name ASC`;
     const res = await this.query(sql, params);
@@ -118,8 +141,6 @@ export class PostgresService {
              COALESCE(c.number, d.room_number) as cabinet_number,
              u.username as login,
              u.username,
-             u.raw_password as password,
-             u.raw_password,
              u.phone as user_phone
       FROM doctors d
       LEFT JOIN specialties s ON d.specialty_id = s.id
@@ -149,7 +170,14 @@ export class PostgresService {
   }
 
   // --- SERVICES ---
-  public async getServices(specialtyId?: string) {
+  public async getServices(specialtyId?: string, clinicId?: string) {
+    const params: any[] = [];
+    let clinicParamPlaceholder = '';
+    if (clinicId) {
+      params.push(clinicId);
+      clinicParamPlaceholder = 'AND (d.clinic_id = $1 OR d.clinic_id IS NULL)';
+    }
+
     let sql = `
       SELECT 
         s.*, 
@@ -159,6 +187,7 @@ export class PostgresService {
           SELECT COUNT(d.id)::int
           FROM doctors d
           WHERE d.specialty_id = s.specialty_id AND d.is_active = true
+            ${clinicParamPlaceholder}
         ) as doctor_count,
         (
           SELECT COALESCE(json_agg(json_build_object(
@@ -171,15 +200,21 @@ export class PostgresService {
           ) ORDER BY d.display_name ASC), '[]'::json)
           FROM doctors d
           WHERE d.specialty_id = s.specialty_id AND d.is_active = true
+            ${clinicParamPlaceholder}
         ) as doctors
       FROM services s
       LEFT JOIN specialties sp ON s.specialty_id = sp.id
       WHERE s.is_active = true
     `;
-    const params: any[] = [];
+
+    if (clinicId) {
+      sql += ` AND (s.clinic_id = $1 OR s.clinic_id IS NULL)`;
+    }
+
     if (specialtyId && specialtyId !== 'ALL' && specialtyId !== 'Barchasi') {
       params.push(specialtyId);
-      sql += ` AND s.specialty_id = $1`;
+      const sIdx = params.length;
+      sql += ` AND s.specialty_id = $${sIdx}`;
     }
     sql += ` ORDER BY s.name ASC`;
     const res = await this.query(sql, params);
@@ -187,14 +222,14 @@ export class PostgresService {
   }
 
   // --- PATIENTS ---
-  public async getPatients(search?: string, limit?: number, offset?: number) {
+  public async getPatients(search?: string, limit?: number, offset?: number, clinicId?: string) {
     let sql = `
       SELECT 
         pt.*,
         (
           SELECT COUNT(qt.id)::int 
           FROM queue_tickets qt 
-          WHERE qt.patient_id = pt.id
+          WHERE qt.patient_id = pt.id AND qt.status = 'COMPLETED'
         ) as total_visits,
         (
           SELECT COALESCE(SUM(p.amount), 0)
@@ -211,7 +246,7 @@ export class PostgresService {
             'status', qt.status
           )
           FROM queue_tickets qt
-          WHERE qt.patient_id = pt.id
+          WHERE qt.patient_id = pt.id AND qt.status = 'COMPLETED'
           ORDER BY qt.created_at DESC
           LIMIT 1
         ) as last_visit,
@@ -232,10 +267,10 @@ export class PostgresService {
               qt.cabinet_number,
               COUNT(qt.id)::int as visit_count,
               MAX(qt.created_at) as last_visited_at,
-              MAX(COALESCE(qt.doctor_conclusion, qt.notes)) as doctor_conclusion,
-              MAX(qt.notes) as notes
+              MAX(NULLIF(TRIM(COALESCE(qt.doctor_conclusion, qt.notes)), '')) as doctor_conclusion,
+              MAX(NULLIF(TRIM(qt.notes), '')) as notes
             FROM queue_tickets qt
-            WHERE qt.patient_id = pt.id
+            WHERE qt.patient_id = pt.id AND qt.status = 'COMPLETED'
             GROUP BY qt.doctor_name, qt.specialty_name, qt.cabinet_number
           ) dv
         ) as doctor_visits
@@ -244,6 +279,10 @@ export class PostgresService {
     `;
     const params: any[] = [];
     let idx = 1;
+    if (clinicId) {
+      params.push(clinicId);
+      sql += ` AND (pt.clinic_id = $${idx++} OR pt.clinic_id IS NULL)`;
+    }
     if (search && search.trim()) {
       params.push(`%${search.trim().toLowerCase()}%`);
       sql += ` AND (LOWER(pt.full_name) LIKE $${idx} OR pt.phone LIKE $${idx} OR pt.patient_number LIKE $${idx++})`;
@@ -270,7 +309,7 @@ export class PostgresService {
         (
           SELECT COUNT(qt.id)::int 
           FROM queue_tickets qt 
-          WHERE qt.patient_id = pt.id
+          WHERE qt.patient_id = pt.id AND qt.status = 'COMPLETED'
         ) as total_visits,
         (
           SELECT COALESCE(SUM(p.amount), 0)
@@ -287,7 +326,7 @@ export class PostgresService {
             'status', qt.status
           )
           FROM queue_tickets qt
-          WHERE qt.patient_id = pt.id
+          WHERE qt.patient_id = pt.id AND qt.status = 'COMPLETED'
           ORDER BY qt.created_at DESC
           LIMIT 1
         ) as last_visit,
@@ -308,10 +347,10 @@ export class PostgresService {
               qt.cabinet_number,
               COUNT(qt.id)::int as visit_count,
               MAX(qt.created_at) as last_visited_at,
-              MAX(COALESCE(qt.doctor_conclusion, qt.notes)) as doctor_conclusion,
-              MAX(qt.notes) as notes
+              MAX(NULLIF(TRIM(COALESCE(qt.doctor_conclusion, qt.notes)), '')) as doctor_conclusion,
+              MAX(NULLIF(TRIM(qt.notes), '')) as notes
             FROM queue_tickets qt
-            WHERE qt.patient_id = pt.id
+            WHERE qt.patient_id = pt.id AND qt.status = 'COMPLETED'
             GROUP BY qt.doctor_name, qt.specialty_name, qt.cabinet_number
           ) dv
         ) as doctor_visits
@@ -328,14 +367,16 @@ export class PostgresService {
     gender?: string;
     address?: string;
     notes?: string;
+    clinicId?: string;
   }) {
-    // 1. If an existing patient matches by phone and name, reuse them
+    const clinicId = data.clinicId || 'tenant_sadaf_01';
+    // 1. If an existing patient matches by phone and name within this clinic, reuse them
     if (data.phone && data.phone.trim() && data.fullName && data.fullName.trim()) {
       const cleanPhone = data.phone.trim();
       const cleanName = data.fullName.trim().toLowerCase();
       const existing = await this.query(
-        'SELECT * FROM patients WHERE phone = $1 AND LOWER(TRIM(full_name)) = $2 LIMIT 1',
-        [cleanPhone, cleanName]
+        'SELECT * FROM patients WHERE (clinic_id = $1 OR clinic_id IS NULL) AND phone = $2 AND LOWER(TRIM(full_name)) = $3 LIMIT 1',
+        [clinicId, cleanPhone, cleanName]
       );
       if (existing.rows.length > 0) {
         return existing.rows[0];
@@ -360,11 +401,12 @@ export class PostgresService {
     }
 
     const res = await this.query(`
-      INSERT INTO patients (id, patient_number, full_name, phone, birth_date, gender, address, notes)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO patients (id, clinic_id, patient_number, full_name, phone, birth_date, gender, address, notes)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `, [
       id,
+      clinicId,
       nextNum,
       data.fullName.trim(),
       data.phone ? data.phone.trim() : null,
@@ -377,42 +419,58 @@ export class PostgresService {
   }
 
   // --- CASH SHIFTS ---
-  public async getCurrentShift(cashierId?: string) {
+  public async getCurrentShift(cashierId?: string, clinicId?: string) {
     let sql = `SELECT * FROM cash_shifts WHERE status = 'OPEN'`;
     const params: any[] = [];
+    let idx = 1;
+    if (clinicId) {
+      params.push(clinicId);
+      sql += ` AND (clinic_id = $${idx++} OR clinic_id IS NULL)`;
+    }
     if (cashierId) {
       params.push(cashierId);
-      sql += ` AND cashier_id = $1`;
+      sql += ` AND cashier_id = $${idx++}`;
     }
     sql += ` ORDER BY opened_at DESC LIMIT 1`;
     const res = await this.query(sql, params);
     return res.rows[0] || null;
   }
 
-  public async openShift(cashierId: string, cashierName: string, openingBalance: number, notes?: string) {
+  public async openShift(cashierId: string, cashierName: string, openingBalance: number, notes?: string, clinicId?: string) {
     const id = `shift_${uuidv4().substring(0, 8)}`;
+    const targetClinicId = clinicId || 'tenant_sadaf_01';
     const res = await this.query(`
-      INSERT INTO cash_shifts (id, cashier_id, cashier_name, opened_at, opening_balance, status, notes)
-      VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, 'OPEN', $5)
+      INSERT INTO cash_shifts (id, clinic_id, cashier_id, cashier_name, opened_at, opening_balance, status, notes)
+      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, $5, 'OPEN', $6)
       RETURNING *
-    `, [id, cashierId, cashierName, openingBalance || 0, notes || null]);
+    `, [id, targetClinicId, cashierId, cashierName, openingBalance || 0, notes || null]);
     return res.rows[0];
   }
 
   public async closeShift(shiftId: string, closingBalance: number) {
+    const payRes = await this.query(`
+      SELECT COALESCE(SUM(amount), 0) as total
+      FROM payments
+      WHERE cash_shift_id = $1
+    `, [shiftId]);
+    const totalPayments = Number(payRes.rows[0]?.total) || 0;
+
     const res = await this.query(`
       UPDATE cash_shifts
-      SET status = 'CLOSED', closed_at = CURRENT_TIMESTAMP, closing_balance = $2
+      SET status = 'CLOSED', 
+          closed_at = CURRENT_TIMESTAMP, 
+          closing_balance = $2,
+          total_received = GREATEST(COALESCE(total_received, 0), $3)
       WHERE id = $1
       RETURNING *
-    `, [shiftId, closingBalance]);
+    `, [shiftId, closingBalance, totalPayments]);
     return res.rows[0];
   }
 
   // --- QUEUE TICKETS ---
   // Atomic generation of ticket for appointment:
   // Prefix: specialty prefix or doctor prefix or 'A'
-  // Unique per (queue_date, queue_prefix, queue_number)
+  // Unique per (queue_date, queue_prefix, queue_number, clinic_id)
   public async createTicketAtomic(client: PoolClient, data: {
     patientId: string;
     doctorId: string;
@@ -420,6 +478,8 @@ export class PostgresService {
     cabinetId?: string;
     createdBy?: string;
     paymentStatus?: string;
+    clinicId?: string;
+    price?: number;
   }) {
     // 1. Get Doctor & Specialty info
     const docRes = await client.query(`
@@ -434,6 +494,8 @@ export class PostgresService {
     const doctor = docRes.rows[0];
     if (!doctor) throw new Error('Shifokor topilmadi.');
 
+    const clinicId = data.clinicId || doctor.clinic_id || 'tenant_sadaf_01';
+
     // 2. Get Patient info
     const patRes = await client.query(`SELECT * FROM patients WHERE id = $1`, [data.patientId]);
     const patient = patRes.rows[0];
@@ -446,12 +508,12 @@ export class PostgresService {
     const todayStr = new Date().toISOString().split('T')[0];
     const prefix = doctor.specialty_prefix || 'A';
 
-    // 4. Lock and calculate next sequence number for this date and prefix
+    // 4. Lock and calculate next sequence number for this date, prefix and clinic
     const seqRes = await client.query(`
       SELECT COALESCE(MAX(queue_number), 0) + 1 as next_seq
       FROM queue_tickets
-      WHERE queue_date = $1 AND queue_prefix = $2
-    `, [todayStr, prefix]);
+      WHERE queue_date = $1 AND queue_prefix = $2 AND (clinic_id = $3 OR clinic_id IS NULL)
+    `, [todayStr, prefix, clinicId]);
     const nextSeq = parseInt(seqRes.rows[0].next_seq, 10);
     const fullNumber = `${prefix}-${String(nextSeq).padStart(3, '0')}`;
 
@@ -492,15 +554,16 @@ export class PostgresService {
     const ticketId = `tck_${uuidv4().substring(0, 8)}`;
     const ticketRes = await client.query(`
       INSERT INTO queue_tickets (
-        id, appointment_id, doctor_id, patient_id, service_id, cabinet_id,
+        id, clinic_id, appointment_id, doctor_id, patient_id, service_id, cabinet_id,
         doctor_name, specialty_name, patient_name, patient_phone, cabinet_number,
         queue_date, queue_prefix, queue_number, full_number,
         status, priority, payment_status, estimated_wait_minutes, created_by
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'WAITING', 0, $16, $17, $18)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'WAITING', 0, $17, $18, $19)
       RETURNING *
     `, [
       ticketId,
+      clinicId,
       appointmentId,
       doctor.id,
       patient.id,
@@ -536,10 +599,16 @@ export class PostgresService {
       amountPaid: number;
     };
     cashierId?: string;
+    clinicId?: string;
   }) {
+    const targetClinicId = data.clinicId || 'tenant_sadaf_01';
     return this.withTransaction(async (client) => {
       // 1. Verify shift
-      const shiftRes = await client.query(`SELECT * FROM cash_shifts WHERE status = 'OPEN' LIMIT 1`);
+      const shiftRes = await client.query(`
+        SELECT * FROM cash_shifts 
+        WHERE status = 'OPEN' AND (clinic_id = $1 OR clinic_id IS NULL) 
+        ORDER BY opened_at DESC LIMIT 1
+      `, [targetClinicId]);
       const activeShift = shiftRes.rows[0];
 
       // Validate cashier user ID against users table
@@ -582,7 +651,8 @@ export class PostgresService {
           serviceId: item.serviceId || '',
           createdBy: validCashierId || undefined,
           paymentStatus,
-          price
+          price,
+          clinicId: targetClinicId
         } as any);
         createdTickets.push(ticket);
       }
@@ -593,11 +663,12 @@ export class PostgresService {
         const paymentId = `pay_${uuidv4().substring(0, 8)}`;
         const receiptNumber = `RCP-${Date.now()}-${uuidv4().substring(0, 4).toUpperCase()}`;
         const payRes = await client.query(`
-          INSERT INTO payments (id, patient_id, cashier_id, cash_shift_id, receipt_number, amount, method, status, notes)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          INSERT INTO payments (id, clinic_id, patient_id, cashier_id, cash_shift_id, receipt_number, amount, method, status, notes)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           RETURNING *
         `, [
           paymentId,
+          targetClinicId,
           data.patientId,
           validCashierId,
           activeShift?.id || null,
@@ -789,6 +860,7 @@ export class PostgresService {
     search?: string;
     limit?: number;
     offset?: number;
+    clinicId?: string;
   }) {
     let sql = `
       SELECT t.*, s.name as service_name, s.price as service_price,
@@ -800,6 +872,11 @@ export class PostgresService {
     `;
     const params: any[] = [];
     let idx = 1;
+
+    if (filter.clinicId) {
+      params.push(filter.clinicId);
+      sql += ` AND (t.clinic_id = $${idx++} OR t.clinic_id IS NULL)`;
+    }
 
     if (filter.date) {
       params.push(filter.date);
@@ -839,12 +916,13 @@ export class PostgresService {
   }
 
   // --- TV TABLO FEED ---
-  public async getTvFeed() {
+  public async getTvFeed(clinicId?: string) {
     const todayStr = new Date().toISOString().split('T')[0];
-    const settings = await this.getSettings();
+    const settings = await this.getSettings(clinicId);
 
     // Hozir chaqirilayotgan yoki qabuldagi oxirgi 4-8 ta talon
-    const calledRes = await this.query(`
+    const calledParams: any[] = [todayStr];
+    let calledSql = `
       SELECT t.*, 
              COALESCE(t.doctor_name, d.display_name) as doctor_name,
              COALESCE(t.cabinet_number, d.room_number) as cabinet_number,
@@ -852,13 +930,22 @@ export class PostgresService {
       FROM queue_tickets t
       LEFT JOIN doctors d ON t.doctor_id = d.id
       LEFT JOIN services s ON t.service_id = s.id
-      WHERE t.queue_date = $1 AND (t.status = 'CALLED' OR t.status = 'IN_PROGRESS')
+      WHERE t.queue_date = $1 
+    `;
+    if (clinicId) {
+      calledParams.push(clinicId);
+      calledSql += ` AND (t.clinic_id = $2 OR t.clinic_id IS NULL) `;
+    }
+    calledSql += `
+      AND (t.status = 'CALLED' OR t.status = 'IN_PROGRESS')
       ORDER BY t.called_at DESC NULLS LAST, t.updated_at DESC
       LIMIT 6
-    `, [todayStr]);
+    `;
+    const calledRes = await this.query(calledSql, calledParams);
 
     // Keyingi kutayotgan navbatlar
-    const waitingRes = await this.query(`
+    const waitingParams: any[] = [todayStr];
+    let waitingSql = `
       SELECT t.*,
              COALESCE(t.doctor_name, d.display_name) as doctor_name,
              COALESCE(t.cabinet_number, d.room_number) as cabinet_number,
@@ -866,10 +953,18 @@ export class PostgresService {
       FROM queue_tickets t
       LEFT JOIN doctors d ON t.doctor_id = d.id
       LEFT JOIN services s ON t.service_id = s.id
-      WHERE t.queue_date = $1 AND t.status = 'WAITING'
+      WHERE t.queue_date = $1 
+    `;
+    if (clinicId) {
+      waitingParams.push(clinicId);
+      waitingSql += ` AND (t.clinic_id = $2 OR t.clinic_id IS NULL) `;
+    }
+    waitingSql += `
+      AND t.status = 'WAITING'
       ORDER BY t.priority DESC, t.queue_number ASC
       LIMIT 8
-    `, [todayStr]);
+    `;
+    const waitingRes = await this.query(waitingSql, waitingParams);
 
     return {
       clinicName: settings?.clinic_name || 'klinika-admin',
@@ -882,10 +977,12 @@ export class PostgresService {
   }
 
   // --- DASHBOARD & METRICS ---
-  public async getDashboardMetrics() {
+  public async getDashboardMetrics(clinicId?: string) {
     const todayStr = new Date().toISOString().split('T')[0];
+    const targetClinicId = clinicId;
 
-    const statsRes = await this.query(`
+    const statsParams: any[] = [todayStr];
+    let statsSql = `
       SELECT
         COUNT(*) as total_today,
         COUNT(*) FILTER (WHERE status = 'WAITING') as waiting_count,
@@ -894,16 +991,28 @@ export class PostgresService {
         COUNT(*) FILTER (WHERE status = 'CANCELLED' OR status = 'SKIPPED') as cancelled_count
       FROM queue_tickets
       WHERE queue_date = $1
-    `, [todayStr]);
+    `;
+    if (targetClinicId) {
+      statsParams.push(targetClinicId);
+      statsSql += ` AND (clinic_id = $2 OR clinic_id IS NULL) `;
+    }
+    const statsRes = await this.query(statsSql, statsParams);
 
-    const paymentRes = await this.query(`
+    const paymentParams: any[] = [todayStr];
+    let paymentSql = `
       SELECT COALESCE(SUM(amount), 0) as total_payments
       FROM payments
       WHERE DATE(created_at) = $1
-    `, [todayStr]);
+    `;
+    if (targetClinicId) {
+      paymentParams.push(targetClinicId);
+      paymentSql += ` AND (clinic_id = $2 OR clinic_id IS NULL) `;
+    }
+    const paymentRes = await this.query(paymentSql, paymentParams);
 
     // Shifokorlar bo'yicha yuklama va tushumlar
-    const doctorsLoadRes = await this.query(`
+    const docLoadParams: any[] = [];
+    let docLoadSql = `
       SELECT d.id, d.display_name, d.room_number, d.phone, s.name as specialty_name,
         c.number as cabinet_number,
         COUNT(t.id) FILTER (WHERE t.status = 'WAITING')::int as waiting,
@@ -917,18 +1026,33 @@ export class PostgresService {
       LEFT JOIN queue_tickets t ON d.id = t.doctor_id
       LEFT JOIN services srv ON t.service_id = srv.id
       WHERE d.is_active = true
+    `;
+    if (targetClinicId) {
+      docLoadParams.push(targetClinicId);
+      docLoadSql += ` AND (d.clinic_id = $1 OR d.clinic_id IS NULL) `;
+    }
+    docLoadSql += `
       GROUP BY d.id, d.display_name, d.room_number, d.phone, s.name, c.number
       ORDER BY total_tickets DESC, waiting DESC, d.display_name ASC
-    `);
+    `;
+    const doctorsLoadRes = await this.query(docLoadSql, docLoadParams);
 
     // Hourly distribution from actual queue_tickets
-    const hourlyRes = await this.query(`
+    const hourlyParams: any[] = [todayStr];
+    let hourlySql = `
       SELECT TO_CHAR(created_at, 'HH24:00') as hour_slot, COUNT(*) as count
       FROM queue_tickets
       WHERE queue_date = $1
+    `;
+    if (targetClinicId) {
+      hourlyParams.push(targetClinicId);
+      hourlySql += ` AND (clinic_id = $2 OR clinic_id IS NULL) `;
+    }
+    hourlySql += `
       GROUP BY hour_slot
       ORDER BY hour_slot ASC
-    `, [todayStr]);
+    `;
+    const hourlyRes = await this.query(hourlySql, hourlyParams);
 
     const defaultHours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
     const hourlyMap = new Map<string, number>();
@@ -941,7 +1065,8 @@ export class PostgresService {
     }));
 
     // Payment breakdown by method (Cash, Card, Online/Transfer)
-    const payBreakdownRes = await this.query(`
+    const pbParams: any[] = [todayStr];
+    let pbSql = `
       SELECT
         COALESCE(SUM(amount) FILTER (WHERE method = 'CASH'), 0) as cash_sum,
         COALESCE(SUM(amount) FILTER (WHERE method = 'CARD'), 0) as card_sum,
@@ -949,7 +1074,12 @@ export class PostgresService {
         COALESCE(SUM(amount), 0) as total_sum
       FROM payments
       WHERE DATE(created_at) = $1
-    `, [todayStr]);
+    `;
+    if (targetClinicId) {
+      pbParams.push(targetClinicId);
+      pbSql += ` AND (clinic_id = $2 OR clinic_id IS NULL) `;
+    }
+    const payBreakdownRes = await this.query(pbSql, pbParams);
 
     const pb = payBreakdownRes.rows[0];
     const totalPay = parseFloat(pb?.total_sum || '0');
@@ -958,11 +1088,17 @@ export class PostgresService {
     const onlinePay = parseFloat(pb?.online_sum || '0');
 
     // Monthly payment total from payments table
-    const monthPayRes = await this.query(`
+    const monthPayParams: any[] = [];
+    let monthPaySql = `
       SELECT COALESCE(SUM(amount), 0) as monthly_sum
       FROM payments
       WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
-    `);
+    `;
+    if (targetClinicId) {
+      monthPayParams.push(targetClinicId);
+      monthPaySql += ` AND (clinic_id = $1 OR clinic_id IS NULL) `;
+    }
+    const monthPayRes = await this.query(monthPaySql, monthPayParams);
     const monthlyRevenue = parseFloat(monthPayRes.rows[0]?.monthly_sum || '0');
 
     const stats = statsRes.rows[0];
@@ -1006,21 +1142,23 @@ export class PostgresService {
     username?: string;
     login?: string;
     password?: string;
-  }) {
+    clinicId?: string;
+  }, clinicId?: string) {
     const id = `doc_${Date.now()}`;
+    const targetClinicId = clinicId || data.clinicId || 'tenant_sadaf_01';
     let cabinetId: string | null = null;
     if (data.cabinetNumber) {
-      const cabRes = await this.query('SELECT id FROM cabinets WHERE number = $1', [data.cabinetNumber]);
+      const cabRes = await this.query('SELECT id FROM cabinets WHERE number = $1 AND (clinic_id = $2 OR clinic_id IS NULL)', [data.cabinetNumber, targetClinicId]);
       if (cabRes.rows.length > 0) {
         cabinetId = cabRes.rows[0].id;
       } else {
         const cabId = `cab_${data.cabinetNumber.replace(/\s+/g, '_')}`;
         const floor = Math.max(1, parseInt(data.cabinetNumber) >= 10 ? Math.floor(parseInt(data.cabinetNumber) / 10) : 1);
         await this.query(`
-          INSERT INTO cabinets (id, number, name, department, floor, is_active)
-          VALUES ($1, $2, $3, $4, $5, true)
+          INSERT INTO cabinets (id, clinic_id, number, name, department, floor, is_active)
+          VALUES ($1, $2, $3, $4, $5, $6, true)
           ON CONFLICT (number) DO NOTHING
-        `, [cabId, data.cabinetNumber, `${data.cabinetNumber}-kabinet`, 'Ambulatoriya', floor]);
+        `, [cabId, targetClinicId, data.cabinetNumber, `${data.cabinetNumber}-kabinet`, 'Ambulatoriya', floor]);
         cabinetId = cabId;
       }
     }
@@ -1046,16 +1184,16 @@ export class PostgresService {
     // 3. Create user record in users table
     const userId = `usr_${id}`;
     await this.query(`
-      INSERT INTO users (id, full_name, username, password_hash, raw_password, role_id, phone, is_active)
-      VALUES ($1, $2, $3, $4, $5, 'role_doctor', $6, true)
-    `, [userId, data.displayName, username, passwordHash, rawPassword, data.phone || null]);
+      INSERT INTO users (id, clinic_id, full_name, username, password_hash, raw_password, role_id, phone, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, 'role_doctor', $7, true)
+    `, [userId, targetClinicId, data.displayName, username, passwordHash, rawPassword, data.phone || null]);
 
     // 4. Create doctor record linked to user_id
     const res = await this.query(`
-      INSERT INTO doctors (id, user_id, specialty_id, cabinet_id, display_name, room_number, phone, address, is_active)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
+      INSERT INTO doctors (id, clinic_id, user_id, specialty_id, cabinet_id, display_name, room_number, phone, address, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
       RETURNING *
-    `, [id, userId, data.specialtyId, cabinetId, data.displayName, data.cabinetNumber, data.phone || '+998 90 000 00 00', data.address || null]);
+    `, [id, targetClinicId, userId, data.specialtyId, cabinetId, data.displayName, data.cabinetNumber, data.phone || '+998 90 000 00 00', data.address || null]);
 
     return {
       ...res.rows[0],
@@ -1172,16 +1310,17 @@ export class PostgresService {
   }
 
   // --- SERVICE CRUD ---
-  public async createService(data: { name: string; specialtyId?: string; price: number; paymentPolicy: string }) {
+  public async createService(data: { name: string; specialtyId?: string; price: number; paymentPolicy: string; clinicId?: string }, clinicId?: string) {
     const id = `srv_${Date.now()}`;
+    const targetClinicId = clinicId || data.clinicId || 'tenant_sadaf_01';
     const policy = (data.paymentPolicy === 'PAY_AFTER_SERVICE' || data.paymentPolicy === 'TICKET_BEFORE_PAYMENT')
       ? 'TICKET_BEFORE_PAYMENT'
       : 'PAY_BEFORE_TICKET';
     const res = await this.query(`
-      INSERT INTO services (id, specialty_id, name, price, payment_policy, is_active)
-      VALUES ($1, $2, $3, $4, $5, true)
+      INSERT INTO services (id, clinic_id, specialty_id, name, price, payment_policy, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, true)
       RETURNING *
-    `, [id, data.specialtyId || 'spec_kardio', data.name, data.price || 0, policy]);
+    `, [id, targetClinicId, data.specialtyId || 'spec_kardio', data.name, data.price || 0, policy]);
     return res.rows[0];
   }
 
@@ -1221,15 +1360,16 @@ export class PostgresService {
   }
 
   // --- CABINET CRUD ---
-  public async createCabinet(data: { roomNumber?: string; number?: string; name: string; floor?: number; department?: string }) {
+  public async createCabinet(data: { roomNumber?: string; number?: string; name: string; floor?: number; department?: string; clinicId?: string }, clinicId?: string) {
     const id = `cab_${Date.now()}`;
+    const targetClinicId = clinicId || data.clinicId || 'tenant_sadaf_01';
     const num = data.roomNumber || data.number || String(Date.now()).slice(-3);
     const dept = data.department || 'Ambulatoriya';
     const res = await this.query(`
-      INSERT INTO cabinets (id, number, name, department, floor, is_active)
-      VALUES ($1, $2, $3, $4, $5, true)
+      INSERT INTO cabinets (id, clinic_id, number, name, department, floor, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, true)
       RETURNING *
-    `, [id, num, data.name, dept, data.floor || 1]);
+    `, [id, targetClinicId, num, data.name, dept, data.floor || 1]);
     return res.rows[0];
   }
 
@@ -1285,7 +1425,16 @@ export class PostgresService {
   }
 
   // --- SETTINGS CRUD ---
-  public async updateSettings(data: any) {
+  public async updateSettings(data: any, clinicId?: string) {
+    const targetClinicId = clinicId || 'tenant_sadaf_01';
+
+    // Ensure settings record exists for this clinic
+    await this.query(`
+      INSERT INTO clinic_settings (id, clinic_id, clinic_name)
+      VALUES ($1, $1, 'Klinika')
+      ON CONFLICT (id) DO NOTHING
+    `, [targetClinicId]);
+
     const fields: string[] = [];
     const values: any[] = [];
     let idx = 1;
@@ -1293,6 +1442,8 @@ export class PostgresService {
     const mapping: Record<string, string> = {
       clinicName: 'clinic_name',
       clinic_name: 'clinic_name',
+      logoUrl: 'logo_url',
+      logo_url: 'logo_url',
       slogan: 'slogan',
       phone: 'phone',
       email: 'email',
@@ -1369,15 +1520,16 @@ export class PostgresService {
     }
 
     if (fields.length === 0) {
-      const res = await this.query(`SELECT * FROM clinic_settings WHERE id = 'default'`);
+      const res = await this.query(`SELECT * FROM clinic_settings WHERE clinic_id = $1 OR id = $1`, [targetClinicId]);
       return res.rows[0];
     }
 
     fields.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(targetClinicId);
     const sql = `
       UPDATE clinic_settings
       SET ${fields.join(', ')}
-      WHERE id = 'default'
+      WHERE clinic_id = $${idx} OR id = $${idx}
       RETURNING *
     `;
     const res = await this.query(sql, values);
@@ -1391,7 +1543,7 @@ export class PostgresService {
         'Menejer (Boshqaruv)',
         'SOZLAMALAR_YANGILANDI',
         'CLINIC_SETTINGS',
-        'default',
+        targetClinicId,
         JSON.stringify({ updated_fields: Object.keys(data), clinic_name: res.rows[0]?.clinic_name }),
         '127.0.0.1'
       ]);
@@ -1402,25 +1554,34 @@ export class PostgresService {
   }
 
   // --- USERS CRUD ---
-  public async getUsers() {
-    const res = await this.query(`
-      SELECT u.id, u.full_name, u.username, u.role_id, r.name as role_name, r.code as role_code, u.phone, u.is_active, u.created_at
+  public async getUsers(clinicId?: string) {
+    let sql = `
+      SELECT u.id, u.full_name, u.username, u.role_id, r.name as role_name, r.code as role_code, u.phone, u.is_active, u.created_at, u.clinic_id
       FROM users u
       LEFT JOIN roles r ON u.role_id = r.id
-      ORDER BY u.created_at DESC
-    `);
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+    if (clinicId) {
+      params.push(clinicId);
+      sql += ` AND (u.clinic_id = $1 OR u.clinic_id IS NULL)`;
+    }
+    sql += ` ORDER BY u.created_at DESC`;
+    const res = await this.query(sql, params);
     return res.rows;
   }
 
-  public async createUser(data: { fullName: string; username: string; password?: string; roleCode: string; phone?: string }) {
+  public async createUser(data: { fullName: string; username: string; password?: string; roleCode: string; phone?: string; clinicId?: string }, clinicIdOverride?: string) {
     const id = `usr_${Date.now()}`;
     const roleId = data.roleCode === 'MANAGER' ? 'role_manager' : (data.roleCode === 'DOCTOR' ? 'role_doctor' : 'role_cashier');
     const pwd = data.password || 'sadaf123';
+    const pwdHash = bcrypt.hashSync(pwd, 10);
+    const clinicId = clinicIdOverride || data.clinicId || 'tenant_sadaf_01';
     const res = await this.query(`
-      INSERT INTO users (id, full_name, username, password_hash, role_id, phone, is_active)
-      VALUES ($1, $2, $3, $4, $5, $6, true)
-      RETURNING id, full_name, username, role_id, phone, is_active, created_at
-    `, [id, data.fullName, data.username, pwd, roleId, data.phone || '+998 90 000 00 00']);
+      INSERT INTO users (id, clinic_id, full_name, username, password_hash, raw_password, role_id, phone, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
+      RETURNING id, full_name, username, role_id, phone, clinic_id, is_active, created_at
+    `, [id, clinicId, data.fullName, data.username, pwdHash, pwd, roleId, data.phone || '+998 90 000 00 00']);
     return res.rows[0];
   }
 
@@ -1446,7 +1607,15 @@ export class PostgresService {
     return { success: true };
   }
 
-  public async getAllShifts() {
+  public async getAllShifts(clinicId?: string) {
+    if (clinicId) {
+      const res = await this.query(`
+        SELECT * FROM cash_shifts 
+        WHERE (clinic_id = $1 OR clinic_id IS NULL)
+        ORDER BY opened_at DESC LIMIT 50
+      `, [clinicId]);
+      return res.rows;
+    }
     const res = await this.query(`
       SELECT * FROM cash_shifts ORDER BY opened_at DESC LIMIT 50
     `);
@@ -1472,9 +1641,10 @@ export class PostgresService {
         p.created_at
       FROM payments p
       LEFT JOIN patients pt ON p.patient_id = pt.id
-      WHERE p.cash_shift_id = $1
+      WHERE p.cash_shift_id = $1 
+         OR (p.cash_shift_id IS NULL AND p.created_at >= $2 AND p.created_at <= COALESCE($3, CURRENT_TIMESTAMP))
       ORDER BY p.created_at DESC
-    `, [shift.id]);
+    `, [shift.id, shift.opened_at, shift.closed_at]);
 
     const payments = paymentsRes.rows;
 
@@ -1517,7 +1687,8 @@ export class PostgresService {
         otherTotal,
         paymentsCount: payments.length,
         openingBalance: Number(shift.opening_balance) || 0,
-        closingBalance: Number(shift.closing_balance) || 0
+        closingBalance: Number(shift.closing_balance) || 0,
+        expectedClosingBalance: (Number(shift.opening_balance) || 0) + cashTotal
       },
       doctorBreakdown: docRes.rows.map((r: any) => ({
         doctorName: r.doctor_name,
@@ -1857,25 +2028,106 @@ export class PostgresService {
     const res = await this.query(`
       SELECT u.id, u.full_name as name, u.username as email, u.phone,
              COALESCE(r.code, 'ADMIN') as role, u.is_active, u.created_at,
-             'klinika-admin Markaziy Klinika' as clinic_name
+             u.clinic_id,
+             COALESCE(cs.clinic_name, 'klinika-admin Markaziy Klinika') as clinic_name
       FROM users u
       LEFT JOIN roles r ON u.role_id = r.id
+      LEFT JOIN clinic_settings cs ON (u.clinic_id = cs.clinic_id OR u.clinic_id = cs.id)
       ORDER BY u.created_at DESC
     `);
     return res.rows;
   }
 
-  public async createSuperAdminUser(data: { name: string; email?: string; phone?: string; role: string; clinicName?: string }) {
+  public async createSuperAdminUser(data: { name: string; email?: string; phone?: string; role: string; password?: string; clinicName?: string; clinicId?: string }) {
     const id = `usr_${uuidv4().substring(0, 8)}`;
-    const username = data.email || `user_${Date.now()}`;
+    const username = data.email || (data.phone ? data.phone.replace(/[^0-9]/g, '') : `user_${Date.now()}`);
     const roleRes = await this.query(`SELECT id FROM roles WHERE code = $1 LIMIT 1`, [data.role]);
-    const roleId = roleRes.rows[0]?.id || 'role_manager';
+    const roleId = roleRes.rows[0]?.id || (data.role === 'SUPER_ADMIN' ? 'role_super_admin' : (data.role === 'DOCTOR' ? 'role_doctor' : (data.role === 'CASHIER' ? 'role_cashier' : 'role_manager')));
+    const rawPwd = (data.password && data.password.trim()) ? data.password.trim() : 'sadaf123';
+    const pwdHash = bcrypt.hashSync(rawPwd, 10);
+    const clinicId = data.clinicId || 'tenant_sadaf_01';
+
     const res = await this.query(`
-      INSERT INTO users (id, full_name, username, password_hash, role_id, phone, is_active, created_at)
-      VALUES ($1, $2, $3, 'hash_default_secret', $4, $5, true, CURRENT_TIMESTAMP)
-      RETURNING id, full_name as name, username as email, phone, is_active, created_at
-    `, [id, data.name, username, roleId, data.phone || null]);
+      INSERT INTO users (id, clinic_id, full_name, username, password_hash, raw_password, role_id, phone, is_active, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, CURRENT_TIMESTAMP)
+      RETURNING id, full_name as name, username as email, phone, is_active, created_at, clinic_id
+    `, [id, clinicId, data.name, username, pwdHash, rawPwd, roleId, data.phone || null]);
     return { ...res.rows[0], role: data.role, clinic_name: data.clinicName || 'klinika-admin Markaziy Klinika' };
+  }
+
+  public async updateSuperAdminUser(id: string, data: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    role?: string;
+    password?: string;
+    clinicId?: string;
+    isActive?: boolean;
+  }) {
+    const fields: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+
+    if (data.name !== undefined) {
+      fields.push(`full_name = $${idx++}`);
+      values.push(data.name);
+    }
+    if (data.email !== undefined) {
+      fields.push(`username = $${idx++}`);
+      values.push(data.email);
+    }
+    if (data.phone !== undefined) {
+      fields.push(`phone = $${idx++}`);
+      values.push(data.phone);
+    }
+    if (data.role !== undefined) {
+      const roleRes = await this.query(`SELECT id FROM roles WHERE code = $1 LIMIT 1`, [data.role]);
+      const roleId = roleRes.rows[0]?.id || (data.role === 'SUPER_ADMIN' ? 'role_super_admin' : (data.role === 'DOCTOR' ? 'role_doctor' : (data.role === 'CASHIER' ? 'role_cashier' : 'role_manager')));
+      fields.push(`role_id = $${idx++}`);
+      values.push(roleId);
+    }
+    if (data.password !== undefined && data.password.trim() !== '') {
+      const hash = bcrypt.hashSync(data.password.trim(), 10);
+      fields.push(`password_hash = $${idx++}`);
+      values.push(hash);
+      fields.push(`raw_password = $${idx++}`);
+      values.push(data.password.trim());
+    }
+    if (data.clinicId !== undefined) {
+      fields.push(`clinic_id = $${idx++}`);
+      values.push(data.clinicId);
+    }
+    if (data.isActive !== undefined) {
+      fields.push(`is_active = $${idx++}`);
+      values.push(data.isActive);
+    }
+
+    if (fields.length === 0) return this.query('SELECT * FROM users WHERE id = $1', [id]).then(r => r.rows[0]);
+
+    fields.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(id);
+    const sql = `
+      UPDATE users
+      SET ${fields.join(', ')}
+      WHERE id = $${idx}
+      RETURNING id, full_name as name, username as email, phone, role_id, clinic_id, is_active, updated_at
+    `;
+    const res = await this.query(sql, values);
+    return res.rows[0];
+  }
+
+  public async deleteSuperAdminUser(id: string) {
+    return this.withTransaction(async (client) => {
+      // Safely unlink references
+      await client.query('UPDATE doctors SET user_id = NULL WHERE user_id = $1', [id]);
+      await client.query('UPDATE cash_shifts SET cashier_id = NULL WHERE cashier_id = $1', [id]);
+      await client.query('UPDATE appointments SET created_by = NULL WHERE created_by = $1', [id]);
+      await client.query('UPDATE payments SET cashier_id = NULL WHERE cashier_id = $1', [id]);
+      await client.query('UPDATE queue_tickets SET created_by = NULL WHERE created_by = $1', [id]);
+      await client.query('UPDATE queue_call_events SET performed_by = NULL WHERE performed_by = $1', [id]);
+      await client.query('DELETE FROM users WHERE id = $1', [id]);
+      return { success: true };
+    });
   }
 
   public async toggleUserStatus(id: string, isActive: boolean) {

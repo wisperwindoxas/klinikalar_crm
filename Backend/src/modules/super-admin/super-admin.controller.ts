@@ -875,6 +875,41 @@ export class SuperAdminController {
     }
   }
 
+  public static async updateUser(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const data = await SuperAdminController.pg.updateSuperAdminUser(id, req.body);
+      
+      const db = DatabaseService.getInstance();
+      const u = db.getUsers().find(x => x.id === id);
+      if (u) {
+        if (req.body.name) u.fullName = req.body.name;
+        if (req.body.phone) u.phone = req.body.phone;
+        if (req.body.email) u.email = req.body.email;
+        if (req.body.role) u.role = req.body.role;
+        if (req.body.password) u.passwordHash = bcrypt.hashSync(req.body.password, 10);
+        if (req.body.clinicId) u.tenantId = req.body.clinicId;
+        db.updateUser(u);
+      }
+
+      res.json({ success: true, message: 'Foydalanuvchi muvaffaqiyatli yangilandi.', data });
+    } catch (e: any) {
+      res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  public static async deleteUser(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      await SuperAdminController.pg.deleteSuperAdminUser(id);
+      const db = DatabaseService.getInstance();
+      db.deleteUser(id);
+      res.json({ success: true, message: 'Foydalanuvchi muvaffaqiyatli o‘chirildi.' });
+    } catch (e: any) {
+      res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
   // --- BRANCHES ---
   public static async getBranches(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {

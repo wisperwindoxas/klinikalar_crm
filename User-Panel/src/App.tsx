@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
 import { ManagerPage } from './pages/ManagerPage';
 import { DoctorPage } from './pages/DoctorPage';
@@ -55,8 +55,11 @@ const RootDispatcher: React.FC = () => {
 };
 
 export const App: React.FC = () => {
+  const isFileOrElectron = window.location.protocol === 'file:' || !!window.electronAPI;
+  const RouterComponent = isFileOrElectron ? HashRouter : BrowserRouter;
+
   return (
-    <BrowserRouter>
+    <RouterComponent>
       <SubscriptionGuard>
         <ToastContainer />
         <Routes>
@@ -134,6 +137,6 @@ export const App: React.FC = () => {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </SubscriptionGuard>
-    </BrowserRouter>
+    </RouterComponent>
   );
 };

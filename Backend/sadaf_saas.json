@@ -10,51 +10,6 @@
       "updatedAt": "2026-10-29T06:03:39.985Z"
     },
     {
-      "id": "tenant_samarqand_05",
-      "code": "CLN02",
-      "name": "Samarqand Med",
-      "slug": "samarqand-med",
-      "status": "ACTIVE",
-      "createdAt": "2026-09-23T10:00:00Z",
-      "updatedAt": "2026-09-23T10:00:00Z"
-    },
-    {
-      "id": "tenant_dental_02",
-      "code": "CLN03",
-      "name": "Dental Plus",
-      "slug": "dental-plus",
-      "status": "TRIAL",
-      "createdAt": "2026-09-23T10:00:00Z",
-      "updatedAt": "2026-09-23T10:00:00Z"
-    },
-    {
-      "id": "tenant_family_04",
-      "code": "CLN04",
-      "name": "Family Clinic",
-      "slug": "family-clinic",
-      "status": "ACTIVE",
-      "createdAt": "2026-09-22T10:00:00Z",
-      "updatedAt": "2026-09-22T10:00:00Z"
-    },
-    {
-      "id": "tenant_shifo_06",
-      "code": "CLN05",
-      "name": "Shifo Medikal",
-      "slug": "shifo-medikal",
-      "status": "ACTIVE",
-      "createdAt": "2026-09-22T10:00:00Z",
-      "updatedAt": "2026-09-22T10:00:00Z"
-    },
-    {
-      "id": "tenant_medlife_03",
-      "code": "CLN06",
-      "name": "MedLife",
-      "slug": "medlife",
-      "status": "EXPIRED",
-      "createdAt": "2026-09-21T10:00:00Z",
-      "updatedAt": "2026-09-21T10:00:00Z"
-    },
-    {
       "id": "tenant_a1fcbdf9",
       "code": "CLN_4255",
       "name": "SurxonMedical",
@@ -62,24 +17,6 @@
       "status": "ACTIVE",
       "createdAt": "2026-10-29T04:12:22.617Z",
       "updatedAt": "2026-10-29T06:05:20.008Z"
-    },
-    {
-      "id": "tenant_465dfe05",
-      "code": "CLN_3263",
-      "name": "Oazis Medikal",
-      "slug": "oazis-medikal",
-      "status": "TRIAL",
-      "createdAt": "2026-10-29T04:34:49.711Z",
-      "updatedAt": "2026-10-29T04:34:49.711Z"
-    },
-    {
-      "id": "tenant_b9747d4e",
-      "code": "CLN_2575",
-      "name": "Mega Med",
-      "slug": "mega-med",
-      "status": "TRIAL",
-      "createdAt": "2026-10-29T04:35:25.424Z",
-      "updatedAt": "2026-10-29T04:35:25.424Z"
     }
   ],
   "clinics": [
@@ -105,71 +42,6 @@
       "updatedAt": "2026-10-29T06:03:39.987Z"
     },
     {
-      "id": "clinic_tenant_samarqand_05",
-      "tenantId": "tenant_samarqand_05",
-      "name": "Samarqand Med",
-      "logoUrl": "",
-      "primaryColor": "#008B8B",
-      "phone": "+998 71 300 00 00",
-      "email": "contact@samarqandmed.uz",
-      "address": "Toshkent sh.",
-      "queuePrefix": "S",
-      "settings": {},
-      "createdAt": "2026-09-23T10:00:00Z"
-    },
-    {
-      "id": "clinic_tenant_dental_02",
-      "tenantId": "tenant_dental_02",
-      "name": "Dental Plus",
-      "logoUrl": "",
-      "primaryColor": "#008B8B",
-      "phone": "+998 71 300 00 01",
-      "email": "contact@dentalplus.uz",
-      "address": "Toshkent sh.",
-      "queuePrefix": "D",
-      "settings": {},
-      "createdAt": "2026-09-23T10:00:00Z"
-    },
-    {
-      "id": "clinic_tenant_family_04",
-      "tenantId": "tenant_family_04",
-      "name": "Family Clinic",
-      "logoUrl": "",
-      "primaryColor": "#008B8B",
-      "phone": "+998 71 300 00 02",
-      "email": "contact@familyclinic.uz",
-      "address": "Toshkent sh.",
-      "queuePrefix": "F",
-      "settings": {},
-      "createdAt": "2026-09-22T10:00:00Z"
-    },
-    {
-      "id": "clinic_tenant_shifo_06",
-      "tenantId": "tenant_shifo_06",
-      "name": "Shifo Medikal",
-      "logoUrl": "",
-      "primaryColor": "#008B8B",
-      "phone": "+998 71 300 00 03",
-      "email": "contact@shifomedikal.uz",
-      "address": "Toshkent sh.",
-      "queuePrefix": "S",
-      "settings": {},
-      "createdAt": "2026-09-22T10:00:00Z"
-    },
-    {
-      "id": "clinic_tenant_medlife_03",
-      "tenantId": "tenant_medlife_03",
-      "name": "MedLife",
-      "logoUrl": "",
-      "primaryColor": "#008B8B",
-      "phone": "+998 71 300 00 04",
-      "email": "contact@medlife.uz",
-      "address": "Toshkent sh.",
-      "queuePrefix": "M",
-      "settings": {},
-      "createdAt": "2026-09-21T10:00:00Z"
-    },
-    {
       "id": "clinic_95f02262",
       "tenantId": "tenant_a1fcbdf9",
       "name": "SurxonMedical",
@@ -185,34 +57,6 @@
       "region": "Surxondaryo viloyati",
       "district": "Qumqo‘rg‘on tumani",
       "updatedAt": "2026-10-29T06:05:20.013Z"
-    },
-    {
-      "id": "clinic_cab26e50",
-      "tenantId": "tenant_465dfe05",
-      "name": "Oazis Medikal",
-      "primaryColor": "#008B8B",
-      "phone": "+998 93 555 44 33",
-      "email": "jamshid@oazis.uz",
-      "address": "Buxoro viloyati, Buxoro shahri, Mustaqillik ko‘chasi 12",
-      "queuePrefix": "O",
-      "settings": {
-        "avgConsultationMinutes": 15
-      },
-      "createdAt": "2026-10-29T04:34:49.711Z"
-    },
-    {
-      "id": "clinic_4be9f4d5",
-      "tenantId": "tenant_b9747d4e",
-      "name": "Mega Med",
-      "primaryColor": "#008B8B",
-      "phone": "+998 94 999 88 77",
-      "email": "botir@megamed.uz",
-      "address": "Andijon viloyati, Andijon shahri, Bobur shox ko‘chasi 1",
-      "queuePrefix": "M",
-      "settings": {
-        "avgConsultationMinutes": 15
-      },
-      "createdAt": "2026-10-29T04:35:25.424Z"
     }
   ],
   "branches": [
@@ -251,30 +95,6 @@
       "isMain": true,
       "status": "ACTIVE",
       "createdAt": "2026-10-29T04:12:22.617Z"
-    },
-    {
-      "id": "branch_4cf8c28d",
-      "tenantId": "tenant_465dfe05",
-      "clinicId": "clinic_cab26e50",
-      "name": "Asosiy filial",
-      "address": "Buxoro viloyati, Buxoro shahri, Mustaqillik ko‘chasi 12",
-      "phone": "+998 93 555 44 33",
-      "queuePrefix": "A",
-      "isMain": true,
-      "status": "ACTIVE",
-      "createdAt": "2026-10-29T04:34:49.711Z"
-    },
-    {
-      "id": "branch_849506d9",
-      "tenantId": "tenant_b9747d4e",
-      "clinicId": "clinic_4be9f4d5",
-      "name": "Asosiy filial",
-      "address": "Andijon viloyati, Andijon shahri, Bobur shox ko‘chasi 1",
-      "phone": "+998 94 999 88 77",
-      "queuePrefix": "A",
-      "isMain": true,
-      "status": "ACTIVE",
-      "createdAt": "2026-10-29T04:35:25.424Z"
     }
   ],
   "cabinets": [
@@ -480,36 +300,12 @@
       "tenantId": "tenant_a1fcbdf9",
       "fullName": "Soatov Xurshid",
       "email": "windoxas@gmail.com",
-      "phone": "+998 907074757",
-      "passwordHash": "$2a$10$ZZH1znN/IgLDwtVMTGZw2.CG0vxoms.g.uinlTEIVPqNtQiz8A3KC",
-      "role": "OWNER",
+      "phone": "+998 90 707 47 57",
+      "passwordHash": "$2a$10$HVcgUiMntCBf5WaqnGNDRe.ja/7GqjPQthaR0238AMtzHvLbyrq8u",
+      "role": "MANAGER",
       "branchId": "branch_31acf070",
       "status": "ACTIVE",
       "createdAt": "2026-10-29T04:12:22.617Z"
-    },
-    {
-      "id": "user_d2250eda",
-      "tenantId": "tenant_465dfe05",
-      "fullName": "Karimov Jamshid",
-      "email": "jamshid@oazis.uz",
-      "phone": "+998 93 555 44 33",
-      "passwordHash": "$2a$10$wwKZe9BYYhc2cZsy5z6RT.WsHFyM4LwZW0EiSFBzQOTo5mHXgJ2CK",
-      "role": "OWNER",
-      "branchId": "branch_4cf8c28d",
-      "status": "ACTIVE",
-      "createdAt": "2026-10-29T04:34:49.711Z"
-    },
-    {
-      "id": "user_0c0d4b5f",
-      "tenantId": "tenant_b9747d4e",
-      "fullName": "Rahimov Botir",
-      "email": "botir@megamed.uz",
-      "phone": "+998 94 999 88 77",
-      "passwordHash": "$2a$10$5.x4vOth8Dy.MdIt3sEJ9.k8NScn0lXEdlAPwF0Z8CoSbfFtLphbm",
-      "role": "OWNER",
-      "branchId": "branch_849506d9",
-      "status": "ACTIVE",
-      "createdAt": "2026-10-29T04:35:25.424Z"
     },
     {
       "id": "usr_7de86d27",
@@ -1210,61 +1006,6 @@
       "autoRenew": true
     },
     {
-      "id": "sub_tenant_samarqand_05",
-      "tenantId": "tenant_samarqand_05",
-      "planId": "plan_pro",
-      "planCode": "PRO",
-      "status": "ACTIVE",
-      "startDate": "2026-09-23T00:00:00Z",
-      "endDate": "2026-10-23T00:00:00Z",
-      "gracePeriodDays": 3,
-      "autoRenew": true
-    },
-    {
-      "id": "sub_tenant_dental_02",
-      "tenantId": "tenant_dental_02",
-      "planId": "plan_starter",
-      "planCode": "STARTER",
-      "status": "TRIAL",
-      "startDate": "2026-09-23T00:00:00Z",
-      "endDate": "2026-10-23T00:00:00Z",
-      "gracePeriodDays": 3,
-      "autoRenew": true
-    },
-    {
-      "id": "sub_tenant_family_04",
-      "tenantId": "tenant_family_04",
-      "planId": "plan_business",
-      "planCode": "BUSINESS",
-      "status": "ACTIVE",
-      "startDate": "2026-09-22T00:00:00Z",
-      "endDate": "2026-10-23T00:00:00Z",
-      "gracePeriodDays": 3,
-      "autoRenew": true
-    },
-    {
-      "id": "sub_tenant_shifo_06",
-      "tenantId": "tenant_shifo_06",
-      "planId": "plan_starter",
-      "planCode": "STARTER",
-      "status": "ACTIVE",
-      "startDate": "2026-09-22T00:00:00Z",
-      "endDate": "2026-10-23T00:00:00Z",
-      "gracePeriodDays": 3,
-      "autoRenew": true
-    },
-    {
-      "id": "sub_tenant_medlife_03",
-      "tenantId": "tenant_medlife_03",
-      "planId": "plan_pro",
-      "planCode": "PRO",
-      "status": "EXPIRED",
-      "startDate": "2026-09-21T00:00:00Z",
-      "endDate": "2026-09-20T00:00:00Z",
-      "gracePeriodDays": 3,
-      "autoRenew": true
-    },
-    {
       "id": "sub_fccb3040",
       "tenantId": "tenant_a1fcbdf9",
       "planId": "plan_pro",
@@ -1273,30 +1014,6 @@
       "startDate": "2026-10-29T04:12:22.617Z",
       "endDate": "2026-11-12T04:12:22.719Z",
       "trialEndDate": "2026-11-12T04:12:22.719Z",
-      "gracePeriodDays": 3,
-      "autoRenew": true
-    },
-    {
-      "id": "sub_addb4e23",
-      "tenantId": "tenant_465dfe05",
-      "planId": "plan_standard",
-      "planCode": "STANDARD",
-      "status": "TRIAL",
-      "startDate": "2026-10-29T04:34:49.711Z",
-      "endDate": "2026-11-12T04:34:49.803Z",
-      "trialEndDate": "2026-11-12T04:34:49.803Z",
-      "gracePeriodDays": 3,
-      "autoRenew": true
-    },
-    {
-      "id": "sub_1a1855ad",
-      "tenantId": "tenant_b9747d4e",
-      "planId": "plan_standard",
-      "planCode": "STANDARD",
-      "status": "TRIAL",
-      "startDate": "2026-10-29T04:35:25.424Z",
-      "endDate": "2026-11-12T04:35:25.511Z",
-      "trialEndDate": "2026-11-12T04:35:25.511Z",
       "gracePeriodDays": 3,
       "autoRenew": true
     }
@@ -1381,6 +1098,125 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "f8f68724-6727-4269-b63f-16c3362acf3c",
+      "tenantId": "tenant_dental_02",
+      "userId": "system",
+      "userRole": "SUPER_ADMIN",
+      "userFullName": "Super Admin",
+      "action": "DELETE_CLINIC",
+      "entityType": "CLINIC",
+      "entityId": "tenant_dental_02",
+      "oldValues": {
+        "name": "Dental Plus"
+      },
+      "newValues": null,
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "createdAt": "2026-10-29T11:30:32.505Z"
+    },
+    {
+      "id": "dc79cbb5-84ee-42e3-8558-ce878824153b",
+      "tenantId": "tenant_family_04",
+      "userId": "system",
+      "userRole": "SUPER_ADMIN",
+      "userFullName": "Super Admin",
+      "action": "DELETE_CLINIC",
+      "entityType": "CLINIC",
+      "entityId": "tenant_family_04",
+      "oldValues": {
+        "name": "Family Clinic"
+      },
+      "newValues": null,
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "createdAt": "2026-10-29T11:30:18.273Z"
+    },
+    {
+      "id": "c7d12487-ab3f-4964-9601-5c98471d217d",
+      "tenantId": "tenant_shifo_06",
+      "userId": "system",
+      "userRole": "SUPER_ADMIN",
+      "userFullName": "Super Admin",
+      "action": "DELETE_CLINIC",
+      "entityType": "CLINIC",
+      "entityId": "tenant_shifo_06",
+      "oldValues": {
+        "name": "Shifo Medikal"
+      },
+      "newValues": null,
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "createdAt": "2026-10-29T11:30:02.176Z"
+    },
+    {
+      "id": "ce07dbec-0bfc-49de-b915-a4ef583d41e0",
+      "tenantId": "tenant_samarqand_05",
+      "userId": "system",
+      "userRole": "SUPER_ADMIN",
+      "userFullName": "Super Admin",
+      "action": "DELETE_CLINIC",
+      "entityType": "CLINIC",
+      "entityId": "tenant_samarqand_05",
+      "oldValues": {
+        "name": "Samarqand Med"
+      },
+      "newValues": null,
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "createdAt": "2026-10-29T11:29:44.285Z"
+    },
+    {
+      "id": "f2426b3d-b373-480d-9ba6-64adf33f2b95",
+      "tenantId": "tenant_medlife_03",
+      "userId": "system",
+      "userRole": "SUPER_ADMIN",
+      "userFullName": "Super Admin",
+      "action": "DELETE_CLINIC",
+      "entityType": "CLINIC",
+      "entityId": "tenant_medlife_03",
+      "oldValues": {
+        "name": "MedLife"
+      },
+      "newValues": null,
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "createdAt": "2026-10-29T11:29:29.725Z"
+    },
+    {
+      "id": "86bfce7a-c7aa-43b5-9b24-9385e70d1aa0",
+      "tenantId": "tenant_b9747d4e",
+      "userId": "system",
+      "userRole": "SUPER_ADMIN",
+      "userFullName": "Super Admin",
+      "action": "DELETE_CLINIC",
+      "entityType": "CLINIC",
+      "entityId": "tenant_b9747d4e",
+      "oldValues": {
+        "name": "Mega Med"
+      },
+      "newValues": null,
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "createdAt": "2026-10-29T11:29:14.403Z"
+    },
+    {
+      "id": "0db2e94c-34d2-42a8-8383-6d9690d6bedf",
+      "tenantId": "tenant_465dfe05",
+      "userId": "system",
+      "userRole": "SUPER_ADMIN",
+      "userFullName": "Super Admin",
+      "action": "DELETE_CLINIC",
+      "entityType": "CLINIC",
+      "entityId": "tenant_465dfe05",
+      "oldValues": {
+        "name": "Oazis Medikal"
+      },
+      "newValues": null,
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+      "createdAt": "2026-10-29T11:28:55.026Z"
+    },
     {
       "id": "d9f06aa5-002a-4b8e-aae0-94c4ac87f1cc",
       "tenantId": "tenant_a1fcbdf9",

@@ -60,6 +60,7 @@ class ApiConstants {
   static String get currentShift => '$baseUrl/cash-shifts/current';
   static String get openShift => '$baseUrl/cash-shifts/open';
   static String closeShift(String id) => '$baseUrl/cash-shifts/$id/close';
+  static String shiftDetails(String id) => '$baseUrl/cash-shifts/$id/details';
   static String get payments => '$baseUrl/payments';
 
   // Manager & Reports

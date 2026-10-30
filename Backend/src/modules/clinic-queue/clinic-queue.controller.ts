@@ -11,10 +11,49 @@ export class ClinicQueueController {
   private static pg = PostgresService.getInstance();
   private static ws = WebSocketGateway.getInstance();
 
+  public static extractTenantId(req: Request): string {
+    const userReq = req as AuthenticatedRequest;
+    
+    // 1. Authenticated context (Tenant Boundary enforcement)
+    if (userReq.user) {
+      // Super Admin can impersonate/inspect another clinic
+      if (userReq.user.role === 'SUPER_ADMIN') {
+        const override = req.headers['x-tenant-id'] || req.headers['x-clinic-id'] || req.query.tenantId || req.query.clinicId;
+        if (override) return String(override).replace(/[^a-zA-Z0-9_\-]/g, '');
+      }
+      if (userReq.user.tenantId) return userReq.user.tenantId;
+    }
+
+    // 2. Decode valid signed JWT
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, config.jwtSecret) as any;
+        if (decoded?.role === 'SUPER_ADMIN') {
+          const override = req.headers['x-tenant-id'] || req.query.tenantId;
+          if (override) return String(override).replace(/[^a-zA-Z0-9_\-]/g, '');
+        }
+        if (decoded?.tenantId) return decoded.tenantId;
+        if (decoded?.clinicId) return decoded.clinicId;
+      } catch (_) {}
+    }
+
+    // 3. Public endpoints (TV Display screens in waiting hall)
+    const publicTenant = req.headers['x-tenant-id'] || req.headers['x-clinic-id'] || req.query.tenantId || req.query.clinicId;
+    if (publicTenant) {
+      const clean = String(publicTenant).replace(/[^a-zA-Z0-9_\-]/g, '');
+      if (clean) return clean;
+    }
+
+    return 'tenant_sadaf_01';
+  }
+
   // --- 1. SPECIALTIES & CABINETS ---
   public static async getSpecialties(req: Request, res: Response): Promise<void> {
     try {
-      const data = await ClinicQueueController.pg.getSpecialties();
+      const tenantId = ClinicQueueController.extractTenantId(req);
+      const data = await ClinicQueueController.pg.getSpecialties(tenantId);
       res.json({ success: true, data });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -23,7 +62,8 @@ export class ClinicQueueController {
 
   public static async getCabinets(req: Request, res: Response): Promise<void> {
     try {
-      const data = await ClinicQueueController.pg.getCabinets();
+      const tenantId = ClinicQueueController.extractTenantId(req);
+      const data = await ClinicQueueController.pg.getCabinets(tenantId);
       res.json({ success: true, data });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -34,7 +74,8 @@ export class ClinicQueueController {
   public static async getDoctors(req: Request, res: Response): Promise<void> {
     try {
       const specialtyId = req.query.specialtyId as string | undefined;
-      const data = await ClinicQueueController.pg.getDoctors(specialtyId);
+      const tenantId = ClinicQueueController.extractTenantId(req);
+      const data = await ClinicQueueController.pg.getDoctors(specialtyId, tenantId);
       res.json({ success: true, data });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -45,7 +86,8 @@ export class ClinicQueueController {
   public static async getServices(req: Request, res: Response): Promise<void> {
     try {
       const specialtyId = req.query.specialtyId as string | undefined;
-      const data = await ClinicQueueController.pg.getServices(specialtyId);
+      const tenantId = ClinicQueueController.extractTenantId(req);
+      const data = await ClinicQueueController.pg.getServices(specialtyId, tenantId);
       res.json({ success: true, data });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -78,7 +120,8 @@ export class ClinicQueueController {
       const search = req.query.search as string | undefined;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
-      const data = await ClinicQueueController.pg.getPatients(search, limit, offset);
+      const tenantId = ClinicQueueController.extractTenantId(req);
+      const data = await ClinicQueueController.pg.getPatients(search, limit, offset, tenantId);
       res.json({ success: true, data });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -134,13 +177,15 @@ export class ClinicQueueController {
         res.status(400).json({ success: false, message: 'Bemor F.I.Sh. kiritilishi shart.' });
         return;
       }
+      const tenantId = ClinicQueueController.extractTenantId(req);
       const patient = await ClinicQueueController.pg.createPatient({
         fullName,
         phone,
         birthDate,
         gender,
         address,
-        notes
+        notes,
+        clinicId: tenantId
       });
       res.status(201).json({ success: true, data: patient });
     } catch (e: any) {
@@ -152,7 +197,8 @@ export class ClinicQueueController {
   public static async getCurrentShift(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const cashierId = req.user?.userId;
-      const data = await ClinicQueueController.pg.getCurrentShift(cashierId);
+      const tenantId = ClinicQueueController.extractTenantId(req);
+      const data = await ClinicQueueController.pg.getCurrentShift(cashierId, tenantId);
       res.json({ success: true, data });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -164,8 +210,9 @@ export class ClinicQueueController {
       const cashierId = req.user?.userId || 'usr_cashier1';
       const cashierName = req.body.cashierName || 'Dilnoza Karimova';
       const { openingBalance, notes } = req.body;
+      const tenantId = ClinicQueueController.extractTenantId(req);
 
-      const data = await ClinicQueueController.pg.openShift(cashierId, cashierName, Number(openingBalance) || 0, notes);
+      const data = await ClinicQueueController.pg.openShift(cashierId, cashierName, Number(openingBalance) || 0, notes, tenantId);
       res.json({ success: true, data, message: 'Kassa smenasi ochildi.' });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -192,6 +239,7 @@ export class ClinicQueueController {
         return;
       }
 
+      const tenantId = ClinicQueueController.extractTenantId(req);
       let cashierId = req.user?.userId;
       if (!cashierId && req.headers.authorization) {
         try {
@@ -208,12 +256,13 @@ export class ClinicQueueController {
         patientId,
         items,
         payment,
-        cashierId
+        cashierId,
+        clinicId: tenantId
       });
 
       // WebSocket broadcast for each created ticket
       for (const tck of result.tickets) {
-        ClinicQueueController.ws.emitTicketCreated('tenant_sadaf_01', 'branch_sadaf_main', tck as any);
+        ClinicQueueController.ws.emitTicketCreated(tenantId, 'branch_main', tck as any);
       }
 
       res.status(201).json({
@@ -230,13 +279,15 @@ export class ClinicQueueController {
   public static async getTickets(req: Request, res: Response): Promise<void> {
     try {
       const { doctorId, status, date, search, limit, offset } = req.query as any;
+      const tenantId = ClinicQueueController.extractTenantId(req);
       const data = await ClinicQueueController.pg.getTickets({
         doctorId,
         status,
         date,
         search,
         limit: limit ? parseInt(limit as string) : undefined,
-        offset: offset ? parseInt(offset as string) : undefined
+        offset: offset ? parseInt(offset as string) : undefined,
+        clinicId: tenantId
       });
       res.json({ success: true, data });
     } catch (e: any) {
@@ -352,7 +403,8 @@ export class ClinicQueueController {
   // --- 9. TV TABLO FEED & TEST CALL ---
   public static async getTvFeed(req: Request, res: Response): Promise<void> {
     try {
-      const data = await ClinicQueueController.pg.getTvFeed();
+      const tenantId = ClinicQueueController.extractTenantId(req);
+      const data = await ClinicQueueController.pg.getTvFeed(tenantId);
       res.json({ success: true, data });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -361,26 +413,27 @@ export class ClinicQueueController {
 
   public static async testCall(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
+      const tenantId = ClinicQueueController.extractTenantId(req);
       const full_number = req.body.full_number || req.body.ticketNumber || 'K-015';
       const specialty_name = req.body.specialty_name || req.body.specialtyName || 'Kardiologiya';
       const doctor_name = req.body.doctor_name || req.body.doctorName || 'Dr. Karimova Malika';
       const cabinet_number = req.body.cabinet_number || req.body.cabinetNumber || '3';
 
-      const settings = await ClinicQueueController.pg.getSettings();
+      const settings = await ClinicQueueController.pg.getSettings(tenantId);
       const testTicket = {
         id: 'test_call',
         full_number,
         specialty_name,
         doctor_name,
         cabinet_number,
-        voiceText: VoiceService.getInstance().formatTicketAnnouncement({
+        voiceText: req.body.voiceText || VoiceService.getInstance().formatTicketAnnouncement({
           full_number,
           specialty_name,
           doctor_name,
           cabinet_number
         }, req.body.template || settings?.tv_voice_template)
       };
-      ClinicQueueController.ws.emitTicketCalled('tenant_sadaf_01', 'branch_sadaf_main', testTicket as any);
+      ClinicQueueController.ws.emitTicketCalled(tenantId, 'branch_main', testTicket as any);
       res.json({ success: true, message: 'TV ga sinov chaqiruvi yuborildi.', data: testTicket });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -390,6 +443,7 @@ export class ClinicQueueController {
   // --- 10. PAYMENTS LIST ---
   public static async getPayments(req: Request, res: Response): Promise<void> {
     try {
+      const tenantId = ClinicQueueController.extractTenantId(req);
       const paymentsRes = await ClinicQueueController.pg.query(`
         SELECT 
           p.*, 
@@ -419,9 +473,10 @@ export class ClinicQueueController {
         LEFT JOIN patients pt ON p.patient_id = pt.id
         LEFT JOIN users u ON p.cashier_id = u.id
         LEFT JOIN cash_shifts cs ON p.cash_shift_id = cs.id
+        WHERE (p.clinic_id = $1 OR p.clinic_id IS NULL)
         ORDER BY p.created_at DESC
         LIMIT 200
-      `);
+      `, [tenantId]);
       res.json({ success: true, data: paymentsRes.rows });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -431,7 +486,8 @@ export class ClinicQueueController {
   // --- 11. REPORTS & MANAGER DASHBOARD ---
   public static async getManagerDashboard(req: Request, res: Response): Promise<void> {
     try {
-      const metrics = await ClinicQueueController.pg.getDashboardMetrics();
+      const tenantId = ClinicQueueController.extractTenantId(req);
+      const metrics = await ClinicQueueController.pg.getDashboardMetrics(tenantId);
       res.json({ success: true, data: metrics });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -441,7 +497,8 @@ export class ClinicQueueController {
   // --- 12. CLINIC SETTINGS ---
   public static async getSettings(req: Request, res: Response): Promise<void> {
     try {
-      const settings = await ClinicQueueController.pg.getSettings();
+      const tenantId = ClinicQueueController.extractTenantId(req);
+      const settings = await ClinicQueueController.pg.getSettings(tenantId);
       res.json({ success: true, data: settings });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -450,8 +507,9 @@ export class ClinicQueueController {
 
   public static async updateSettings(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const updated = await ClinicQueueController.pg.updateSettings(req.body);
-      ClinicQueueController.ws.emitTvSettingsUpdated('tenant_sadaf_01', 'branch_sadaf_main', updated);
+      const tenantId = ClinicQueueController.extractTenantId(req);
+      const updated = await ClinicQueueController.pg.updateSettings(req.body, tenantId);
+      ClinicQueueController.ws.emitTvSettingsUpdated(tenantId, 'branch_main', updated);
       res.json({ success: true, message: 'Sozlamalar yangilandi va TV tablosi jonli yangilandi.', data: updated });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -494,7 +552,8 @@ export class ClinicQueueController {
   // --- 13. CRUD ACTIONS FOR MANAGER ---
   public static async createDoctor(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const doc = await ClinicQueueController.pg.createDoctor(req.body);
+      const tenantId = ClinicQueueController.extractTenantId(req);
+      const doc = await ClinicQueueController.pg.createDoctor(req.body, tenantId);
       res.status(201).json({ success: true, message: 'Yangi shifokor yaratildi.', data: doc });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -523,7 +582,8 @@ export class ClinicQueueController {
 
   public static async createService(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const srv = await ClinicQueueController.pg.createService(req.body);
+      const tenantId = ClinicQueueController.extractTenantId(req);
+      const srv = await ClinicQueueController.pg.createService(req.body, tenantId);
       res.status(201).json({ success: true, message: 'Yangi xizmat qo\'shildi.', data: srv });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -552,7 +612,8 @@ export class ClinicQueueController {
 
   public static async createCabinet(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const cab = await ClinicQueueController.pg.createCabinet(req.body);
+      const tenantId = ClinicQueueController.extractTenantId(req);
+      const cab = await ClinicQueueController.pg.createCabinet(req.body, tenantId);
       res.status(201).json({ success: true, message: 'Yangi kabinet yaratildi.', data: cab });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -602,7 +663,8 @@ export class ClinicQueueController {
   // --- 14. USERS AND SHIFTS MANAGEMENT ---
   public static async getUsers(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const users = await ClinicQueueController.pg.getUsers();
+      const tenantId = ClinicQueueController.extractTenantId(req);
+      const users = await ClinicQueueController.pg.getUsers(tenantId);
       res.json({ success: true, data: users });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -611,7 +673,8 @@ export class ClinicQueueController {
 
   public static async createUser(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const user = await ClinicQueueController.pg.createUser(req.body);
+      const tenantId = ClinicQueueController.extractTenantId(req);
+      const user = await ClinicQueueController.pg.createUser(req.body, tenantId);
       res.status(201).json({ success: true, message: 'Yangi foydalanuvchi yaratildi.', data: user });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
@@ -640,7 +703,8 @@ export class ClinicQueueController {
 
   public static async getAllShifts(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const shifts = await ClinicQueueController.pg.getAllShifts();
+      const tenantId = ClinicQueueController.extractTenantId(req);
+      const shifts = await ClinicQueueController.pg.getAllShifts(tenantId);
       res.json({ success: true, data: shifts });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });

@@ -20,6 +20,7 @@ import {
   LockKeyhole
 } from 'lucide-react';
 import { UserApiClient } from '../api/client';
+import { APP_LOGO } from '../utils/brand';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -191,7 +192,7 @@ export const LoginPage: React.FC = () => {
           <div className="relative z-10 space-y-6">
             <div className="flex items-center gap-3">
               <div className="w-14 h-14 bg-transparent flex items-center justify-center shrink-0 filter drop-shadow-lg">
-                <img src="/logo.png" alt="klinika-admin Logo" className="w-full h-full object-contain bg-transparent" />
+                <img src={APP_LOGO} alt="klinika-admin Logo" className="w-full h-full object-contain bg-transparent" />
               </div>
               <div>
                 <h1 className="text-2xl font-black tracking-tight flex items-center gap-1.5">
@@ -251,18 +252,6 @@ export const LoginPage: React.FC = () => {
               </div>
             </div>
           </div>
-
-          {/* Bottom Live System Indicator */}
-          <div className="relative z-10 pt-4 border-t border-white/15 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
-              </span>
-              <span className="text-teal-100 font-medium">Server holati: Onlayn</span>
-            </div>
-            <span className="text-teal-200/80 font-mono text-[11px]">PostgreSQL 16 • SSL</span>
-          </div>
         </div>
 
         {/* ================= RIGHT COLUMN: Modern Form & Controls ================= */}
@@ -274,15 +263,6 @@ export const LoginPage: React.FC = () => {
                 <span className="text-xs font-bold uppercase tracking-wider text-teal-700 bg-teal-50 border border-teal-200/60 px-3 py-1 rounded-full">
                   Xodimlar Kirish Portali
                 </span>
-                <a
-                  href="http://localhost:3002"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs font-bold text-teal-700 hover:text-teal-900 transition flex items-center gap-1.5 hover:underline"
-                >
-                  <Tv className="w-3.5 h-3.5 text-teal-600" />
-                  <span>TV Tablo (3002)</span>
-                </a>
               </div>
               <h3 className="text-2xl font-black text-slate-800 tracking-tight mt-2">
                 Tizimga xush kelibsiz! 👋

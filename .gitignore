@@ -57,6 +57,7 @@ dist/
 **/dist/
 build/
 **/build/
+!Desktop-App/build/
 .next/
 out/
 .turbo/
@@ -109,14 +110,21 @@ app.*.symbols
 app.*.map.json
 
 # ------------------------------------------------------------------------------
-# 6. Binary & Package Builds (APKs, AABs, Bundles)
+# 6. Binary & Package Builds (APKs, AABs, Bundles, Electron Releases)
 # ------------------------------------------------------------------------------
-# Large mobile binaries should not bloat Git history (use GitHub Releases)
+# Large binaries should not bloat Git history (use GitHub Releases)
 *.apk
 *.aab
 *.ipa
 *.app
+*.dmg
+*.exe
+*.zip
+*.blockmap
 *.dSYM/
+Desktop-App/release/
+Desktop-App/dist/
+Backend/cache/audio/
 
 # ------------------------------------------------------------------------------
 # 7. Temporary / Scratch Files

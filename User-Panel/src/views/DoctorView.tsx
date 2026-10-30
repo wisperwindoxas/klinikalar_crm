@@ -13,8 +13,22 @@ import {
 
 import { showNotification } from '../components/ToastNotification';
 import { CompleteVisitModal } from '../components/CompleteVisitModal';
+import { AppUpdateModal } from '../components/AppUpdateModal';
+import { APP_LOGO, APP_VERSION } from '../utils/brand';
 
 const API_BASE_URL = 'http://localhost:5001/api/v1';
+
+const getAuthHeaders = (extra: Record<string, string> = {}): Record<string, string> => {
+  const token = localStorage.getItem('sadaf_user_token') || localStorage.getItem('token') || '';
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...extra
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+};
 
 // Helper: Detect doctor gender by Uzbek naming conventions
 export const isFemaleDoctor = (name?: string): boolean => {
@@ -241,15 +255,30 @@ export const DoctorView: React.FC = () => {
   });
   const [breakMode, setBreakMode] = useState(false);
   const [testingTv, setTestingTv] = useState(false);
+  const [clinicSettings, setClinicSettings] = useState<any>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
 
   const showToast = (title: string, message?: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
     showNotification(title, message, type);
   };
 
-  // 1. Fetch doctors catalog & initialize session
+  // 1. Fetch doctors catalog & initialize session & clinic settings
   useEffect(() => {
     fetchDoctorsCatalog();
+    fetchClinicSettings();
   }, []);
+
+  const fetchClinicSettings = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/clinic/settings`, { headers: getAuthHeaders() });
+      const json = await res.json();
+      if (json.data) {
+        setClinicSettings(json.data);
+      }
+    } catch (e) {
+      console.warn('Error fetching clinic settings:', e);
+    }
+  };
 
   // 3. Whenever doctorInfo changes, reload doctor data
   useEffect(() => {
@@ -664,17 +693,23 @@ export const DoctorView: React.FC = () => {
         <div>
           {/* Logo Header */}
           <div className="p-6 flex items-center gap-3">
-            <div className="w-12 h-12 bg-transparent flex items-center justify-center flex-shrink-0 filter drop-shadow-md">
-              <img src="/logo.png" alt="klinika-admin Logo" className="w-full h-full object-contain bg-transparent" />
+            <div className="w-12 h-12 bg-transparent flex items-center justify-center flex-shrink-0 filter drop-shadow-md overflow-hidden">
+              <img
+                src={clinicSettings?.logo_url || APP_LOGO}
+                alt={clinicSettings?.clinic_name || 'Klinika-admin'}
+                className="w-full h-full object-contain bg-transparent rounded-lg"
+              />
             </div>
-            <div>
-              <div className="font-black text-lg tracking-tight leading-tight text-[#172B4D]">klinika-admin</div>
+            <div className="min-w-0">
+              <div className="font-black text-lg tracking-tight leading-tight text-[#172B4D] truncate">
+                {clinicSettings?.clinic_name || 'Klinika-admin'}
+              </div>
               <div className="text-xs text-slate-500 font-medium">Shifokor Paneli</div>
             </div>
           </div>
 
           {/* Navigation Items */}
-          <nav className="px-3 space-y-1.5 mt-1">
+          <nav className="px-3 space-y-2 mt-2">
             {navItems.map(item => {
               const Icon = item.icon;
               const isActive = currentTab === item.id;
@@ -682,13 +717,13 @@ export const DoctorView: React.FC = () => {
                 <button
                   key={item.id}
                   onClick={() => handleTabChange(item.id)}
-                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-[13px] font-semibold transition text-left cursor-pointer ${
+                  className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-[14px] font-semibold transition text-left cursor-pointer group ${
                     isActive
                       ? 'bg-medical-blue text-white shadow-lg shadow-medical-blue/30 font-bold'
                       : 'text-slate-600 hover:text-[#172B4D] hover:bg-slate-100'
                   }`}
                 >
-                  <Icon className={`w-5 h-5 stroke-[2.2] flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                  <Icon className={`w-6 h-6 stroke-[2.8] flex-shrink-0 transition-transform ${isActive ? 'text-white scale-105' : 'text-slate-500 group-hover:text-slate-700'}`} />
                   <span className="truncate">{item.label}</span>
                 </button>
               );
@@ -698,11 +733,11 @@ export const DoctorView: React.FC = () => {
 
         {/* Clean Clinic Badge at Bottom (Zero Postgres/database text) */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/70 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-medical-blue flex items-center justify-center flex-shrink-0 font-bold">
-            <ShieldCheck className="w-5 h-5 text-medical-blue" />
+          <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-medical-blue flex items-center justify-center flex-shrink-0 font-bold">
+            <ShieldCheck className="w-6 h-6 stroke-[2.5] text-medical-blue" />
           </div>
           <div className="min-w-0">
-            <div className="text-xs font-bold text-[#172B4D] truncate">klinika-admin</div>
+            <div className="text-xs font-bold text-[#172B4D] truncate">{clinicSettings?.clinic_name || 'Klinika-admin'}</div>
             <div className="text-[10px] text-slate-400 font-medium">Shifokor Tizimi v2.4</div>
           </div>
         </div>
@@ -1485,6 +1520,37 @@ export const DoctorView: React.FC = () => {
                 </div>
               </div>
 
+              {/* Dastur Yangilanishi (GitHub Releases) */}
+              <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-medical-blue to-teal-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-medical-blue/20">
+                      <Sparkles className="w-5 h-5 text-yellow-300" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base font-black text-[#172B4D]">Dastur Yangilanishi</h2>
+                        <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 border border-teal-200 text-[10px] font-black">
+                          v{APP_VERSION}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        GitHub Releases orqali dasturning eng so'nggi versiyasini tekshirish va yuklab olish
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsUpdateModalOpen(true)}
+                    className="px-5 py-2.5 bg-gradient-to-r from-medical-blue to-teal-600 hover:opacity-95 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-md shadow-medical-blue/20 active:scale-95 cursor-pointer self-start sm:self-auto"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Yangilanishlarni tekshirish</span>
+                  </button>
+                </div>
+              </div>
+
               {/* 2-Column Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* LEFT COLUMN: Shifokor Profili va Holat */}
@@ -2139,15 +2205,21 @@ export const DoctorView: React.FC = () => {
 
                                 {/* Shifokor Ko'rik Xulosasi & Tashxis */}
                                 <td className="py-3 px-3.5 align-top">
-                                  <div className="p-2.5 rounded-xl bg-slate-50 hover:bg-teal-50/40 border border-slate-200/70 transition-all text-[11px] leading-relaxed">
-                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-teal-700 mb-1">
-                                      <FileText className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
-                                      <span>{v.doctor_name ? `${v.doctor_name} xulosasi:` : "Tibbiy xulosa:"}</span>
+                                  {conclusionText && conclusionText !== "Xulosa berilmadi" && conclusionText !== "null" ? (
+                                    <div className="p-2.5 rounded-xl bg-emerald-50/60 hover:bg-emerald-50 border border-emerald-200/70 transition-all text-[11px] leading-relaxed">
+                                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-800 mb-1">
+                                        <FileText className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                                        <span>{v.doctor_name ? `${v.doctor_name} xulosasi:` : "Tibbiy xulosa:"}</span>
+                                      </div>
+                                      <div className="text-slate-800 font-medium whitespace-pre-wrap">
+                                        {conclusionText}
+                                      </div>
                                     </div>
-                                    <div className="text-slate-700 font-medium whitespace-pre-wrap">
-                                      {conclusionText}
+                                  ) : (
+                                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/60 text-slate-400 text-[11px] italic">
+                                      Tibbiy xulosa kiritilmagan
                                     </div>
-                                  </div>
+                                  )}
                                 </td>
                               </tr>
                             );
@@ -2204,6 +2276,9 @@ export const DoctorView: React.FC = () => {
           </div>
         );
       })()}
+
+      {/* App Update Modal */}
+      <AppUpdateModal isOpen={isUpdateModalOpen} onClose={() => setIsUpdateModalOpen(false)} />
     </div>
   );
 };

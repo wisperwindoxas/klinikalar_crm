@@ -21,6 +21,7 @@ export class AuthController {
 
       const identifier = String(rawIdentifier).trim();
       const cleanPhone = identifier.replace(/[\s\-\(\)\+]/g, '');
+      const last9Digits = cleanPhone.length >= 9 ? cleanPhone.slice(-9) : cleanPhone;
 
       // 1. Check in PostgreSQL database
       const pg = PostgresService.getInstance();
@@ -29,18 +30,24 @@ export class AuthController {
                COALESCE(d.id, d_by_phone.id) as doctor_id, 
                COALESCE(d.room_number, d_by_phone.room_number) as room_number, 
                COALESCE(d.specialty_id, d_by_phone.specialty_id) as specialty_id, 
-               COALESCE(s.name, s_by_phone.name) as specialty_name
+               COALESCE(s.name, s_by_phone.name) as specialty_name,
+               cs.clinic_name as clinic_name
         FROM users u
         LEFT JOIN roles r ON u.role_id = r.id
         LEFT JOIN doctors d ON d.user_id = u.id
         LEFT JOIN specialties s ON d.specialty_id = s.id
-        LEFT JOIN doctors d_by_phone ON (REGEXP_REPLACE(d_by_phone.phone, '[^0-9]', '', 'g') = $2)
+        LEFT JOIN doctors d_by_phone ON (
+          REGEXP_REPLACE(d_by_phone.phone, '[^0-9]', '', 'g') = $2
+          OR RIGHT(REGEXP_REPLACE(d_by_phone.phone, '[^0-9]', '', 'g'), 9) = $3
+        )
         LEFT JOIN specialties s_by_phone ON d_by_phone.specialty_id = s_by_phone.id
+        LEFT JOIN clinic_settings cs ON (cs.clinic_id = u.clinic_id OR cs.id = u.clinic_id)
         WHERE u.username = $1 
            OR u.phone = $1 
            OR REGEXP_REPLACE(u.phone, '[^0-9]', '', 'g') = $2
+           OR RIGHT(REGEXP_REPLACE(u.phone, '[^0-9]', '', 'g'), 9) = $3
         LIMIT 1
-      `, [identifier, cleanPhone]);
+      `, [identifier, cleanPhone, last9Digits]);
 
       if (pgUserRes.rows.length > 0) {
         const pgUser = pgUserRes.rows[0];
@@ -51,25 +58,19 @@ export class AuthController {
         }
 
         let isValid = false;
-        if (pgUser.password_hash === password) {
-          isValid = true;
-        } else {
+        if (pgUser.password_hash) {
           try {
             isValid = bcrypt.compareSync(password, pgUser.password_hash);
-          } catch (e) {
+          } catch (_) {
             isValid = false;
           }
         }
 
-        // Direct fallback match for standard demo accounts if bcrypt salt doesn't match
-        if (!isValid) {
-          if (
-            (pgUser.username === 'admin' && (password === 'admin123' || password === 'sadaf123')) ||
-            ((pgUser.username === 'kassir' || pgUser.username === 'kassir1' || pgUser.username === 'kassir2') && (password === 'kassir123' || password === 'sadaf123')) ||
-            ((pgUser.role_code === 'DOCTOR' || pgUser.username === 'doctor' || pgUser.username.startsWith('doc_')) && (password === 'doctor123' || password === 'sadaf123'))
-          ) {
-            isValid = true;
-          }
+        // Automatic secure migration: If legacy password was stored as plain text, migrate to bcrypt
+        if (!isValid && pgUser.password_hash === password) {
+          isValid = true;
+          const newHash = bcrypt.hashSync(password, 10);
+          pg.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, pgUser.id]).catch(() => {});
         }
 
         if (!isValid) {
@@ -78,11 +79,25 @@ export class AuthController {
         }
 
         const role = pgUser.role_code || 'MANAGER';
-        const db = DatabaseService.getInstance();
-        const jsonUser = db.getUsers().find(u => u.id === pgUser.id || (u.phone && u.phone.replace(/[^0-9]/g, '') === cleanPhone));
-        const userTenantId = jsonUser?.tenantId || 'tenant_sadaf_01';
-        const userBranchId = jsonUser?.branchId || 'branch_sadaf_main';
-        const userClinic = db.getClinicByTenant(userTenantId);
+        const userTenantId = pgUser.clinic_id || 'tenant_sadaf_01';
+        const userBranchId = pgUser.branch_id || 'branch_sadaf_main';
+        
+        // Clinic name from query or fallback
+        let clinicName = pgUser.clinic_name || '';
+        if (!clinicName) {
+          try {
+            const cRes = await pg.query('SELECT clinic_name FROM clinic_settings WHERE clinic_id = $1 OR id = $1 LIMIT 1', [userTenantId]);
+            if (cRes.rows.length > 0 && cRes.rows[0].clinic_name) {
+              clinicName = cRes.rows[0].clinic_name;
+            } else if (userTenantId === 'tenant_sadaf_01') {
+              clinicName = 'Sadaf Dental';
+            } else {
+              clinicName = 'Klinika';
+            }
+          } catch (e) {
+            clinicName = userTenantId === 'tenant_sadaf_01' ? 'Sadaf Dental' : 'Klinika';
+          }
+        }
 
         const token = jwt.sign(
           {
@@ -115,7 +130,7 @@ export class AuthController {
             },
             clinic: {
               id: userTenantId,
-              name: userClinic?.name || 'klinika-admin'
+              name: clinicName
             }
           }
         });
@@ -314,8 +329,20 @@ export class AuthController {
         autoRenew: true
       });
 
-      // 6. Sync to PostgreSQL (Subscriptions & Users)
+      // 6. Sync to PostgreSQL (Clinic Settings, Subscriptions, Users, Specialties, Cabinets)
       const pg = PostgresService.getInstance();
+      try {
+        await pg.query(
+          `INSERT INTO clinic_settings (
+            id, clinic_id, clinic_name, phone, address, work_start_time, work_end_time, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, '08:00', '18:00', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          ON CONFLICT (id) DO UPDATE SET clinic_name = EXCLUDED.clinic_name, phone = EXCLUDED.phone`,
+          [tenantId, tenantId, clinicName, phone, address || '']
+        );
+      } catch (err) {
+        console.warn('Postgres clinic_settings insert fallback:', err);
+      }
+
       try {
         await pg.query(
           `INSERT INTO clinic_subscriptions (
@@ -343,19 +370,49 @@ export class AuthController {
         const cleanPhoneDigits = phone.replace(/[^0-9]/g, '');
         await pg.query(
           `INSERT INTO users (
-            id, username, full_name, phone, password_hash, role_id, is_active, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, 'role_manager', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-          ON CONFLICT (username) DO UPDATE SET phone = EXCLUDED.phone, password_hash = EXCLUDED.password_hash`,
+            id, username, full_name, phone, password_hash, role_id, clinic_id, is_active, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, 'role_manager', $6, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          ON CONFLICT (username) DO UPDATE SET phone = EXCLUDED.phone, password_hash = EXCLUDED.password_hash, clinic_id = EXCLUDED.clinic_id`,
           [
             userId,
             cleanPhoneDigits || userId,
             ownerFullName,
             phone,
-            passwordHash
+            passwordHash,
+            tenantId
           ]
         );
       } catch (err) {
         console.warn('Postgres user insert fallback:', err);
+      }
+
+      try {
+        const specs = [
+          { name: 'Terapiya', code: 'TER' },
+          { name: 'Kardiologiya', code: 'KARD' },
+          { name: 'Pediatriya', code: 'PED' },
+          { name: 'Stomatologiya', code: 'STOM' }
+        ];
+        for (const sp of specs) {
+          await pg.query(
+            `INSERT INTO specialties (id, clinic_id, name, code, is_active)
+             VALUES ($1, $2, $3, $4, true)
+             ON CONFLICT DO NOTHING`,
+            [`spec_${uuidv4().substring(0, 8)}`, tenantId, sp.name, sp.code]
+          );
+        }
+
+        const cabs = ['101', '102', '103'];
+        for (const cNum of cabs) {
+          await pg.query(
+            `INSERT INTO cabinets (id, clinic_id, number, name, is_active)
+             VALUES ($1, $2, $3, $4, true)
+             ON CONFLICT DO NOTHING`,
+            [`cab_${uuidv4().substring(0, 8)}`, tenantId, cNum, `${cNum}-xona`]
+          );
+        }
+      } catch (err) {
+        console.warn('Postgres seed specialties/cabinets fallback:', err);
       }
 
       // Audit Log

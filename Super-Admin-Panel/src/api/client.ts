@@ -269,6 +269,19 @@ export class ApiClient {
     });
   }
 
+  public static async updateUser(id: string, payload: { name?: string; email?: string; phone?: string; role?: string; password?: string; clinicId?: string }) {
+    return this.request(`/super-admin/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  public static async deleteUser(id: string) {
+    return this.request(`/super-admin/users/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
   // Real Branches
   public static async getBranches() {
     return this.request('/super-admin/branches');

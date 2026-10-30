@@ -34,7 +34,10 @@ class PatientModel {
     this.doctorsVisited = const [],
   });
 
-  factory PatientModel.fromJson(Map<String, dynamic> json) {
+  factory PatientModel.fromJson(Map<String, dynamic> rawJson) {
+    final Map<String, dynamic> json = (rawJson['patient'] is Map<String, dynamic>)
+        ? Map<String, dynamic>.from(rawJson['patient'])
+        : rawJson;
     return PatientModel(
       id: json['id']?.toString() ?? '',
       patientNumber: json['patientNumber']?.toString() ?? json['patient_number']?.toString(),
@@ -49,7 +52,7 @@ class PatientModel {
       totalSpent: Formatters.parseDouble(json['totalSpent'] ?? json['total_spent'] ?? json['total_paid'] ?? 0),
       lastVisitDate: json['lastVisitDate'] ?? json['last_visit_date'],
       lastDoctorName: json['lastDoctorName'] ?? json['last_doctor_name'],
-      doctorsVisited: json['doctors_visited'] ?? json['doctorsVisited'] ?? [],
+      doctorsVisited: json['doctors_visited'] ?? json['doctor_visits'] ?? json['doctorsVisited'] ?? [],
     );
   }
 

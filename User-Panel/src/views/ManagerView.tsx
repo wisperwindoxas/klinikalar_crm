@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Menu, HeartPulse, SlidersHorizontal, Users, Stethoscope, DoorOpen,
@@ -10,7 +10,7 @@ import {
   Sparkles, Mic, Play, Save, RotateCcw, Award, Briefcase, UserCheck,
   Phone, User, MapPin, Download, FileSpreadsheet, Layers, Hash, Building2, Tag, Banknote, Lock,
   Globe, Mail, Bell, Percent, Sliders, Copy, Printer, Filter, MessageSquare, ShieldAlert, Unlock, Pause,
-  CheckSquare, QrCode
+  CheckSquare, QrCode, Upload, Image as ImageIcon
 } from 'lucide-react';
 import { NewPatientModal } from '../components/NewPatientModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
@@ -18,9 +18,40 @@ import { showNotification } from '../components/ToastNotification';
 import { formatUzbekPhone } from '../utils/phone';
 import { UzbekistanAddressSelect } from '../components/UzbekistanAddressSelect';
 import { TicketIssuedModal } from '../components/TicketIssuedModal';
+import { ElectronDisplaySelector } from '../components/ElectronDisplaySelector';
+import { AppUpdateModal } from '../components/AppUpdateModal';
+import { APP_LOGO, APP_VERSION } from '../utils/brand';
+import { printThermalTicket } from '../utils/thermalPrinter';
 import * as XLSX from 'xlsx';
 
 const API_BASE_URL = 'http://localhost:5001/api/v1';
+
+const getAuthToken = (): string => {
+  return localStorage.getItem('sadaf_user_token') || localStorage.getItem('token') || '';
+};
+
+const getAuthHeaders = (extra: Record<string, string> = {}): Record<string, string> => {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...extra
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+};
+
+const TEST_TICKETS_ARRAY = [{
+  ticket_number: 'S-001',
+  full_number: 'S-001',
+  specialty_name: 'STOMATOLOGIYA',
+  doctor_name: 'Dr. Alisher Alimov',
+  cabinet_number: '4',
+  patient_name: 'Malika Alimova',
+  payment_status: 'PAID',
+  estimated_wait_minutes: 15
+}];
 
 export const ManagerView: React.FC = () => {
   const navigate = useNavigate();
@@ -29,6 +60,38 @@ export const ManagerView: React.FC = () => {
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+
+  // Authenticated Current User
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    try {
+      const raw = localStorage.getItem('sadaf_user');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const getRoleDisplayName = (role?: string) => {
+    if (!role) return 'Menejer';
+    const r = role.toUpperCase();
+    if (r === 'MANAGER') return 'Menejer';
+    if (r === 'ADMIN') return 'Administrator';
+    if (r === 'SUPER_ADMIN') return 'Bosh Administrator';
+    if (r === 'DOCTOR') return 'Shifokor';
+    if (r === 'CASHIER') return 'Kassir';
+    return role;
+  };
+
+  const getUserInitials = (name?: string) => {
+    if (!name) return 'MM';
+    const clean = name.replace(/^(dr\.|dr|shifokor)\s+/i, '').trim();
+    const parts = clean.split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return clean.slice(0, 2).toUpperCase();
+  };
 
   // Clock
   const [time, setTime] = useState('14:25');
@@ -66,9 +129,10 @@ export const ManagerView: React.FC = () => {
   const fetchClinicSubscriptionAndSms = async () => {
     try {
       setLoadingSubscription(true);
+      const authHeaders = getAuthHeaders();
       const [subRes, smsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/clinic/subscription`).then(r => r.json()).catch(() => ({ data: null })),
-        fetch(`${API_BASE_URL}/super-admin/sms/settings`).then(r => r.json()).catch(() => ({ data: null }))
+        fetch(`${API_BASE_URL}/clinic/subscription`, { headers: authHeaders }).then(r => r.json()).catch(() => ({ data: null })),
+        fetch(`${API_BASE_URL}/super-admin/sms/settings`, { headers: authHeaders }).then(r => r.json()).catch(() => ({ data: null }))
       ]);
       if (subRes?.data) setClinicSubscription(subRes.data);
       if (smsRes?.data) setSmsSettings(smsRes.data);
@@ -194,15 +258,16 @@ export const ManagerView: React.FC = () => {
 
   // Settings Form (Comprehensive Site & Clinic Settings)
   const [settingsForm, setSettingsForm] = useState({
-    clinicName: 'klinika-admin',
-    slogan: 'Zamonaviy tibbiyot va professional xizmat',
-    phone: '+998 71 200 00 20',
-    email: 'info@sadafclinic.uz',
-    address: "Toshkent sh., Chilonzor tumani, Bunyodkor ko'chasi 15-uy",
+    clinicName: '',
+    logoUrl: '',
+    slogan: '',
+    phone: '',
+    email: '',
+    address: '',
     workStartTime: '08:00',
     workEndTime: '18:00',
     workDays: 'Dushanba - Shanba',
-    websiteUrl: 'https://sadafmed.uz',
+    websiteUrl: '',
     defaultPaymentPolicy: 'PAY_BEFORE_CALL',
     defaultQueuePrefix: 'A',
     autoCallNext: false,
@@ -217,6 +282,7 @@ export const ManagerView: React.FC = () => {
     voiceLanguage: 'uz-UZ'
   });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const initialSettingsLoadedRef = useRef(false);
 
   // Printer & Ticket Settings State (100% Real PostgreSQL & localStorage sync)
   interface TicketPrinterSettings {
@@ -248,10 +314,10 @@ export const ManagerView: React.FC = () => {
     copies: 1,
     autoPrint: true,
     soundAlert: true,
-    clinicName: 'KLINIKA-ADMIN',
+    clinicName: '',
     showLogo: true,
-    address: "Toshkent sh., Chilonzor tumani, Bunyodkor ko'chasi 15-uy",
-    phone: '+998 71 200 00 20',
+    address: '',
+    phone: '',
     welcomeNote: "Navbat talonini qabul yakunigacha saqlang",
     showDate: true,
     showTicketNumber: true,
@@ -378,23 +444,24 @@ export const ManagerView: React.FC = () => {
     }
   }, [currentTabSlug]);
 
-  const loadManagerData = async () => {
+  const loadManagerData = async (forceSettingsReload = false) => {
     try {
+      const authHeaders = getAuthHeaders();
       const [dashRes, docRes, specRes, srvRes, cabRes, payRes, tvRes, tckRes, patRes, shiftRes, setRes, usersRes, shiftsRes, auditRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/reports/manager-dashboard`).then(r => r.json()).catch(() => ({ data: null })),
-        fetch(`${API_BASE_URL}/doctors`).then(r => r.json()).catch(() => ({ data: [] })),
-        fetch(`${API_BASE_URL}/specialties`).then(r => r.json()).catch(() => ({ data: [] })),
-        fetch(`${API_BASE_URL}/services`).then(r => r.json()).catch(() => ({ data: [] })),
-        fetch(`${API_BASE_URL}/cabinets`).then(r => r.json()).catch(() => ({ data: [] })),
-        fetch(`${API_BASE_URL}/payments`).then(r => r.json()).catch(() => ({ data: [] })),
-        fetch(`${API_BASE_URL}/tv/feed`).then(r => r.json()).catch(() => ({ data: null })),
-        fetch(`${API_BASE_URL}/queues/tickets`).then(r => r.json()).catch(() => ({ data: [] })),
-        fetch(`${API_BASE_URL}/patients`).then(r => r.json()).catch(() => ({ data: [] })),
-        fetch(`${API_BASE_URL}/cash-shifts/current`).then(r => r.json()).catch(() => ({ data: null })),
-        fetch(`${API_BASE_URL}/clinic/settings`).then(r => r.json()).catch(() => ({ data: null })),
-        fetch(`${API_BASE_URL}/users`).then(r => r.json()).catch(() => ({ data: [] })),
-        fetch(`${API_BASE_URL}/cash-shifts`).then(r => r.json()).catch(() => ({ data: [] })),
-        fetch(`${API_BASE_URL}/clinic/audit-logs`).then(r => r.json()).catch(() => ({ data: [] }))
+        fetch(`${API_BASE_URL}/reports/manager-dashboard`, { headers: authHeaders }).then(r => r.json()).catch(() => ({ data: null })),
+        fetch(`${API_BASE_URL}/doctors`, { headers: authHeaders }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`${API_BASE_URL}/specialties`, { headers: authHeaders }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`${API_BASE_URL}/services`, { headers: authHeaders }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`${API_BASE_URL}/cabinets`, { headers: authHeaders }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`${API_BASE_URL}/payments`, { headers: authHeaders }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`${API_BASE_URL}/tv/feed`, { headers: authHeaders }).then(r => r.json()).catch(() => ({ data: null })),
+        fetch(`${API_BASE_URL}/queues/tickets`, { headers: authHeaders }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`${API_BASE_URL}/patients`, { headers: authHeaders }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`${API_BASE_URL}/cash-shifts/current`, { headers: authHeaders }).then(r => r.json()).catch(() => ({ data: null })),
+        fetch(`${API_BASE_URL}/clinic/settings`, { headers: authHeaders }).then(r => r.json()).catch(() => ({ data: null })),
+        fetch(`${API_BASE_URL}/users`, { headers: authHeaders }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`${API_BASE_URL}/cash-shifts`, { headers: authHeaders }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`${API_BASE_URL}/clinic/audit-logs`, { headers: authHeaders }).then(r => r.json()).catch(() => ({ data: [] }))
       ]);
 
       if (dashRes.data) setDashboardData(dashRes.data);
@@ -411,56 +478,67 @@ export const ManagerView: React.FC = () => {
       if (auditRes.data) setAuditLogsList(auditRes.data);
       if (setRes.data) {
         setClinicSettings(setRes.data);
-        setSettingsForm({
-          clinicName: setRes.data.clinic_name || 'klinika-admin',
-          slogan: setRes.data.slogan || 'Zamonaviy tibbiyot va professional xizmat',
-          phone: setRes.data.phone || '+998 71 200 00 20',
-          email: setRes.data.email || 'info@sadafclinic.uz',
-          address: setRes.data.address || "Toshkent sh., Chilonzor tumani, Bunyodkor ko'chasi 15-uy",
-          workStartTime: setRes.data.work_start_time || '08:00',
-          workEndTime: setRes.data.work_end_time || '18:00',
-          workDays: setRes.data.work_days || 'Dushanba - Shanba',
-          websiteUrl: setRes.data.website_url || 'https://sadafmed.uz',
-          defaultPaymentPolicy: setRes.data.default_payment_policy || 'PAY_BEFORE_CALL',
-          defaultQueuePrefix: setRes.data.default_queue_prefix || 'A',
-          autoCallNext: !!setRes.data.auto_call_next,
-          ticketAutoCancelMinutes: setRes.data.ticket_auto_cancel_minutes ?? 15,
-          maxDailyTicketsPerDoctor: setRes.data.max_daily_tickets_per_doctor ?? 50,
-          emergencyPriority: setRes.data.emergency_priority ?? true,
-          currency: setRes.data.currency || 'UZS',
-          vatPercent: setRes.data.vat_percent ?? 0,
-          cashierAutoCloseShift: setRes.data.cashier_auto_close_shift ?? true,
-          soundNotification: setRes.data.sound_notification ?? true,
-          recallLimit: setRes.data.recall_limit ?? 3,
-          voiceLanguage: setRes.data.voice_language || 'uz-UZ'
-        });
-        setTvSettings({
-          clinicName: setRes.data.clinic_name || 'klinika-admin',
-          tvVoiceTemplate: setRes.data.tv_voice_template || 'Talon raqami {letter}{zeros}, {number} raqam egasi, sizni {cabinet} xona, {specialty} xonasiga marhamat!',
-          tvVoiceName: setRes.data.tv_voice_name || 'uz-UZ-MadinaNeural',
-          tvSoundEnabled: setRes.data.tv_sound_enabled !== false,
-          tvSloganTitle: setRes.data.tv_slogan_title || 'Sog‘lig‘ingiz biz uchun muhim!',
-          tvSloganSubtitle: setRes.data.tv_slogan_subtitle || 'Navbat bilan qabulga marhamat!',
-          tvCallingTitle: setRes.data.tv_calling_title || 'Hozir chaqirilmoqda!',
-          tvStandbyTitle: setRes.data.tv_standby_title || 'Qabul kutilmoqda',
-          tvStandbyFooter: setRes.data.tv_standby_footer || 'Iltimos, navbat raqamingiz chaqirilishini kuting!',
-          tvBottomBanner: setRes.data.tv_bottom_banner || 'Sizning sog‘lig‘ingiz – bizning ustuvor vazifamiz!',
-          tvInstruction1: setRes.data.tv_instruction_1 || 'Iltimos, navbatingizni kuting',
-          tvInstruction2: setRes.data.tv_instruction_2 || "Navbat raqami ovozli e'lon qilinadi",
-          tvInstruction3: setRes.data.tv_instruction_3 || 'Talon raqamini va kabinet raqamini diqqat bilan tinglang'
-        });
-        if (setRes.data.printer_settings && typeof setRes.data.printer_settings === 'object') {
-          setPrinterSettings(prev => ({ ...prev, ...setRes.data.printer_settings }));
-          localStorage.setItem('sadaf_ticket_settings', JSON.stringify(setRes.data.printer_settings));
+        if (!initialSettingsLoadedRef.current || forceSettingsReload) {
+          initialSettingsLoadedRef.current = true;
+          setSettingsForm({
+            clinicName: setRes.data.clinic_name ?? (currentUser?.clinicName || ''),
+            logoUrl: setRes.data.logo_url ?? '',
+            slogan: setRes.data.slogan ?? '',
+            phone: setRes.data.phone ?? '',
+            email: setRes.data.email ?? '',
+            address: setRes.data.address ?? '',
+            workStartTime: setRes.data.work_start_time || '08:00',
+            workEndTime: setRes.data.work_end_time || '18:00',
+            workDays: setRes.data.work_days || 'Dushanba - Shanba',
+            websiteUrl: setRes.data.website_url ?? '',
+            defaultPaymentPolicy: setRes.data.default_payment_policy || 'PAY_BEFORE_CALL',
+            defaultQueuePrefix: setRes.data.default_queue_prefix || 'A',
+            autoCallNext: !!setRes.data.auto_call_next,
+            ticketAutoCancelMinutes: setRes.data.ticket_auto_cancel_minutes ?? 15,
+            maxDailyTicketsPerDoctor: setRes.data.max_daily_tickets_per_doctor ?? 50,
+            emergencyPriority: setRes.data.emergency_priority ?? true,
+            currency: setRes.data.currency || 'UZS',
+            vatPercent: setRes.data.vat_percent ?? 0,
+            cashierAutoCloseShift: setRes.data.cashier_auto_close_shift ?? true,
+            soundNotification: setRes.data.sound_notification ?? true,
+            recallLimit: setRes.data.recall_limit ?? 3,
+            voiceLanguage: setRes.data.voice_language || 'uz-UZ'
+          });
+          setTvSettings({
+            clinicName: setRes.data.clinic_name || (currentUser?.clinicName || 'Klinika'),
+            tvVoiceTemplate: setRes.data.tv_voice_template || 'Talon raqami {letter}{zeros}, {number} raqam egasi, sizni {cabinet} xona, {specialty} xonasiga marhamat!',
+            tvVoiceName: setRes.data.tv_voice_name || 'uz-UZ-MadinaNeural',
+            tvSoundEnabled: setRes.data.tv_sound_enabled !== false,
+            tvSloganTitle: setRes.data.tv_slogan_title || 'Sog‘lig‘ingiz biz uchun muhim!',
+            tvSloganSubtitle: setRes.data.tv_slogan_subtitle || 'Navbat bilan qabulga marhamat!',
+            tvCallingTitle: setRes.data.tv_calling_title || 'Hozir chaqirilmoqda!',
+            tvStandbyTitle: setRes.data.tv_standby_title || 'Qabul kutilmoqda',
+            tvStandbyFooter: setRes.data.tv_standby_footer || 'Iltimos, navbat raqamingiz chaqirilishini kuting!',
+            tvBottomBanner: setRes.data.tv_bottom_banner || 'Sizning sog‘lig‘ingiz – bizning ustuvor vazifamiz!',
+            tvInstruction1: setRes.data.tv_instruction_1 || 'Iltimos, navbatingizni kuting',
+            tvInstruction2: setRes.data.tv_instruction_2 || "Navbat raqami ovozli e'lon qilinadi",
+            tvInstruction3: setRes.data.tv_instruction_3 || 'Talon raqamini va kabinet raqamini diqqat bilan tinglang'
+          });
+          if (setRes.data.printer_settings && typeof setRes.data.printer_settings === 'object') {
+            setPrinterSettings(prev => ({ ...prev, ...setRes.data.printer_settings }));
+            localStorage.setItem('sadaf_ticket_settings', JSON.stringify(setRes.data.printer_settings));
+          } else {
+            setPrinterSettings(prev => ({
+              ...prev,
+              clinicName: prev.clinicName || setRes.data.clinic_name || '',
+              address: prev.address || setRes.data.address || '',
+              phone: prev.phone || setRes.data.phone || ''
+            }));
+          }
         }
       }
       if (tvRes.data?.upcomingQueue) {
         setLiveQueueList(tvRes.data.upcomingQueue);
       }
-      fetch(`${API_BASE_URL}/clinic/subscription`).then(r => r.json()).then(res => {
+      fetch(`${API_BASE_URL}/clinic/subscription`, { headers: authHeaders }).then(r => r.json()).then(res => {
         if (res?.data) setClinicSubscription(res.data);
       }).catch(() => {});
-      fetch(`${API_BASE_URL}/super-admin/sms/settings`).then(r => r.json()).then(res => {
+      fetch(`${API_BASE_URL}/super-admin/sms/settings`, { headers: authHeaders }).then(r => r.json()).then(res => {
         if (res?.data) setSmsSettings(res.data);
       }).catch(() => {});
     } catch (e) {
@@ -491,13 +569,13 @@ export const ManagerView: React.FC = () => {
       if (editingDoctorId) {
         await fetch(`${API_BASE_URL}/doctors/${editingDoctorId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload)
         });
       } else {
         await fetch(`${API_BASE_URL}/doctors`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload)
         });
       }
@@ -519,7 +597,7 @@ export const ManagerView: React.FC = () => {
       itemDetails: `${doc.specialty_name || 'Umumiy'} • ${doc.cabinet_number || doc.room_number || '-'}-kabinet`,
       onConfirm: async () => {
         try {
-          await fetch(`${API_BASE_URL}/doctors/${doc.id}`, { method: 'DELETE' });
+          await fetch(`${API_BASE_URL}/doctors/${doc.id}`, { method: 'DELETE', headers: getAuthHeaders() });
           loadManagerData();
           showNotification('Shifokor o\'chirildi', `${doc.display_name} muvaffaqiyatli o'chirildi.`, 'success');
         } catch (e) {
@@ -573,13 +651,13 @@ export const ManagerView: React.FC = () => {
       if (editingServiceId) {
         await fetch(`${API_BASE_URL}/services/${editingServiceId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload)
         });
       } else {
         await fetch(`${API_BASE_URL}/services`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload)
         });
       }
@@ -715,7 +793,7 @@ export const ManagerView: React.FC = () => {
       itemDetails: `Narxi: ${Number(srv.price || 0).toLocaleString()} so'm`,
       onConfirm: async () => {
         try {
-          await fetch(`${API_BASE_URL}/services/${srv.id}`, { method: 'DELETE' });
+          await fetch(`${API_BASE_URL}/services/${srv.id}`, { method: 'DELETE', headers: getAuthHeaders() });
           loadManagerData();
           showNotification('Xizmat o\'chirildi', `${srv.name} muvaffaqiyatli o'chirildi.`, 'success');
         } catch (e) {
@@ -741,13 +819,13 @@ export const ManagerView: React.FC = () => {
       if (editingCabinetId) {
         res = await fetch(`${API_BASE_URL}/cabinets/${editingCabinetId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload)
         });
       } else {
         res = await fetch(`${API_BASE_URL}/cabinets`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload)
         });
       }
@@ -772,7 +850,7 @@ export const ManagerView: React.FC = () => {
       const cabName = floorForm.firstCabinetName || `${cabNum}-kabinet (${floorForm.department})`;
       const res = await fetch(`${API_BASE_URL}/cabinets`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           number: cabNum,
           roomNumber: cabNum,
@@ -804,7 +882,7 @@ export const ManagerView: React.FC = () => {
       itemDetails: `${cab.floor || 1}-qavat • Xona ${cabNum}`,
       onConfirm: async () => {
         try {
-          const res = await fetch(`${API_BASE_URL}/cabinets/${cab.id}`, { method: 'DELETE' });
+          const res = await fetch(`${API_BASE_URL}/cabinets/${cab.id}`, { method: 'DELETE', headers: getAuthHeaders() });
           const data = await res.json();
           if (res.ok && data.success) {
             loadManagerData();
@@ -835,7 +913,7 @@ export const ManagerView: React.FC = () => {
       tickets: []
     });
     try {
-      const res = await fetch(`${API_BASE_URL}/doctors/${doctor.id}/performance`);
+      const res = await fetch(`${API_BASE_URL}/doctors/${doctor.id}/performance`, { headers: getAuthHeaders() });
       const data = await res.json();
       if (res.ok && data.success) {
         setSelectedDoctorReport(data.data);
@@ -1021,7 +1099,7 @@ export const ManagerView: React.FC = () => {
     setPatientHistoryLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/patients/${patient.id}`).then(r => r.json());
+      const res = await fetch(`${API_BASE_URL}/patients/${patient.id}`, { headers: getAuthHeaders() }).then(r => r.json());
       if (res.success && res.data) {
         setPatientTickets(res.data.tickets || []);
         setPatientPayments(res.data.payments || []);
@@ -1083,7 +1161,7 @@ export const ManagerView: React.FC = () => {
     try {
       await fetch(`${API_BASE_URL}/patients/${editingPatientId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(patientForm)
       });
       setIsPatientEditModalOpen(false);
@@ -1105,7 +1183,7 @@ export const ManagerView: React.FC = () => {
       itemDetails: `Karta: #${patient.patient_number || patient.id?.substring(0, 6)} • Tel: ${patient.phone || '-'}`,
       onConfirm: async () => {
         try {
-          await fetch(`${API_BASE_URL}/patients/${patient.id}`, { method: 'DELETE' });
+          await fetch(`${API_BASE_URL}/patients/${patient.id}`, { method: 'DELETE', headers: getAuthHeaders() });
           loadManagerData();
           showNotification('Bemor o\'chirildi', `${patient.full_name} bazadan muvaffaqiyatli o'chirildi.`, 'success');
         } catch (e) {
@@ -1127,7 +1205,7 @@ export const ManagerView: React.FC = () => {
         try {
           await fetch(`${API_BASE_URL}/queues/tickets/${ticket.id}/cancel`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({})
           });
           loadManagerData();
@@ -1146,7 +1224,7 @@ export const ManagerView: React.FC = () => {
     try {
       const res = await fetch(`${API_BASE_URL}/clinic/settings`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(settingsForm)
       });
       const data = await res.json();
@@ -1154,8 +1232,14 @@ export const ManagerView: React.FC = () => {
         showNotification('Sozlamalar saqlandi', 'Klinika va sayt sozlamalari muvaffaqiyatli saqlandi va kuchga kirdi!', 'success');
         if (data.data) {
           setClinicSettings(data.data);
+          if (settingsForm.clinicName && currentUser) {
+            try {
+              const updatedUser = { ...currentUser, clinicName: settingsForm.clinicName };
+              localStorage.setItem('sadaf_user', JSON.stringify(updatedUser));
+            } catch {}
+          }
         }
-        loadManagerData();
+        await loadManagerData(true);
       } else {
         showNotification('Xatolik', data.message || 'Sozlamalarni saqlashda xatolik yuz berdi', 'error');
       }
@@ -1169,15 +1253,16 @@ export const ManagerView: React.FC = () => {
   const handleResetSettings = () => {
     if (clinicSettings) {
       setSettingsForm({
-        clinicName: clinicSettings.clinic_name || 'klinika-admin',
-        slogan: clinicSettings.slogan || 'Zamonaviy tibbiyot va professional xizmat',
-        phone: clinicSettings.phone || '+998 71 200 00 20',
-        email: clinicSettings.email || 'info@sadafclinic.uz',
-        address: clinicSettings.address || "Toshkent sh., Chilonzor tumani, Bunyodkor ko'chasi 15-uy",
+        clinicName: clinicSettings.clinic_name ?? (currentUser?.clinicName || ''),
+        logoUrl: clinicSettings.logo_url ?? '',
+        slogan: clinicSettings.slogan ?? '',
+        phone: clinicSettings.phone ?? '',
+        email: clinicSettings.email ?? '',
+        address: clinicSettings.address ?? '',
         workStartTime: clinicSettings.work_start_time || '08:00',
         workEndTime: clinicSettings.work_end_time || '18:00',
         workDays: clinicSettings.work_days || 'Dushanba - Shanba',
-        websiteUrl: clinicSettings.website_url || 'https://sadafmed.uz',
+        websiteUrl: clinicSettings.website_url ?? '',
         defaultPaymentPolicy: clinicSettings.default_payment_policy || 'PAY_BEFORE_CALL',
         defaultQueuePrefix: clinicSettings.default_queue_prefix || 'A',
         autoCallNext: !!clinicSettings.auto_call_next,
@@ -1226,13 +1311,13 @@ export const ManagerView: React.FC = () => {
       if (editingUserId) {
         await fetch(`${API_BASE_URL}/users/${editingUserId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(userForm)
         });
       } else {
         await fetch(`${API_BASE_URL}/users`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(userForm)
         });
       }
@@ -1253,7 +1338,7 @@ export const ManagerView: React.FC = () => {
       itemDetails: `Rol: ${usr.role} • Login: ${usr.username} • Tel: ${usr.phone || '-'}`,
       onConfirm: async () => {
         try {
-          await fetch(`${API_BASE_URL}/users/${usr.id}`, { method: 'DELETE' });
+          await fetch(`${API_BASE_URL}/users/${usr.id}`, { method: 'DELETE', headers: getAuthHeaders() });
           loadManagerData();
           showNotification('Foydalanuvchi o\'chirildi', `${usr.full_name || usr.username} muvaffaqiyatli o'chirildi.`, 'success');
         } catch (e) {
@@ -1269,7 +1354,7 @@ export const ManagerView: React.FC = () => {
     try {
       await fetch(`${API_BASE_URL}/cash-shifts/open`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           cashierId: 'usr_cashier1',
           cashierName: shiftForm.cashierName,
@@ -1298,7 +1383,7 @@ export const ManagerView: React.FC = () => {
     try {
       const res = await fetch(`${API_BASE_URL}/cash-shifts/${closingShiftData.id}/close`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           closingBalance: Number(closingCashAmount) || 0
         })
@@ -1324,7 +1409,7 @@ export const ManagerView: React.FC = () => {
     setIsLoadingShiftDetails(true);
     setSelectedShiftDetails(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/cash-shifts/${shift.id}/details`);
+      const res = await fetch(`${API_BASE_URL}/cash-shifts/${shift.id}/details`, { headers: getAuthHeaders() });
       const json = await res.json();
       if (json.success && json.data) {
         setSelectedShiftDetails(json.data);
@@ -1411,16 +1496,13 @@ export const ManagerView: React.FC = () => {
     try {
       const res = await fetch(`${API_BASE_URL}/clinic/settings`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(tvSettings)
       });
       const data = await res.json();
       if (res.ok) {
         showNotification('Sozlamalar saqlandi', "TV Tablosi yozuvlari va ovoz shabloni muvaffaqiyatli yangilandi va TV ga uzatildi.", 'success');
-        loadManagerData();
+        await loadManagerData(true);
       } else {
         showNotification('Xatolik', data.message || 'Saqlashda xatolik yuz berdi', 'error');
       }
@@ -1471,7 +1553,7 @@ export const ManagerView: React.FC = () => {
     try {
       const res = await fetch(`${API_BASE_URL}/tv/test-call`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           ticketNumber: testTicketNum,
           specialtyName: testSpecName,
@@ -1496,10 +1578,7 @@ export const ManagerView: React.FC = () => {
     try {
       const res = await fetch(`${API_BASE_URL}/clinic/settings`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           printer_settings: printerSettings
         })
@@ -1518,6 +1597,7 @@ export const ManagerView: React.FC = () => {
       } catch {}
 
       showNotification('Sozlamalar saqlandi', 'Printer va talon sozlamalari muvaffaqiyatli saqlandi va barcha kassirlar uchun kuchga kirdi!', 'success');
+      await loadManagerData(true);
     } catch (err: any) {
       showNotification('Xatolik', err.message || 'Sozlamalarni saqlashda xatolik yuz berdi', 'error');
     } finally {
@@ -1608,13 +1688,17 @@ export const ManagerView: React.FC = () => {
         {/* Top Brand */}
         <div>
           <div className="p-5 flex items-center gap-3">
-            <div className="w-12 h-12 bg-transparent flex items-center justify-center flex-shrink-0 filter drop-shadow-md">
-              <img src="/logo.png" alt="klinika-admin Logo" className="w-full h-full object-contain bg-transparent" />
+            <div className="w-12 h-12 bg-transparent flex items-center justify-center flex-shrink-0 filter drop-shadow-md overflow-hidden">
+              <img
+                src={clinicSettings?.logo_url || settingsForm?.logoUrl || APP_LOGO}
+                alt={clinicSettings?.clinic_name || settingsForm?.clinicName || 'Klinika-admin'}
+                className="w-full h-full object-contain bg-transparent rounded-lg"
+              />
             </div>
             {!sidebarCollapsed && (
               <div className="overflow-hidden">
-                <div className="font-bold text-lg text-white tracking-tight leading-tight">
-                  klinika-admin
+                <div className="font-bold text-lg text-white tracking-tight leading-tight truncate">
+                  {clinicSettings?.clinic_name || settingsForm?.clinicName || 'Klinika-admin'}
                 </div>
                 <div className="text-xs text-slate-400 font-medium">
                   Boshqaruv Tizimi
@@ -1740,7 +1824,7 @@ export const ManagerView: React.FC = () => {
       {/* 2. MAIN WORKSPACE */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* TOP NAVBAR (100% 1:1 WITH Meneger.png) */}
-        <header className="h-16 bg-white border-b border-slate-200/80 px-6 flex items-center justify-between flex-shrink-0 z-10 shadow-sm">
+        <header className="h-16 bg-white border-b border-slate-200/80 px-6 flex items-center justify-between flex-shrink-0 relative z-40 shadow-sm">
           {/* Left Brand / Hamburger */}
           <div className="flex items-center gap-4">
             <button
@@ -1751,7 +1835,7 @@ export const ManagerView: React.FC = () => {
             </button>
             <div>
               <h1 className="text-base font-bold text-[#172B4D] leading-tight">
-                {clinicSettings?.clinic_name || 'Klinika'}
+                {clinicSettings?.clinic_name || settingsForm?.clinicName || 'Klinika-admin'}
               </h1>
               <p className="text-[11px] text-slate-500 font-medium">Navbat Tizimi — Boshqaruv</p>
             </div>
@@ -1774,43 +1858,51 @@ export const ManagerView: React.FC = () => {
             <div className="relative">
               <button
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className="flex items-center gap-2.5 p-1.5 pr-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition"
+                className="flex items-center gap-2.5 p-1.5 pr-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition shadow-2xs cursor-pointer"
               >
-                <div className="w-8 h-8 rounded-full bg-[#1677FF] text-white flex items-center justify-center font-bold text-xs shadow-sm">
-                  MM
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#1677FF] to-blue-700 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                  {getUserInitials(currentUser?.fullName || currentUser?.name || currentUser?.username)}
                 </div>
-                <span className="text-xs font-bold text-[#172B4D]">Menejer</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <div className="flex flex-col text-left">
+                  <span className="text-xs font-bold text-[#172B4D] leading-tight max-w-[150px] truncate">
+                    {currentUser?.fullName || currentUser?.name || currentUser?.username || 'Menejer'}
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-semibold">
+                    {getRoleDisplayName(currentUser?.role)}
+                  </span>
+                </div>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
               </button>
 
               {userDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-50">
-                  <div className="px-3 py-2 border-b border-slate-100">
-                    <div className="text-xs font-bold text-slate-800">Menejer Administratsiya</div>
-                    <div className="text-[10px] text-slate-400">admin@sadaf.uz</div>
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setUserDropdownOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 z-50">
+                    <div className="px-3 py-2.5 border-b border-slate-100">
+                      <div className="text-xs font-bold text-slate-800 truncate">
+                        {currentUser?.fullName || currentUser?.name || currentUser?.username || 'Menejer'}
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                        {currentUser?.phone ? formatUzbekPhone(currentUser.phone) : (currentUser?.email || currentUser?.username || '')}
+                      </div>
+                      <div className="mt-1.5">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60">
+                          {getRoleDisplayName(currentUser?.role)}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 mt-1 transition cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5 text-rose-500" />
+                      <span>Tizimdan chiqish</span>
+                    </button>
                   </div>
-                  <button
-                    onClick={() => navigate('/cashier')}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 flex items-center gap-2 mt-1"
-                  >
-                    <Ticket className="w-3.5 h-3.5" />
-                    <span>Kassir oynasiga o'tish</span>
-                  </button>
-                  <button
-                    onClick={() => navigate('/doctor')}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 flex items-center gap-2"
-                  >
-                    <Stethoscope className="w-3.5 h-3.5" />
-                    <span>Shifokor oynasiga o'tish</span>
-                  </button>
-                  <button
-                    onClick={handleLogout}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 mt-1"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>Tizimdan chiqish</span>
-                  </button>
-                </div>
+                </>
               )}
             </div>
           </div>
@@ -2570,7 +2662,7 @@ export const ManagerView: React.FC = () => {
                       </div>
 
                       <button
-                        onClick={loadManagerData}
+                        onClick={() => loadManagerData()}
                         className="p-2.5 bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl transition cursor-pointer"
                         title="Yangilash"
                       >
@@ -4319,6 +4411,9 @@ export const ManagerView: React.FC = () => {
           {/* TAB 10: TV TABLOSI VA OVOZLI E'LON SOZLAMALARI (TO'LIQ BOSHQARUV) */}
           {activeTab === 'TV_TABLOSI' && (
             <div className="space-y-6">
+              {/* ELECTRON MULTI-DISPLAY (HDMI TV) SELECTOR */}
+              <ElectronDisplaySelector onNotification={showNotification} />
+
               {/* Header with Title and Actions */}
               <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -4565,10 +4660,7 @@ export const ManagerView: React.FC = () => {
                           try {
                             const res = await fetch(`${API_BASE_URL}/clinic/settings`, {
                               method: 'PATCH',
-                              headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-                              },
+                              headers: getAuthHeaders(),
                               body: JSON.stringify({ tvSoundEnabled: newStatus })
                             });
                             if (res.ok) {
@@ -5104,8 +5196,8 @@ export const ManagerView: React.FC = () => {
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Klinika Brendi</p>
-                    <p className="text-xs font-black text-slate-800 truncate">{settingsForm.clinicName || 'klinika-admin'}</p>
-                    <p className="text-[10px] text-slate-400 truncate mt-0.5">{settingsForm.slogan || 'Rasmiy tibbiyot markazi'}</p>
+                    <p className="text-xs font-black text-slate-800 truncate">{settingsForm.clinicName || 'Klinika nomi'}</p>
+                    <p className="text-[10px] text-slate-400 truncate mt-0.5">{settingsForm.slogan || 'Shior kiritilmagan'}</p>
                   </div>
                 </div>
 
@@ -5139,9 +5231,40 @@ export const ManagerView: React.FC = () => {
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Aloqa Markazi</p>
-                    <p className="text-xs font-black text-slate-800 truncate">{settingsForm.phone}</p>
-                    <p className="text-[10px] text-slate-400 truncate mt-0.5">{settingsForm.email}</p>
+                    <p className="text-xs font-black text-slate-800 truncate">{settingsForm.phone || 'Telefon kiritilmagan'}</p>
+                    <p className="text-[10px] text-slate-400 truncate mt-0.5">{settingsForm.email || 'Email kiritilmagan'}</p>
                   </div>
+                </div>
+              </div>
+
+              {/* DASTUR YANGILANISHI (GITHUB RELEASES) */}
+              <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-medical-blue to-teal-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-medical-blue/20">
+                      <Sparkles className="w-5 h-5 text-yellow-300" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base font-black text-slate-900">Dastur Yangilanishi</h3>
+                        <span className="px-2 py-0.5 rounded-md bg-blue-50 text-medical-blue border border-blue-200 text-[10px] font-black">
+                          v{APP_VERSION}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        GitHub Releases orqali dasturning yangi versiyasini tekshirish, o'zgarishlar bilan tanishish va avtomatik yangilash
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsUpdateModalOpen(true)}
+                    className="px-5 py-2.5 bg-gradient-to-r from-medical-blue to-teal-600 hover:opacity-95 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-md shadow-medical-blue/20 active:scale-95 cursor-pointer self-start sm:self-auto"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Yangilanishlarni tekshirish</span>
+                  </button>
                 </div>
               </div>
 
@@ -5162,6 +5285,68 @@ export const ManagerView: React.FC = () => {
                     </div>
 
                     <div className="space-y-3.5 pt-1">
+                      {/* Klinika Logotipi */}
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1.5 flex items-center gap-1.5">
+                          <ImageIcon className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Klinika logotipi</span>
+                        </label>
+                        <div className="flex items-center gap-4 p-3 bg-slate-50 border border-slate-200/90 rounded-2xl">
+                          <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-center overflow-hidden shrink-0 p-1.5">
+                            <img
+                              src={settingsForm.logoUrl || clinicSettings?.logo_url || APP_LOGO}
+                              alt="Logo preview"
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                          <div className="flex-1 space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <label className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-2xs">
+                                <Upload className="w-3.5 h-3.5 text-blue-600" />
+                                <span>Rasm yuklash</span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      if (file.size > 2 * 1024 * 1024) {
+                                        showNotification('Hajm katta', 'Logotip hajmi 2MB dan oshmasligi kerak', 'error');
+                                        return;
+                                      }
+                                      const reader = new FileReader();
+                                      reader.onload = () => {
+                                        setSettingsForm(prev => ({ ...prev, logoUrl: reader.result as string }));
+                                        showNotification('Logotip tanlandi', 'Logotip tanlandi. Saqlash tugmasini bosing.', 'success');
+                                      };
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                />
+                              </label>
+
+                              {(settingsForm.logoUrl || clinicSettings?.logo_url) && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSettingsForm(prev => ({ ...prev, logoUrl: '' }));
+                                    showNotification('Logotip o\'chirildi', 'Standart dastur logotipi tiklandi. Saqlash tugmasini bosing.', 'info');
+                                  }}
+                                  className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-bold transition flex items-center gap-1 border border-rose-200 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>O'chirish</span>
+                                </button>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-400 leading-tight">
+                              PNG, JPG, SVG tavsiya etiladi. Logotip yuklanmasa, standart dastur logotipi ishlatiladi.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
                       <div>
                         <label className="text-xs font-bold text-slate-700 block mb-1 flex items-center gap-1.5">
                           <Building2 className="w-3.5 h-3.5 text-slate-400" />
@@ -5171,7 +5356,7 @@ export const ManagerView: React.FC = () => {
                           type="text"
                           value={settingsForm.clinicName}
                           onChange={e => setSettingsForm({ ...settingsForm, clinicName: e.target.value })}
-                          placeholder="klinika-admin"
+                          placeholder="Klinika nomini kiriting"
                           className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition"
                         />
                       </div>
@@ -5185,7 +5370,7 @@ export const ManagerView: React.FC = () => {
                           type="text"
                           value={settingsForm.slogan}
                           onChange={e => setSettingsForm({ ...settingsForm, slogan: e.target.value })}
-                          placeholder="Zamonaviy tibbiyot va professional xizmat"
+                          placeholder="Klinika shiorini kiriting"
                           className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition"
                         />
                       </div>
@@ -5200,7 +5385,7 @@ export const ManagerView: React.FC = () => {
                             type="text"
                             value={settingsForm.phone}
                             onChange={e => setSettingsForm({ ...settingsForm, phone: formatUzbekPhone(e.target.value) })}
-                            placeholder="+998 (71) 200-00-20"
+                            placeholder="+998 (__) ___-__-__"
                             className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-800 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition"
                           />
                         </div>
@@ -5213,7 +5398,7 @@ export const ManagerView: React.FC = () => {
                             type="email"
                             value={settingsForm.email}
                             onChange={e => setSettingsForm({ ...settingsForm, email: e.target.value })}
-                            placeholder="info@sadafclinic.uz"
+                            placeholder="Masalan: info@klinika.uz"
                             className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition"
                           />
                         </div>
@@ -5228,7 +5413,7 @@ export const ManagerView: React.FC = () => {
                           type="text"
                           value={settingsForm.address}
                           onChange={e => setSettingsForm({ ...settingsForm, address: e.target.value })}
-                          placeholder="Toshkent sh., Chilonzor tumani, Bunyodkor ko'chasi 15-uy"
+                          placeholder="Masalan: Toshkent sh., Chilonzor tumani..."
                           className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition"
                         />
                       </div>
@@ -5242,7 +5427,7 @@ export const ManagerView: React.FC = () => {
                           type="text"
                           value={settingsForm.websiteUrl}
                           onChange={e => setSettingsForm({ ...settingsForm, websiteUrl: e.target.value })}
-                          placeholder="https://sadafmed.uz yoki @sadaf_clinic_bot"
+                          placeholder="Masalan: https://klinika.uz yoki @klinika_bot"
                           className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition"
                         />
                       </div>
@@ -5602,16 +5787,20 @@ export const ManagerView: React.FC = () => {
 
                   <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-3.5">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 font-black text-lg">
-                        {settingsForm.clinicName?.charAt(0) || 'S'}
+                      <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center p-1 overflow-hidden shadow-sm">
+                        <img
+                          src={settingsForm.logoUrl || clinicSettings?.logo_url || APP_LOGO}
+                          alt="Logo"
+                          className="w-full h-full object-contain"
+                        />
                       </div>
                       <div>
-                        <h5 className="text-base font-black text-slate-900">{settingsForm.clinicName || 'klinika-admin'}</h5>
-                        <p className="text-xs text-slate-500">{settingsForm.slogan || 'Zamonaviy tibbiyot va professional xizmat'}</p>
+                        <h5 className="text-base font-black text-slate-900">{settingsForm.clinicName || clinicSettings?.clinic_name || 'Klinika-admin'}</h5>
+                        <p className="text-xs text-slate-500">{settingsForm.slogan || "Shior ko'rsatilmagan"}</p>
                         <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400 mt-1">
                           <span className="flex items-center gap-1">
                             <MapPin className="w-3 h-3 text-slate-400" />
-                            {settingsForm.address || 'Toshkent sh.'}
+                            {settingsForm.address || "Manzil ko'rsatilmagan"}
                           </span>
                           <span>•</span>
                           <span className="flex items-center gap-1">
@@ -5623,10 +5812,12 @@ export const ManagerView: React.FC = () => {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
-                      <div className="px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold text-xs flex items-center gap-1.5">
-                        <Phone className="w-3.5 h-3.5" />
-                        {settingsForm.phone}
-                      </div>
+                      {settingsForm.phone && (
+                        <div className="px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold text-xs flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5" />
+                          {settingsForm.phone}
+                        </div>
+                      )}
                       <div className="px-3 py-1.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 font-bold text-xs">
                         Prefiks: {settingsForm.defaultQueuePrefix}
                       </div>
@@ -5901,7 +6092,7 @@ export const ManagerView: React.FC = () => {
                           type="text"
                           value={printerSettings.clinicName || ''}
                           onChange={e => setPrinterSettings(prev => ({ ...prev, clinicName: e.target.value }))}
-                          placeholder="KLINIKA-ADMIN"
+                          placeholder="Klinika nomi"
                           className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold focus:ring-2 focus:ring-[#0F766E]/20 focus:border-[#0F766E] outline-none uppercase tracking-wide"
                         />
                       </div>
@@ -5912,7 +6103,7 @@ export const ManagerView: React.FC = () => {
                           type="text"
                           value={printerSettings.phone || ''}
                           onChange={e => setPrinterSettings(prev => ({ ...prev, phone: e.target.value }))}
-                          placeholder="+998 71 200 00 20"
+                          placeholder="+998 (__) ___-__-__"
                           className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-[#0F766E]/20 focus:border-[#0F766E] outline-none"
                         />
                       </div>
@@ -5923,7 +6114,7 @@ export const ManagerView: React.FC = () => {
                           type="text"
                           value={printerSettings.address || ''}
                           onChange={e => setPrinterSettings(prev => ({ ...prev, address: e.target.value }))}
-                          placeholder="Toshkent sh., Chilonzor tumani, Bunyodkor ko'chasi 15-uy"
+                          placeholder="Masalan: Toshkent sh., Chilonzor tumani..."
                           className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-[#0F766E]/20 focus:border-[#0F766E] outline-none"
                         />
                       </div>
@@ -6103,7 +6294,7 @@ export const ManagerView: React.FC = () => {
                         {/* HEADER */}
                         <div className="text-center space-y-0.5 border-b-2 border-dashed border-black pb-2">
                           <div className={`font-black uppercase tracking-wider text-black ${previewPaperSize === '80mm' ? 'text-base' : 'text-sm'}`}>
-                            {printerSettings.clinicName || 'KLINIKA-ADMIN'}
+                            {printerSettings.clinicName || settingsForm.clinicName || clinicSettings?.clinic_name || 'KLINIKA'}
                           </div>
                           {printerSettings.address && (
                             <div className={`text-black font-sans leading-tight ${previewPaperSize === '80mm' ? 'text-[11px]' : 'text-[9.5px]'}`}>
@@ -7944,7 +8135,22 @@ export const ManagerView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      window.print();
+                      printThermalTicket({
+                        tickets: [{
+                          patient_name: selectedPayment.patient_name || 'Bemor',
+                          specialty_name: selectedPayment.notes || 'Tibbiy xizmat',
+                          service_price: selectedPayment.amount
+                        }],
+                        config: {
+                          clinicName: settingsForm.clinicName || clinicSettings?.clinic_name || 'KLINIKA-ADMIN',
+                          address: settingsForm.address || clinicSettings?.address || '',
+                          phone: settingsForm.phone || clinicSettings?.phone || '',
+                          footerText: "Tashrifingiz uchun rahmat! Salomat bo'ling!"
+                        },
+                        mode: 'RECEIPT',
+                        payment: selectedPayment,
+                        paperSize: '80mm'
+                      });
                     }}
                     className="px-4 py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer"
                   >
@@ -8384,6 +8590,12 @@ export const ManagerView: React.FC = () => {
                                             )}
                                           </div>
                                           <div className="text-[11px] text-slate-400">Klinika shifokori</div>
+                                          {dv.doctor_conclusion && dv.doctor_conclusion.trim() && dv.doctor_conclusion !== 'Xulosa berilmadi' && dv.doctor_conclusion !== 'null' ? (
+                                            <div className="mt-1.5 p-2 bg-emerald-50/70 border border-emerald-200/60 rounded-xl text-[11px] text-emerald-900 font-medium leading-relaxed max-w-sm">
+                                              <span className="font-bold text-emerald-800 block text-[10px] uppercase tracking-wider mb-0.5">Tibbiy xulosa:</span>
+                                              {dv.doctor_conclusion}
+                                            </div>
+                                          ) : null}
                                         </div>
                                       </div>
                                     </td>
@@ -9670,19 +9882,15 @@ export const ManagerView: React.FC = () => {
       {/* Test Ticket Modal for Manager Print Testing */}
       <TicketIssuedModal
         isOpen={isTestTicketModalOpen}
-        tickets={[{
-          ticket_number: 'S-001',
-          full_number: 'S-001',
-          specialty_name: 'STOMATOLOGIYA',
-          doctor_name: 'Dr. Alisher Alimov',
-          cabinet_number: '4',
-          patient_name: 'Malika Alimova',
-          payment_status: 'PAID',
-          estimated_wait_minutes: 15
-        }]}
+        tickets={TEST_TICKETS_ARRAY}
         initialPaperSize={previewPaperSize}
         onPaperSizeChange={setPreviewPaperSize}
         onClose={() => setIsTestTicketModalOpen(false)}
+      />
+      {/* App Update Modal */}
+      <AppUpdateModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
       />
     </div>
   );

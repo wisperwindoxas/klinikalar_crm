@@ -16,6 +16,14 @@ export class VoiceController {
         return;
       }
 
+      if (text.length > 250) {
+        res.status(400).json({
+          success: false,
+          message: "Matn uzunligi ko'pi bilan 250 belgidan oshmasligi kerak."
+        });
+        return;
+      }
+
       const voiceService = VoiceService.getInstance();
       const filePath = await voiceService.getAudioFilePath(text, voice);
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { X, Printer, Ticket, QrCode, FileText, Check } from 'lucide-react';
+import { printThermalTicket } from '../utils/thermalPrinter';
 
 interface TicketIssuedModalProps {
   isOpen: boolean;
@@ -11,7 +11,7 @@ interface TicketIssuedModalProps {
   onClose: () => void;
 }
 
-export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = ({
+export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = React.memo(({
   isOpen,
   tickets,
   payment,
@@ -64,39 +64,21 @@ export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = ({
   });
 
   useEffect(() => {
+    if (!isOpen) return;
     if (initialPaperSize) {
       setPaperSize(initialPaperSize);
     }
-  }, [initialPaperSize]);
-
-  useEffect(() => {
     try {
       const saved = localStorage.getItem('sadaf_ticket_settings');
       if (saved) setConfig(JSON.parse(saved));
     } catch {}
-    fetch('http://localhost:5001/api/v1/clinic/settings')
-      .then(r => r.json())
-      .then(res => {
-        if (res.data?.printer_settings) {
-          const ps = typeof res.data.printer_settings === 'string'
-            ? JSON.parse(res.data.printer_settings)
-            : res.data.printer_settings;
-          setConfig((prev: any) => ({ ...prev, ...ps }));
-          if (ps.paperSize && !initialPaperSize) {
-            setPaperSize(ps.paperSize);
-          }
-        }
-      })
-      .catch(() => {});
-  }, [isOpen, initialPaperSize]);
+  }, [isOpen]);
 
   if (!isOpen || !tickets || tickets.length === 0) return null;
 
   const handleSelectPaperSize = (size: '58mm' | '80mm') => {
+    if (paperSize === size) return;
     setPaperSize(size);
-    if (onPaperSizeChange) {
-      onPaperSizeChange(size);
-    }
     try {
       const saved = localStorage.getItem('sadaf_cashier_settings');
       const parsed = saved ? JSON.parse(saved) : {};
@@ -105,8 +87,22 @@ export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = ({
     } catch {}
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handleCloseModal = () => {
+    if (onPaperSizeChange) {
+      onPaperSizeChange(paperSize);
+    }
+    onClose();
+  };
+
+  const handlePrint = async () => {
+    await printThermalTicket({
+      tickets,
+      config,
+      paperSize,
+      mode: activeTab,
+      payment,
+      silent: false
+    });
   };
 
   const firstTicket = tickets[0];
@@ -309,77 +305,9 @@ export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = ({
 
   return (
     <>
-      {/* 1. ULTRA-PRECISE THERMAL PRINT CSS FOR XP-80T (80mm) & XP-58 (58mm) */}
-      <style>{`
-        @media print {
-          @page {
-            size: ${is80mm ? '80mm auto' : '58mm auto'};
-            margin: 0 !important;
-          }
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-            box-sizing: border-box !important;
-          }
-          html, body {
-            width: ${is80mm ? '80mm' : '58mm'} !important;
-            min-width: ${is80mm ? '80mm' : '58mm'} !important;
-            max-width: ${is80mm ? '80mm' : '58mm'} !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            background: #ffffff !important;
-            color: #000000 !important;
-            height: auto !important;
-            min-height: 0 !important;
-            max-height: none !important;
-            overflow: visible !important;
-          }
-          /* COMPLETELY HIDE #root IN PRINT MODE SO HEIGHT IS ZERO AND NEVER PRINTS EXTRA PAGES */
-          #root {
-            display: none !important;
-          }
-          /* PRINT DIRECTLY FROM BODY PORTAL */
-          #thermal-print-portal {
-            display: block !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            min-width: 100% !important;
-            margin: 0 !important;
-            padding: ${is80mm ? '2mm 3.5mm 3mm 3.5mm' : '1.5mm 2mm 2.5mm 2mm'} !important;
-            box-sizing: border-box !important;
-            background: #ffffff !important;
-            color: #000000 !important;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Courier New", monospace !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-          }
-          .thermal-ticket-card {
-            box-sizing: border-box !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-            page-break-after: avoid !important;
-            break-after: avoid !important;
-          }
-          .thermal-ticket-card + .thermal-ticket-card {
-            page-break-before: always !important;
-            break-before: page !important;
-            padding-top: 3mm !important;
-          }
-          .thermal-ticket-card * {
-            color: #000000 !important;
-            border-color: #000000 !important;
-            background-color: transparent !important;
-          }
-        }
-      `}</style>
-
-      {/* 2. ON-SCREEN MODAL DIALOG (Hidden in print mode) */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#172B4D]/60 backdrop-blur-sm p-4 print:hidden">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 border border-[#DCE3EA] flex flex-col max-h-[92vh]">
+      {/* ON-SCREEN MODAL DIALOG */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#172B4D]/75 p-4 print:hidden">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-[#DCE3EA] flex flex-col max-h-[92vh]">
           {/* MODAL HEADER */}
           <div className="p-4 bg-[#0F766E] text-white flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
@@ -393,7 +321,7 @@ export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = ({
                 </span>
               </div>
             </div>
-            <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg text-white/80 transition cursor-pointer" title="Yopish">
+            <button onClick={handleCloseModal} className="p-1.5 hover:bg-white/10 rounded-lg text-white/80 transition cursor-pointer" title="Yopish">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -405,7 +333,7 @@ export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = ({
               <button
                 type="button"
                 onClick={() => handleSelectPaperSize('80mm')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
                   is80mm
                     ? 'bg-[#0F766E] text-white shadow-sm ring-2 ring-[#0F766E]/30'
                     : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-300'
@@ -417,7 +345,7 @@ export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = ({
               <button
                 type="button"
                 onClick={() => handleSelectPaperSize('58mm')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
                   !is80mm
                     ? 'bg-[#0F766E] text-white shadow-sm ring-2 ring-[#0F766E]/30'
                     : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-300'
@@ -460,7 +388,7 @@ export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = ({
           {/* SCREEN PREVIEW AREA */}
           <div className="p-6 overflow-y-auto bg-slate-200/70 flex justify-center">
             <div
-              className={`bg-white shadow-md border border-slate-300 transition-all font-mono text-black ${
+              className={`bg-white shadow-md border border-slate-300 font-mono text-black ${
                 is80mm ? 'w-[360px] p-5 rounded-xl' : 'w-[260px] p-3.5 rounded-lg'
               }`}
             >
@@ -475,7 +403,7 @@ export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = ({
           {/* FOOTER ACTIONS */}
           <div className="p-4 bg-white border-t border-[#DCE3EA] flex items-center justify-between gap-3 shrink-0">
             <button
-              onClick={onClose}
+              onClick={handleCloseModal}
               className="flex-1 py-2.5 bg-[#F5F7FA] hover:bg-[#DCE3EA] text-[#172B4D] text-xs font-bold rounded-xl transition cursor-pointer"
             >
               Yopish
@@ -490,18 +418,6 @@ export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = ({
           </div>
         </div>
       </div>
-
-      {/* 3. DIRECT BODY PORTAL FOR REAL THERMAL PRINTING (Hidden on screen, rendered on document.body) */}
-      {typeof document !== 'undefined' && createPortal(
-        <div id="thermal-print-portal" className="hidden font-mono text-black">
-          {activeTab === 'TICKETS' ? (
-            tickets.map((tck, idx) => renderTicketItem(tck, idx, true))
-          ) : (
-            renderReceiptItem()
-          )}
-        </div>,
-        document.body
-      )}
     </>
   );
-};
+});

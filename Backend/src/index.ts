@@ -6,6 +6,7 @@ import { config } from './config';
 import { DatabaseService } from './database/database.service';
 import { WebSocketGateway } from './websocket/websocket.gateway';
 import { authenticateJwt, requireRoles, enforceTenantBoundary } from './middleware/auth.middleware';
+import { authRateLimiter, voiceRateLimiter } from './middleware/rate-limiter.middleware';
 import { UserRole } from './types';
 
 // Controllers
@@ -46,158 +47,209 @@ app.get('/health', (req, res) => {
 
 const apiRouter = express.Router();
 
+// Role Groups for Authorization Matrix
+const STAFF_ROLES = [
+  UserRole.SUPER_ADMIN,
+  UserRole.MANAGER,
+  UserRole.CASHIER,
+  UserRole.DOCTOR,
+  UserRole.RECEPTIONIST,
+  UserRole.OPERATOR
+];
+const ADMIN_ROLES = [UserRole.SUPER_ADMIN, UserRole.MANAGER];
+const CASHIER_ROLES = [UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.CASHIER];
+
 // 1. Auth Endpoints
-apiRouter.post('/auth/login', AuthController.login);
+apiRouter.post('/auth/login', authRateLimiter, AuthController.login);
 apiRouter.post('/auth/register-clinic', AuthController.registerClinic);
 apiRouter.get('/auth/me', authenticateJwt, AuthController.getMe);
 
-// 2. Super Admin Endpoints (Restricted to SUPER_ADMIN)
-apiRouter.get('/super-admin/dashboard', SuperAdminController.getDashboard);
-apiRouter.get('/super-admin/clinics', SuperAdminController.getClinics);
-apiRouter.get('/super-admin/clinics/:id/details', SuperAdminController.getClinicDetails);
-apiRouter.patch('/super-admin/clinics/:id', SuperAdminController.updateClinic);
-apiRouter.delete('/super-admin/clinics/:id', SuperAdminController.deleteClinic);
-apiRouter.patch('/super-admin/clinics/:id/status', SuperAdminController.updateClinicStatus);
-apiRouter.patch('/super-admin/clinics/:id/plan', SuperAdminController.updateClinicPlan);
-apiRouter.post('/super-admin/clinics/:id/users', SuperAdminController.createClinicUser);
-apiRouter.put('/super-admin/clinics/:id/users/:userId', SuperAdminController.updateClinicUser);
-apiRouter.delete('/super-admin/clinics/:id/users/:userId', SuperAdminController.deleteClinicUser);
-apiRouter.patch('/super-admin/clinics/:id/users/:userId/status', SuperAdminController.toggleClinicUserStatus);
-apiRouter.get('/super-admin/audit-logs', SuperAdminController.getAuditLogs);
+// 2. Super Admin Endpoints (Strictly Restricted to SUPER_ADMIN)
+const superAdminAuth = [authenticateJwt, requireRoles([UserRole.SUPER_ADMIN])];
+apiRouter.get('/super-admin/dashboard', ...superAdminAuth, SuperAdminController.getDashboard);
+apiRouter.get('/super-admin/clinics', ...superAdminAuth, SuperAdminController.getClinics);
+apiRouter.get('/super-admin/clinics/:id/details', ...superAdminAuth, SuperAdminController.getClinicDetails);
+apiRouter.patch('/super-admin/clinics/:id', ...superAdminAuth, SuperAdminController.updateClinic);
+apiRouter.delete('/super-admin/clinics/:id', ...superAdminAuth, SuperAdminController.deleteClinic);
+apiRouter.patch('/super-admin/clinics/:id/status', ...superAdminAuth, SuperAdminController.updateClinicStatus);
+apiRouter.patch('/super-admin/clinics/:id/plan', ...superAdminAuth, SuperAdminController.updateClinicPlan);
+apiRouter.post('/super-admin/clinics/:id/users', ...superAdminAuth, SuperAdminController.createClinicUser);
+apiRouter.put('/super-admin/clinics/:id/users/:userId', ...superAdminAuth, SuperAdminController.updateClinicUser);
+apiRouter.delete('/super-admin/clinics/:id/users/:userId', ...superAdminAuth, SuperAdminController.deleteClinicUser);
+apiRouter.patch('/super-admin/clinics/:id/users/:userId/status', ...superAdminAuth, SuperAdminController.toggleClinicUserStatus);
+apiRouter.get('/super-admin/audit-logs', ...superAdminAuth, SuperAdminController.getAuditLogs);
 
 // Real Subscriptions & Plans
-apiRouter.get('/super-admin/subscriptions', SuperAdminController.getSubscriptions);
-apiRouter.post('/super-admin/subscriptions/:id/extend', SuperAdminController.extendSubscription);
-apiRouter.patch('/super-admin/subscriptions/:id/status', SuperAdminController.updateSubscriptionStatus);
-apiRouter.patch('/super-admin/subscriptions/:id/sms', SuperAdminController.updateSubscriptionSms);
-apiRouter.post('/super-admin/subscriptions/:id/change-plan', SuperAdminController.changeSubscriptionPlan);
-apiRouter.get('/super-admin/plans', SuperAdminController.getPlans);
-apiRouter.put('/super-admin/plans/:code', SuperAdminController.updatePlan);
+apiRouter.get('/super-admin/subscriptions', ...superAdminAuth, SuperAdminController.getSubscriptions);
+apiRouter.post('/super-admin/subscriptions/:id/extend', ...superAdminAuth, SuperAdminController.extendSubscription);
+apiRouter.patch('/super-admin/subscriptions/:id/status', ...superAdminAuth, SuperAdminController.updateSubscriptionStatus);
+apiRouter.patch('/super-admin/subscriptions/:id/sms', ...superAdminAuth, SuperAdminController.updateSubscriptionSms);
+apiRouter.post('/super-admin/subscriptions/:id/change-plan', ...superAdminAuth, SuperAdminController.changeSubscriptionPlan);
+apiRouter.get('/super-admin/plans', ...superAdminAuth, SuperAdminController.getPlans);
+apiRouter.put('/super-admin/plans/:code', ...superAdminAuth, SuperAdminController.updatePlan);
 
 // Real Users (Global)
-apiRouter.get('/super-admin/users', SuperAdminController.getUsers);
-apiRouter.post('/super-admin/users', SuperAdminController.createUser);
-apiRouter.patch('/super-admin/users/:id/status', SuperAdminController.updateUserStatus);
+apiRouter.get('/super-admin/users', ...superAdminAuth, SuperAdminController.getUsers);
+apiRouter.post('/super-admin/users', ...superAdminAuth, SuperAdminController.createUser);
+apiRouter.put('/super-admin/users/:id', ...superAdminAuth, SuperAdminController.updateUser);
+apiRouter.delete('/super-admin/users/:id', ...superAdminAuth, SuperAdminController.deleteUser);
+apiRouter.patch('/super-admin/users/:id/status', ...superAdminAuth, SuperAdminController.updateUserStatus);
 
 // Real Branches
-apiRouter.get('/super-admin/branches', SuperAdminController.getBranches);
-apiRouter.post('/super-admin/branches', SuperAdminController.createBranch);
+apiRouter.get('/super-admin/branches', ...superAdminAuth, SuperAdminController.getBranches);
+apiRouter.post('/super-admin/branches', ...superAdminAuth, SuperAdminController.createBranch);
 
 // Real Services (Global catalog)
-apiRouter.get('/super-admin/services', SuperAdminController.getServices);
-apiRouter.post('/super-admin/services', SuperAdminController.createService);
-apiRouter.put('/super-admin/services/:id', SuperAdminController.updateService);
-apiRouter.delete('/super-admin/services/:id', SuperAdminController.deleteService);
+apiRouter.get('/super-admin/services', ...superAdminAuth, SuperAdminController.getServices);
+apiRouter.post('/super-admin/services', ...superAdminAuth, SuperAdminController.createService);
+apiRouter.put('/super-admin/services/:id', ...superAdminAuth, SuperAdminController.updateService);
+apiRouter.delete('/super-admin/services/:id', ...superAdminAuth, SuperAdminController.deleteService);
 
 // Real Support Desk
-apiRouter.get('/super-admin/support', SuperAdminController.getSupportTickets);
-apiRouter.post('/super-admin/support', SuperAdminController.createSupportTicket);
-apiRouter.post('/super-admin/support/:id/reply', SuperAdminController.replySupportTicket);
+apiRouter.get('/super-admin/support', ...superAdminAuth, SuperAdminController.getSupportTickets);
+apiRouter.post('/super-admin/support', ...superAdminAuth, SuperAdminController.createSupportTicket);
+apiRouter.post('/super-admin/support/:id/reply', ...superAdminAuth, SuperAdminController.replySupportTicket);
 
 // Real Promo Codes
-apiRouter.get('/super-admin/promo', SuperAdminController.getPromoCodes);
-apiRouter.post('/super-admin/promo', SuperAdminController.createPromoCode);
-apiRouter.patch('/super-admin/promo/:id/status', SuperAdminController.togglePromoCode);
+apiRouter.get('/super-admin/promo', ...superAdminAuth, SuperAdminController.getPromoCodes);
+apiRouter.post('/super-admin/promo', ...superAdminAuth, SuperAdminController.createPromoCode);
+apiRouter.patch('/super-admin/promo/:id/status', ...superAdminAuth, SuperAdminController.togglePromoCode);
 
 // Real API Keys & Integrations
-apiRouter.get('/super-admin/api-keys', SuperAdminController.getApiKeys);
-apiRouter.post('/super-admin/api-keys', SuperAdminController.createApiKey);
-apiRouter.delete('/super-admin/api-keys/:id', SuperAdminController.deleteApiKey);
+apiRouter.get('/super-admin/api-keys', ...superAdminAuth, SuperAdminController.getApiKeys);
+apiRouter.post('/super-admin/api-keys', ...superAdminAuth, SuperAdminController.createApiKey);
+apiRouter.delete('/super-admin/api-keys/:id', ...superAdminAuth, SuperAdminController.deleteApiKey);
 
 // Real System Settings
-apiRouter.get('/super-admin/settings', SuperAdminController.getSystemSettings);
-apiRouter.put('/super-admin/settings/:key', SuperAdminController.updateSystemSetting);
+apiRouter.get('/super-admin/settings', ...superAdminAuth, SuperAdminController.getSystemSettings);
+apiRouter.put('/super-admin/settings/:key', ...superAdminAuth, SuperAdminController.updateSystemSetting);
 
 // Real Payments & Invoices
-apiRouter.get('/super-admin/payments', SuperAdminController.getPayments);
+apiRouter.get('/super-admin/payments', ...superAdminAuth, SuperAdminController.getPayments);
 
 // Real Reports & Analytics
-apiRouter.get('/super-admin/reports', SuperAdminController.getReports);
+apiRouter.get('/super-admin/reports', ...superAdminAuth, SuperAdminController.getReports);
 
 // Real System Status
-apiRouter.get('/super-admin/system-status', SuperAdminController.getSystemStatus);
+apiRouter.get('/super-admin/system-status', ...superAdminAuth, SuperAdminController.getSystemStatus);
 
 // Real SMS Gateway & Management
-apiRouter.get('/super-admin/sms/settings', SuperAdminController.getSmsSettings);
-apiRouter.put('/super-admin/sms/settings', SuperAdminController.updateSmsSettings);
-apiRouter.get('/super-admin/sms/templates', SuperAdminController.getSmsTemplates);
-apiRouter.put('/super-admin/sms/templates/:eventType', SuperAdminController.updateSmsTemplate);
-apiRouter.get('/super-admin/sms/logs', SuperAdminController.getSmsLogs);
-apiRouter.post('/super-admin/sms/send-test', SuperAdminController.sendTestSms);
+apiRouter.get('/super-admin/sms/settings', ...superAdminAuth, SuperAdminController.getSmsSettings);
+apiRouter.put('/super-admin/sms/settings', ...superAdminAuth, SuperAdminController.updateSmsSettings);
+apiRouter.get('/super-admin/sms/templates', ...superAdminAuth, SuperAdminController.getSmsTemplates);
+apiRouter.put('/super-admin/sms/templates/:eventType', ...superAdminAuth, SuperAdminController.updateSmsTemplate);
+apiRouter.get('/super-admin/sms/logs', ...superAdminAuth, SuperAdminController.getSmsLogs);
+apiRouter.post('/super-admin/sms/send-test', ...superAdminAuth, SuperAdminController.sendTestSms);
 
 // 3. Clinic Management & Settings (Tenant Bound)
 apiRouter.get('/clinics/current', authenticateJwt, enforceTenantBoundary, ClinicsController.getCurrentClinic);
-apiRouter.patch('/clinics/branding', authenticateJwt, enforceTenantBoundary, ClinicsController.updateBranding);
-apiRouter.get('/branches', authenticateJwt, enforceTenantBoundary, ClinicsController.getBranches);
-apiRouter.post('/branches', authenticateJwt, enforceTenantBoundary, ClinicsController.createBranch);
+apiRouter.patch('/clinics/branding', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicsController.updateBranding);
+apiRouter.get('/branches', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicsController.getBranches);
+apiRouter.post('/branches', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicsController.createBranch);
 
 // 4. Doctors (CRUD)
-apiRouter.get('/doctors', ClinicQueueController.getDoctors);
-apiRouter.get('/doctors/:id/performance', ClinicQueueController.getDoctorPerformance);
-apiRouter.post('/doctors', ClinicQueueController.createDoctor);
-apiRouter.put('/doctors/:id', ClinicQueueController.updateDoctor);
-apiRouter.delete('/doctors/:id', ClinicQueueController.deleteDoctor);
+apiRouter.get('/doctors', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.getDoctors);
+apiRouter.get('/doctors/:id/performance', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.getDoctorPerformance);
+apiRouter.post('/doctors', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.createDoctor);
+apiRouter.put('/doctors/:id', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.updateDoctor);
+apiRouter.delete('/doctors/:id', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.deleteDoctor);
 
 // 5. Patients (CRUD)
-apiRouter.get('/patients', ClinicQueueController.getPatients);
-apiRouter.get('/patients/:id', ClinicQueueController.getPatientById);
-apiRouter.post('/patients', ClinicQueueController.createPatient);
-apiRouter.put('/patients/:id', ClinicQueueController.updatePatient);
-apiRouter.delete('/patients/:id', ClinicQueueController.deletePatient);
+apiRouter.get('/patients', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.getPatients);
+apiRouter.get('/patients/:id', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.getPatientById);
+apiRouter.post('/patients', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.createPatient);
+apiRouter.put('/patients/:id', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.updatePatient);
+apiRouter.delete('/patients/:id', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.deletePatient);
 
 // 6. Queues & Tickets (PostgreSQL Engine & Multi-tenant)
-apiRouter.get('/queues/tickets', ClinicQueueController.getTickets);
-apiRouter.post('/queues/tickets', QueuesController.createTicket);
-apiRouter.post('/queues/multi-register', ClinicQueueController.multiRegister);
-apiRouter.post('/queues/call-next', ClinicQueueController.callNext);
-apiRouter.post('/queues/tickets/:id/recall', ClinicQueueController.recall);
-apiRouter.post('/queues/tickets/:id/call', QueuesController.callTicket);
-apiRouter.post('/queues/tickets/:id/start', ClinicQueueController.startTicket);
-apiRouter.post('/queues/tickets/:id/complete', ClinicQueueController.completeTicket);
-apiRouter.post('/queues/tickets/:id/skip', ClinicQueueController.skipTicket);
-apiRouter.post('/queues/tickets/:id/cancel', ClinicQueueController.cancelTicket);
+apiRouter.get('/queues/tickets', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.getTickets);
+apiRouter.post('/queues/tickets', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), QueuesController.createTicket);
+apiRouter.post('/queues/multi-register', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.multiRegister);
+apiRouter.post('/queues/call-next', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.callNext);
+apiRouter.post('/queues/tickets/:id/recall', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.recall);
+apiRouter.post('/queues/tickets/:id/call', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), QueuesController.callTicket);
+apiRouter.post('/queues/tickets/:id/start', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.startTicket);
+apiRouter.post('/queues/tickets/:id/complete', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.completeTicket);
+apiRouter.post('/queues/tickets/:id/skip', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.skipTicket);
+apiRouter.post('/queues/tickets/:id/cancel', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.cancelTicket);
 
 // 7. Catalogs (Specialties, Cabinets, Services CRUD)
-apiRouter.get('/specialties', ClinicQueueController.getSpecialties);
-apiRouter.get('/cabinets', ClinicQueueController.getCabinets);
-apiRouter.post('/cabinets', ClinicQueueController.createCabinet);
-apiRouter.put('/cabinets/:id', ClinicQueueController.updateCabinet);
-apiRouter.delete('/cabinets/:id', ClinicQueueController.deleteCabinet);
+apiRouter.get('/specialties', ClinicQueueController.getSpecialties); // Public catalog for Kiosk / Screens
+apiRouter.get('/cabinets', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.getCabinets);
+apiRouter.post('/cabinets', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.createCabinet);
+apiRouter.put('/cabinets/:id', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.updateCabinet);
+apiRouter.delete('/cabinets/:id', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.deleteCabinet);
 
-apiRouter.get('/services', ClinicQueueController.getServices);
-apiRouter.post('/services', ClinicQueueController.createService);
-apiRouter.put('/services/:id', ClinicQueueController.updateService);
-apiRouter.delete('/services/:id', ClinicQueueController.deleteService);
-apiRouter.patch('/services/:id/payment-policy', ClinicQueueController.updateServicePolicy);
+apiRouter.get('/services', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.getServices);
+apiRouter.post('/services', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.createService);
+apiRouter.put('/services/:id', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.updateService);
+apiRouter.delete('/services/:id', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.deleteService);
+apiRouter.patch('/services/:id/payment-policy', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.updateServicePolicy);
 
 // 8. Cash Shifts & Payments
-apiRouter.get('/cash-shifts/current', ClinicQueueController.getCurrentShift);
-apiRouter.post('/cash-shifts/open', ClinicQueueController.openShift);
-apiRouter.post('/cash-shifts/:id/close', ClinicQueueController.closeShift);
-apiRouter.get('/cash-shifts/:id/details', ClinicQueueController.getShiftDetails);
-apiRouter.get('/payments', ClinicQueueController.getPayments);
+apiRouter.get('/cash-shifts/current', authenticateJwt, enforceTenantBoundary, requireRoles(CASHIER_ROLES), ClinicQueueController.getCurrentShift);
+apiRouter.post('/cash-shifts/open', authenticateJwt, enforceTenantBoundary, requireRoles(CASHIER_ROLES), ClinicQueueController.openShift);
+apiRouter.post('/cash-shifts/:id/close', authenticateJwt, enforceTenantBoundary, requireRoles(CASHIER_ROLES), ClinicQueueController.closeShift);
+apiRouter.get('/cash-shifts/:id/details', authenticateJwt, enforceTenantBoundary, requireRoles(CASHIER_ROLES), ClinicQueueController.getShiftDetails);
+apiRouter.get('/payments', authenticateJwt, enforceTenantBoundary, requireRoles(CASHIER_ROLES), ClinicQueueController.getPayments);
 
-// 9. TV Display Screen (Public & Test Calls)
+// 9. TV Display Screen (Public Waiting Hall Feed & Protected Test Calls)
 apiRouter.get('/tv/feed', ClinicQueueController.getTvFeed);
-apiRouter.post('/tv/test-call', ClinicQueueController.testCall);
+apiRouter.post('/tv/test-call', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.testCall);
 
 // 10. Reports & Manager Analytics
-apiRouter.get('/reports/manager-dashboard', ClinicQueueController.getManagerDashboard);
-apiRouter.get('/clinic/settings', ClinicQueueController.getSettings);
-apiRouter.patch('/clinic/settings', ClinicQueueController.updateSettings);
-apiRouter.get('/clinic/subscription', ClinicQueueController.getSubscription);
-apiRouter.get('/clinic/audit-logs', ClinicQueueController.getAuditLogs);
+apiRouter.get('/reports/manager-dashboard', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.getManagerDashboard);
+apiRouter.get('/clinic/settings', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.getSettings);
+apiRouter.patch('/clinic/settings', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.updateSettings);
+apiRouter.get('/clinic/subscription', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.getSubscription);
+apiRouter.get('/clinic/audit-logs', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.getAuditLogs);
 
 // 11. Users & Shifts Management
-apiRouter.get('/users', ClinicQueueController.getUsers);
-apiRouter.post('/users', ClinicQueueController.createUser);
-apiRouter.put('/users/:id', ClinicQueueController.updateUser);
-apiRouter.delete('/users/:id', ClinicQueueController.deleteUser);
-apiRouter.get('/cash-shifts', ClinicQueueController.getAllShifts);
+apiRouter.get('/users', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.getUsers);
+apiRouter.post('/users', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.createUser);
+apiRouter.put('/users/:id', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.updateUser);
+apiRouter.delete('/users/:id', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.deleteUser);
+apiRouter.get('/cash-shifts', authenticateJwt, enforceTenantBoundary, requireRoles(CASHIER_ROLES), ClinicQueueController.getAllShifts);
 
-// 12. Realistic Human Voice (Studio Quality Azure Neural Uzbek TTS)
-apiRouter.get('/voice/speak', VoiceController.speak);
+// 12. Realistic Human Voice (Studio Quality Azure Neural Uzbek TTS with Rate Limiter)
+apiRouter.get('/voice/speak', voiceRateLimiter, VoiceController.speak);
 apiRouter.get('/voice/voices', VoiceController.getVoices);
+
+// 13. Application Updates & Release Metadata (Public / Cross-platform)
+apiRouter.get('/app/latest-release', (_req, res) => {
+  res.json({
+    success: true,
+    data: {
+      tag_name: 'v1.0.1',
+      name: 'Klinika-admin v1.0.1',
+      body: "• Kiberxavfsizlik to'liq mustahkamlandi (OWASP, SQLi, Backdoor bartaraf etildi)\n• Talon qog'oz o'lchami almashtirishdagi qotish (lag) bartaraf etildi\n• TV tablo va ovozli chaqiruv barqarorlashtirildi\n• macOS va Windows uchun yangi o'rnatuvchi paketlar",
+      published_at: new Date().toISOString(),
+      html_url: 'https://github.com/wisperwindoxas/klinikalar_crm/releases/tag/v1.0.1',
+      assets: [
+        {
+          name: 'Klinika-admin-1.0.1.dmg',
+          browser_download_url: 'https://github.com/wisperwindoxas/klinikalar_crm/releases/download/v1.0.1/Klinika-admin-1.0.1.dmg',
+          size: 113622259
+        },
+        {
+          name: 'Klinika-admin Setup 1.0.1.exe',
+          browser_download_url: 'https://github.com/wisperwindoxas/klinikalar_crm/releases/download/v1.0.1/Klinika-admin.Setup.1.0.1.exe',
+          size: 94102295
+        },
+        {
+          name: 'Klinika-admin-1.0.1-mac.zip',
+          browser_download_url: 'https://github.com/wisperwindoxas/klinikalar_crm/releases/download/v1.0.1/Klinika-admin-1.0.1-mac.zip',
+          size: 108843437
+        },
+        {
+          name: 'Klinika-admin-1.0.1-win.zip',
+          browser_download_url: 'https://github.com/wisperwindoxas/klinikalar_crm/releases/download/v1.0.1/Klinika-admin-1.0.1-win.zip',
+          size: 119411433
+        }
+      ]
+    }
+  });
+});
 
 app.use('/api/v1', apiRouter);
 

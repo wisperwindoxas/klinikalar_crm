@@ -50,7 +50,24 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
   }
 
   final _patientSearchController = TextEditingController();
+  final _doctorSearchController = TextEditingController();
   int _visiblePatientsCount = 15;
+
+  // TV Tablo Settings & Control Center
+  final _tvVoiceTemplateCtrl = TextEditingController();
+  final _tvSloganTitleCtrl = TextEditingController();
+  final _tvSloganSubtitleCtrl = TextEditingController();
+  final _tvCallingTitleCtrl = TextEditingController();
+  final _tvStandbyTitleCtrl = TextEditingController();
+  final _tvBottomBannerCtrl = TextEditingController();
+  final _testTicketCtrl = TextEditingController(text: 'T-001');
+  final _testRoomCtrl = TextEditingController(text: '4');
+  final _testDoctorCtrl = TextEditingController(text: 'Dr. Azizbek Rahimov');
+  bool _tvSoundEnabled = true;
+  String _tvVoiceName = 'uz-UZ-MadinaNeural';
+  bool _isSavingTv = false;
+  bool _isSendingTestCall = false;
+  Map<String, dynamic> _clinicSettings = {};
 
   @override
   void initState() {
@@ -61,6 +78,16 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
   @override
   void dispose() {
     _patientSearchController.dispose();
+    _doctorSearchController.dispose();
+    _tvVoiceTemplateCtrl.dispose();
+    _tvSloganTitleCtrl.dispose();
+    _tvSloganSubtitleCtrl.dispose();
+    _tvCallingTitleCtrl.dispose();
+    _tvStandbyTitleCtrl.dispose();
+    _tvBottomBannerCtrl.dispose();
+    _testTicketCtrl.dispose();
+    _testRoomCtrl.dispose();
+    _testDoctorCtrl.dispose();
     super.dispose();
   }
 
@@ -71,15 +98,89 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
     final patients = await ApiService().getPatients();
     final services = await ApiService().getServices();
     final stats = await ApiService().getManagerDashboard();
+    final settings = await ApiService().getClinicSettings();
 
-    setState(() {
-      _doctors = docs;
-      _tickets = tickets;
-      _patients = patients;
-      _services = services;
-      _dashboardStats = stats;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _doctors = docs;
+        _tickets = tickets;
+        _patients = patients;
+        _services = services;
+        _dashboardStats = stats;
+        _clinicSettings = settings;
+
+        if (_tvVoiceTemplateCtrl.text.isEmpty) {
+          _tvSoundEnabled = settings['tv_sound_enabled'] ?? settings['tvSoundEnabled'] ?? true;
+          _tvVoiceName = settings['tv_voice_name'] ?? settings['tvVoiceName'] ?? 'uz-UZ-MadinaNeural';
+          _tvVoiceTemplateCtrl.text = settings['tv_voice_template'] ?? settings['tvVoiceTemplate'] ?? 'Talon raqami {letter}{zeros}, {number} raqam egasi, sizni {cabinet} xona, {specialty} xonasiga marhamat!';
+          _tvSloganTitleCtrl.text = settings['tv_slogan_title'] ?? settings['tvSloganTitle'] ?? 'Sog‘lig‘ingiz biz uchun muhim!';
+          _tvSloganSubtitleCtrl.text = settings['tv_slogan_subtitle'] ?? settings['tvSloganSubtitle'] ?? 'Navbat bilan qabulga marhamat!';
+          _tvCallingTitleCtrl.text = settings['tv_calling_title'] ?? settings['tvCallingTitle'] ?? 'Hozir chaqirilmoqda!';
+          _tvStandbyTitleCtrl.text = settings['tv_standby_title'] ?? settings['tvStandbyTitle'] ?? 'Qabul kutilmoqda';
+          _tvBottomBannerCtrl.text = settings['tv_bottom_banner'] ?? settings['tvBottomBanner'] ?? 'Sizning sog‘lig‘ingiz – bizning ustuvor vazifamiz!';
+        }
+
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _saveTvSettings() async {
+    setState(() => _isSavingTv = true);
+    final payload = {
+      'tvSoundEnabled': _tvSoundEnabled,
+      'tvVoiceName': _tvVoiceName,
+      'tvVoiceTemplate': _tvVoiceTemplateCtrl.text.trim(),
+      'tvSloganTitle': _tvSloganTitleCtrl.text.trim(),
+      'tvSloganSubtitle': _tvSloganSubtitleCtrl.text.trim(),
+      'tvCallingTitle': _tvCallingTitleCtrl.text.trim(),
+      'tvStandbyTitle': _tvStandbyTitleCtrl.text.trim(),
+      'tvBottomBanner': _tvBottomBannerCtrl.text.trim(),
+    };
+    final res = await ApiService().updateClinicSettings(payload);
+    if (!mounted) return;
+    setState(() => _isSavingTv = false);
+    if (res['success'] != false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('TV Tablo sozlamalari muvaffaqiyatli saqlandi va jonli efirga uzatildi!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res['message'] ?? 'Sozlamalarni saqlashda xatolik yuz berdi'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _sendTestCall() async {
+    final ticketNum = _testTicketCtrl.text.trim().isNotEmpty ? _testTicketCtrl.text.trim() : 'T-001';
+    final roomNum = _testRoomCtrl.text.trim().isNotEmpty ? _testRoomCtrl.text.trim() : '4';
+    final docName = _testDoctorCtrl.text.trim().isNotEmpty ? _testDoctorCtrl.text.trim() : 'Dr. Azizbek Rahimov';
+
+    setState(() => _isSendingTestCall = true);
+    final res = await ApiService().sendTvTestCall(ticketNum, roomNum, docName);
+    if (!mounted) return;
+    setState(() => _isSendingTestCall = false);
+    if (res['success'] != false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('TV Tabloga ovozli test chaqiruvi yuborildi ($ticketNum • $roomNum-xona)!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res['message'] ?? 'Chaqiruv yuborishda xatolik'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   @override
@@ -457,73 +558,316 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
 
   // ==================== TAB 2: SHIFOKORLAR ====================
   Widget _buildDoctorsTab() {
+    final query = _doctorSearchController.text.toLowerCase().trim();
+    final filtered = _doctors.where((d) {
+      if (query.isEmpty) return true;
+      final nameMatches = d.fullName.toLowerCase().contains(query);
+      final specMatches = d.specialty.toLowerCase().contains(query);
+      final roomMatches = d.roomNumber.toLowerCase().contains(query);
+      return nameMatches || specMatches || roomMatches;
+    }).toList();
+
+    final activeCount = _doctors.where((d) => d.isActive).length;
+
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        // Top Search & Controls Container
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          color: Colors.white,
+          child: Column(
             children: [
-              Text('Jami ${_doctors.length} ta shifokor', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
-              ElevatedButton.icon(
-                onPressed: () {
-                  ManagerDoctorSheet.show(context, onSaved: _fetchData);
-                },
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Shifokor qo‘shish', style: TextStyle(fontSize: 12)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              // Search Input
+              TextFormField(
+                controller: _doctorSearchController,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted),
+                  hintText: 'Shifokor ismi yoki mutaxassisligi bo‘yicha...',
+                  suffixIcon: _doctorSearchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            _doctorSearchController.clear();
+                            setState(() {});
+                          },
+                        )
+                      : null,
                 ),
+              ),
+              const SizedBox(height: 10),
+              // Stats & Add Button
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.mintLight,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Jami: ${_doctors.length} ta',
+                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppColors.primary),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFF16A34A), shape: BoxShape.circle)),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Faol: $activeCount',
+                              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      ManagerDoctorSheet.show(context, onSaved: _fetchData);
+                    },
+                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+                    label: const Text('Yangi shifokor', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
+        const Divider(height: 1, color: AppColors.border),
+
+        // Doctors List
         Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            itemCount: _doctors.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              final doc = _doctors[index];
-              return Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: AppColors.mintLight,
-                      child: Text(doc.fullName.isNotEmpty ? doc.fullName[0] : 'D', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(doc.fullName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                          Text('${doc.specialty} • ${doc.roomNumber}-xona', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                          Text('Qabul: ${Formatters.formatCurrency(doc.consultationPrice)}', style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.textMuted),
-                      onPressed: () {
+          child: filtered.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.medical_services_outlined, size: 48, color: AppColors.textMuted),
+                      const SizedBox(height: 8),
+                      const Text('Shifokorlar topilmadi', style: TextStyle(color: AppColors.textMuted)),
+                    ],
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final doc = filtered[index];
+                    final isFemale = _isDoctorFemale(doc.fullName);
+
+                    return InkWell(
+                      onTap: () {
                         ManagerDoctorSheet.show(context, doctor: doc, onSaved: _fetchData);
                       },
-                    ),
-                  ],
+                      borderRadius: BorderRadius.circular(18),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.025),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Avatar with status indicator
+                                Stack(
+                                  children: [
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: isFemale
+                                              ? [const Color(0xFF0D9488), const Color(0xFF14B8A6)]
+                                              : [const Color(0xFF0284C7), const Color(0xFF0369A1)],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      child: Center(
+                                        child: Icon(
+                                          isFemale ? Icons.face_3_rounded : Icons.face_6_rounded,
+                                          color: Colors.white,
+                                          size: 28,
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      bottom: 0,
+                                      right: 0,
+                                      child: Container(
+                                        width: 12,
+                                        height: 12,
+                                        decoration: BoxDecoration(
+                                          color: doc.isActive ? const Color(0xFF16A34A) : Colors.amber.shade700,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.white, width: 2),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(width: 12),
+
+                                // Doctor Main Info
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        doc.fullName,
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.mintLight,
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              doc.specialty,
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.primary,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF1F5F9),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              '${doc.roomNumber}-xona',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF475569),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                // Status Badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: doc.isActive ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    doc.isActive ? 'Faol' : 'Damda',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: doc.isActive ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                            const SizedBox(height: 10),
+
+                            // Footer: Price & Edit Button
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.payments_outlined, size: 14, color: AppColors.textMuted),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      Formatters.formatCurrency(doc.consultationPrice),
+                                      style: const TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: () {
+                                    ManagerDoctorSheet.show(context, doctor: doc, onSaved: _fetchData);
+                                  },
+                                  icon: const Icon(Icons.edit_note_rounded, size: 16),
+                                  label: const Text('Tahrirlash & Parol', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.primary,
+                                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
       ],
     );
+  }
+
+  bool _isDoctorFemale(String name) {
+    final clean = name.toLowerCase().trim();
+    if (RegExp(r'(ova|yeva|qizi)\b', caseSensitive: false).hasMatch(clean)) return true;
+    const femaleNames = ['malika', 'dilnoza', 'nilufar', 'gulnoza', 'umida', 'shahlo', 'zulayho', 'nargiza', 'madina', 'dildora', 'nodira', 'munisa', 'rayhon', 'feruza'];
+    return femaleNames.any((f) => clean.contains(f));
   }
 
   // ==================== TAB 3: BEMORLAR BAZASI ====================
@@ -542,14 +886,15 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
 
     return Column(
       children: [
+        // Top Search Header
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           color: Colors.white,
           child: Column(
             children: [
               TextFormField(
                 controller: _patientSearchController,
-                onChanged: (q) async {
+                onChanged: (_) {
                   setState(() {
                     _visiblePatientsCount = 15;
                   });
@@ -586,6 +931,8 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
           ),
         ),
         const Divider(height: 1, color: AppColors.border),
+
+        // Patients List
         Expanded(
           child: displayed.isEmpty
               ? Center(
@@ -644,17 +991,36 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.border),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.02),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
                           child: Row(
                             children: [
-                              CircleAvatar(
-                                radius: 20,
-                                backgroundColor: isFemale ? const Color(0xFFFCE7F3) : const Color(0xFFEFF6FF),
-                                child: Icon(
-                                  isFemale ? Icons.face_3_rounded : Icons.face_6_rounded,
-                                  color: isFemale ? const Color(0xFFDB2777) : const Color(0xFF2563EB),
-                                  size: 22,
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: isFemale
+                                        ? [const Color(0xFFFCE7F3), const Color(0xFFFBCFE8)]
+                                        : [const Color(0xFFEFF6FF), const Color(0xFFDBEAFE)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Center(
+                                  child: Icon(
+                                    isFemale ? Icons.face_3_rounded : Icons.face_6_rounded,
+                                    color: isFemale ? const Color(0xFFDB2777) : const Color(0xFF2563EB),
+                                    size: 24,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -662,14 +1028,36 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      p.fullName,
-                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                                    ),
-                                    const SizedBox(height: 2),
                                     Row(
                                       children: [
-                                        const Icon(Icons.phone_outlined, size: 12, color: AppColors.textMuted),
+                                        Flexible(
+                                          child: Text(
+                                            p.fullName,
+                                            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if (p.patientNumber != null) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF1F5F9),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              '#${p.patientNumber}',
+                                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.phone_rounded, size: 12, color: AppColors.textMuted),
                                         const SizedBox(width: 4),
                                         Text(
                                           Formatters.formatPhone(p.phone),
@@ -677,15 +1065,24 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'Tashriflar: ${p.totalVisits} marta • ${Formatters.formatCurrency(p.totalSpent)}',
-                                      style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'Tashriflar: ${p.totalVisits} marta',
+                                          style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                        ),
+                                        const Text(' • ', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                                        Text(
+                                          Formatters.formatCurrency(p.totalSpent),
+                                          style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
                               ),
-                              const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                              const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.textMuted),
                             ],
                           ),
                         ),
@@ -698,44 +1095,132 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
     );
   }
 
-  // ==================== TAB 4: TV PULTI & SOZLAMALAR ====================
+  // ==================== TAB 4: TV TABLO & SOZLAMALAR MARKAZI ====================
   Widget _buildTvAndSettingsTab() {
-    final user = AuthService().currentUser;
-
     return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.all(16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 0. Manager Profile Card
+          // 1. TV JONLI MONITOR PREVIEW & STATUS CARD
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 5)),
+              ],
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  width: 56,
-                  height: 56,
-                  child: Image.asset(
-                    'assets/images/logo.png',
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.admin_panel_settings_rounded, color: AppColors.medicalBlue, size: 30),
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.tv_rounded, color: Colors.white, size: 22),
+                        SizedBox(width: 8),
+                        Text(
+                          'Markaziy TV Tablo',
+                          style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF16A34A).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFF22C55E)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.fiber_manual_record_rounded, size: 8, color: Color(0xFF22C55E)),
+                          SizedBox(width: 4),
+                          Text('Jonli Efirda (Online)', style: TextStyle(color: Color(0xFF22C55E), fontSize: 11, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 14),
-                Expanded(
+                const SizedBox(height: 12),
+                const Text(
+                  'Kutish zalidagi katta ekranda navbatlar, ovozli e\'lonlar va bannerlar real-vaqtda boshqariladi.',
+                  style: TextStyle(color: Colors.white70, fontSize: 11.5),
+                ),
+                const SizedBox(height: 14),
+
+                // Test Chaqiruv Inputlari
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(user?.fullName ?? 'Menejer', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                      const SizedBox(height: 2),
-                      Text('Roli: ${user?.role ?? "MANAGER"} • ${user?.clinicName ?? "klinika-admin"}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                      const SizedBox(height: 2),
-                      Text('Aloqa: ${user?.phone ?? "Biriktirilmagan"}', style: const TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                      const Text('Tezkor Sinov Chaqiruvi (Test Call):', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: TextFormField(
+                              controller: _testTicketCtrl,
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                              decoration: InputDecoration(
+                                hintText: 'Talon (T-001)',
+                                hintStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+                                filled: true,
+                                fillColor: Colors.black26,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: TextFormField(
+                              controller: _testRoomCtrl,
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                              decoration: InputDecoration(
+                                hintText: 'Xona (4)',
+                                hintStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+                                filled: true,
+                                fillColor: Colors.black26,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 38,
+                        child: ElevatedButton.icon(
+                          onPressed: _isSendingTestCall ? null : _sendTestCall,
+                          icon: _isSendingTestCall
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.campaign_rounded, size: 16),
+                          label: const Text('TV Tabloga Ovozli Test Chaqiruv Yuborish', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0284C7),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -744,77 +1229,274 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
           ),
           const SizedBox(height: 16),
 
-          // 1. TV Display Remote Controller
+          // 2. OVOZ VA DIKTANT SOZLAMALARI CARD
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(Icons.tv_rounded, color: AppColors.primary, size: 22),
-                    SizedBox(width: 8),
-                    Text('TV Tablo Masofaviy Boshqaruvi', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                    const Row(
+                      children: [
+                        Icon(Icons.record_voice_over_rounded, color: AppColors.primary, size: 20),
+                        SizedBox(width: 8),
+                        Text('Ovozli Chaqiruv (TTS)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    Switch(
+                      value: _tvSoundEnabled,
+                      activeColor: AppColors.primary,
+                      onChanged: (val) => setState(() => _tvSoundEnabled = val),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                const Text('Kutish zalidagi katta monitorga test chaqiruv yoki bildirishnoma yuborish', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                const Text(
+                  'Bemor chaqirilganda sun\'iy intellekt orqali o‘zbek tilida tabiiy diktor ovozida e\'lon qilinadi.',
+                  style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                ),
                 const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      await ApiService().sendTvTestCall('K-015', '104', 'Dr. Azizbek Rahimov');
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('TV Tabloga ovozli test chaqiruvi yuborildi!'), backgroundColor: AppColors.success),
-                      );
-                    },
-                    icon: const Icon(Icons.campaign_rounded),
-                    label: const Text('Ovozli Test E\'lon Qilish (TV Tablo)'),
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+
+                // Ovoz Tanlash (Madina vs Sardor)
+                const Text('Diktant Ovozi:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() => _tvVoiceName = 'uz-UZ-MadinaNeural'),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: _tvVoiceName == 'uz-UZ-MadinaNeural' ? AppColors.mintLight : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _tvVoiceName == 'uz-UZ-MadinaNeural' ? AppColors.primary : const Color(0xFFE2E8F0),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.face_3_rounded, size: 20, color: _tvVoiceName == 'uz-UZ-MadinaNeural' ? AppColors.primary : AppColors.textMuted),
+                              const SizedBox(width: 6),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Madina', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    Text('Ayol ovozi', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() => _tvVoiceName = 'uz-UZ-SardorNeural'),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: _tvVoiceName == 'uz-UZ-SardorNeural' ? AppColors.mintLight : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _tvVoiceName == 'uz-UZ-SardorNeural' ? AppColors.primary : const Color(0xFFE2E8F0),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.face_6_rounded, size: 20, color: _tvVoiceName == 'uz-UZ-SardorNeural' ? AppColors.primary : AppColors.textMuted),
+                              const SizedBox(width: 6),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Sardor', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    Text('Erkak ovozi', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Chaqiruv Shabloni
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Ovozli Chaqiruv Matni Shabloni:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _tvVoiceTemplateCtrl.text = 'Talon raqami {letter}{zeros}, {number} raqam egasi, sizni {cabinet} xona, {specialty} xonasiga marhamat!';
+                        });
+                      },
+                      child: const Text('Asliga qaytarish', style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _tvVoiceTemplateCtrl,
+                  maxLines: 3,
+                  style: const TextStyle(fontSize: 12),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.all(12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
                   ),
+                ),
+                const SizedBox(height: 6),
+                // Quick Tags Chips
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    _buildTemplateTagChip('{number}', 'Raqam'),
+                    _buildTemplateTagChip('{cabinet}', 'Xona'),
+                    _buildTemplateTagChip('{specialty}', 'Mutaxassislik'),
+                    _buildTemplateTagChip('{letter}', 'Harf'),
+                  ],
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
 
-          // 2. Clinic Subscription Status (Super Admin connection)
+          // 3. TV MATNLARI VA YUGURUVCHI SATR CARD
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.mintLight,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('SaaS Obuna Holati', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
-                    Text('FAOL • ENTERPRISE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: AppColors.primary)),
+                    Icon(Icons.subtitles_rounded, color: AppColors.primary, size: 20),
+                    SizedBox(width: 8),
+                    Text('TV Ekran Matnlari va Bannerlar', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                   ],
                 ),
-                const SizedBox(height: 6),
-                const Text('Keyingi to‘lov sanasi: 23-oktabr, 2027 (Yillik reja)', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                const SizedBox(height: 6),
-                const Text('SMS shlyuz: Eskiz.uz (Faol, 2 450 ta SMS qoldiq)', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                const SizedBox(height: 12),
+
+                // Slogan Title
+                const Text('Klinika Shiori (Slogan):', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                const SizedBox(height: 5),
+                TextFormField(
+                  controller: _tvSloganTitleCtrl,
+                  style: const TextStyle(fontSize: 12.5),
+                  decoration: InputDecoration(
+                    hintText: 'Sog‘lig‘ingiz biz uchun muhim!',
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Slogan Subtitle
+                const Text('Qo‘shimcha Shior Matni:', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                const SizedBox(height: 5),
+                TextFormField(
+                  controller: _tvSloganSubtitleCtrl,
+                  style: const TextStyle(fontSize: 12.5),
+                  decoration: InputDecoration(
+                    hintText: 'Navbat bilan qabulga marhamat!',
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Calling Title
+                const Text('Chaqirilganda Ko‘rinadigan Matn:', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                const SizedBox(height: 5),
+                TextFormField(
+                  controller: _tvCallingTitleCtrl,
+                  style: const TextStyle(fontSize: 12.5),
+                  decoration: InputDecoration(
+                    hintText: 'Hozir chaqirilmoqda!',
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Bottom Running Banner (Yuguruvchi Satr)
+                const Text('Pastki Yuguruvchi Satr (Ticker Banner):', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                const SizedBox(height: 5),
+                TextFormField(
+                  controller: _tvBottomBannerCtrl,
+                  maxLines: 2,
+                  style: const TextStyle(fontSize: 12.5),
+                  decoration: InputDecoration(
+                    hintText: 'Sizning sog‘lig‘ingiz – bizning ustuvor vazifamiz!',
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.all(12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  ),
+                ),
               ],
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // 4. SAQLASH TUGMASI (JONLI EFIRGA QO'LLASH)
+          SizedBox(
+            height: 50,
+            child: ElevatedButton.icon(
+              onPressed: _isSavingTv ? null : _saveTvSettings,
+              icon: _isSavingTv
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.cloud_upload_rounded),
+              label: const Text(
+                'TV Tablo Sozlamalarini Saqlash (Jonli Yangilash)',
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 3,
+              ),
             ),
           ),
           const SizedBox(height: 20),
 
-          // 3. Logout
+          // 5. Tizimdan Chiqish
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: 46,
             child: OutlinedButton(
               onPressed: () async {
                 await AuthService().logout();
@@ -826,18 +1508,43 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.error,
                 side: const BorderSide(color: AppColors.errorLight),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.logout_rounded, size: 18),
                   SizedBox(width: 8),
-                  Text('Tizimdan chiqish', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  Text('Tizimdan chiqish (Logout)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
           ),
+          const SizedBox(height: 20),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTemplateTagChip(String tag, String label) {
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _tvVoiceTemplateCtrl.text += ' $tag';
+        });
+      },
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFCBD5E1)),
+        ),
+        child: Text(
+          '$tag ($label)',
+          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        ),
       ),
     );
   }

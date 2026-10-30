@@ -2,13 +2,14 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { DatabaseService } from '../database/database.service';
+import { PostgresService } from '../database/postgres.service';
 import { TenantContext, UserRole } from '../types';
 
 export interface AuthenticatedRequest extends Request {
   user?: TenantContext;
 }
 
-export const authenticateJwt = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+export const authenticateJwt = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({ success: false, message: 'Authentication required. Bearer token missing.' });
@@ -21,20 +22,56 @@ export const authenticateJwt = (req: AuthenticatedRequest, res: Response, next: 
     const db = DatabaseService.getInstance();
     const user = db.getUserById(payload.userId);
 
-    if (!user || user.status !== 'ACTIVE') {
+    let role = (user?.role || payload.role || UserRole.MANAGER) as UserRole;
+    let tenantId = user?.tenantId || payload.tenantId || '';
+    let branchId = user?.branchId || payload.branchId;
+
+    if (!user) {
+      // Check PostgreSQL user store
+      try {
+        const pg = PostgresService.getInstance();
+        const pgRes = await pg.query(
+          `SELECT u.id, u.is_active, COALESCE(r.code, 'MANAGER') as role_code, u.clinic_id, u.branch_id
+           FROM users u
+           LEFT JOIN roles r ON u.role_id = r.id
+           WHERE u.id = $1 LIMIT 1`,
+          [payload.userId]
+        );
+
+        if (pgRes.rows.length > 0) {
+          const pgUser = pgRes.rows[0];
+          if (pgUser.is_active === false) {
+            res.status(401).json({ success: false, message: 'User account is inactive or blocked.' });
+            return;
+          }
+          role = (pgUser.role_code || payload.role || UserRole.MANAGER) as UserRole;
+          tenantId = pgUser.clinic_id || tenantId;
+          branchId = pgUser.branch_id || branchId;
+        } else if (!payload.userId) {
+          res.status(401).json({ success: false, message: 'User account not found.' });
+          return;
+        }
+      } catch (dbErr) {
+        // Fallback to verified JWT claims if DB has momentary timeout
+        if (!payload.userId) {
+          res.status(401).json({ success: false, message: 'User account verification failed.' });
+          return;
+        }
+      }
+    } else if (user.status !== 'ACTIVE') {
       res.status(401).json({ success: false, message: 'User account is inactive or not found.' });
       return;
     }
 
     req.user = {
-      tenantId: user.tenantId || '',
-      userId: user.id,
-      role: user.role,
-      branchId: user.branchId
+      tenantId: tenantId || '',
+      userId: payload.userId,
+      role,
+      branchId
     };
 
     // If Super Admin provided x-tenant-id header for tenant-impersonation
-    if (user.role === UserRole.SUPER_ADMIN && req.headers['x-tenant-id']) {
+    if (role === UserRole.SUPER_ADMIN && req.headers['x-tenant-id']) {
       req.user.tenantId = String(req.headers['x-tenant-id']);
     }
 
@@ -42,6 +79,24 @@ export const authenticateJwt = (req: AuthenticatedRequest, res: Response, next: 
   } catch (err) {
     res.status(401).json({ success: false, message: 'Invalid or expired authentication token.' });
   }
+};
+
+export const optionalAuthenticateJwt = async (req: AuthenticatedRequest, _res: Response, next: NextFunction): Promise<void> => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+  const token = authHeader.split(' ')[1];
+  try {
+    const payload = jwt.verify(token, config.jwtSecret) as any;
+    req.user = {
+      tenantId: payload.tenantId || '',
+      userId: payload.userId || '',
+      role: (payload.role || UserRole.MANAGER) as UserRole,
+      branchId: payload.branchId
+    };
+  } catch (_) {}
+  next();
 };
 
 export const requireRoles = (allowedRoles: UserRole[]) => {

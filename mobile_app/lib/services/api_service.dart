@@ -278,7 +278,13 @@ class ApiService {
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         final data = (decoded is Map<String, dynamic> && decoded['data'] != null) ? decoded['data'] : decoded;
-        return PatientModel.fromJson(data);
+        if (data is Map<String, dynamic>) {
+          if (data['patient'] is Map<String, dynamic>) {
+            final pMap = Map<String, dynamic>.from(data['patient']);
+            return PatientModel.fromJson(pMap);
+          }
+          return PatientModel.fromJson(data);
+        }
       }
       return null;
     } catch (e) {
@@ -408,6 +414,22 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> getShiftDetails(String shiftId) async {
+    try {
+      final response = await http.get(Uri.parse(ApiConstants.shiftDetails(shiftId)), headers: _headers());
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['data'] is Map<String, dynamic>) {
+          return decoded['data'];
+        }
+        return (decoded is Map<String, dynamic>) ? decoded : {};
+      }
+      return {};
+    } catch (e) {
+      return {};
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getPayments() async {
     try {
       final response = await http.get(Uri.parse(ApiConstants.payments), headers: _headers());
@@ -432,6 +454,39 @@ class ApiService {
       return {};
     } catch (e) {
       return {};
+    }
+  }
+
+  // ==================== CLINIC SETTINGS ====================
+  Future<Map<String, dynamic>> getClinicSettings() async {
+    try {
+      final response = await http.get(Uri.parse(ApiConstants.clinicSettings), headers: _headers());
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['data'] is Map<String, dynamic>) {
+          return decoded['data'];
+        }
+        return (decoded is Map<String, dynamic>) ? decoded : {};
+      }
+      return {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateClinicSettings(Map<String, dynamic> data) async {
+    try {
+      final response = await http.patch(
+        Uri.parse(ApiConstants.clinicSettings),
+        headers: _headers(),
+        body: jsonEncode(data),
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      }
+      return {'success': false, 'message': 'Xatolik: ${response.statusCode}'};
+    } catch (e) {
+      return {'success': false, 'message': '$e'};
     }
   }
 

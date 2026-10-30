@@ -15,8 +15,15 @@ class ManagerDoctorSheet extends StatefulWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => ManagerDoctorSheet(doctor: doctor, onSaved: onSaved),
+      barrierColor: Colors.black.withOpacity(0.55),
+      builder: (sheetCtx) => AnimatedPadding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+        child: ManagerDoctorSheet(doctor: doctor, onSaved: onSaved),
+      ),
     );
   }
 
@@ -34,7 +41,7 @@ class _ManagerDoctorSheetState extends State<ManagerDoctorSheet> {
   final _passwordController = TextEditingController(text: 'doctor123');
 
   bool _isSaving = false;
-  bool _obscurePassword = false; // Default visible for manager as requested!
+  bool _obscurePassword = true; // Default hidden (••••••) as requested!
 
   @override
   void initState() {

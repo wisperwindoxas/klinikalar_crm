@@ -35,7 +35,7 @@ export const SubscriptionGuard: React.FC<{ children: React.ReactNode }> = ({ chi
           const u = JSON.parse(userJson);
           if (u.tenantId) tenantId = u.tenantId;
         }
-      } catch (e) {}
+      } catch (e) { }
 
       const res = await fetch(`${API_BASE_URL}/clinic/subscription?tenantId=${tenantId}`, {
         headers: { 'x-tenant-id': tenantId }
@@ -258,16 +258,15 @@ export const SubscriptionGuard: React.FC<{ children: React.ReactNode }> = ({ chi
 
           {/* Central Modal Card */}
           <div className="relative w-full max-w-xl bg-slate-900/90 border border-slate-700/80 rounded-3xl p-6 sm:p-8 md:p-10 text-center shadow-2xl shadow-black/80 flex flex-col items-center">
-            
+
             {/* Animated Lock Shield Badge */}
             <div className="relative mb-6">
-              <div className={`w-24 h-24 rounded-3xl flex items-center justify-center shadow-2xl ${
-                isBlocked
+              <div className={`w-24 h-24 rounded-3xl flex items-center justify-center shadow-2xl ${isBlocked
                   ? 'bg-rose-500/20 text-rose-500 border border-rose-500/40 shadow-rose-500/20'
                   : isSuspended
-                  ? 'bg-amber-500/20 text-amber-500 border border-amber-500/40 shadow-amber-500/20'
-                  : 'bg-rose-600/20 text-rose-500 border border-rose-600/40 shadow-rose-600/20'
-              }`}>
+                    ? 'bg-amber-500/20 text-amber-500 border border-amber-500/40 shadow-amber-500/20'
+                    : 'bg-rose-600/20 text-rose-500 border border-rose-600/40 shadow-rose-600/20'
+                }`}>
                 {isBlocked ? (
                   <Lock className="w-12 h-12 stroke-[2.2] animate-pulse" />
                 ) : isSuspended ? (
@@ -292,8 +291,8 @@ export const SubscriptionGuard: React.FC<{ children: React.ReactNode }> = ({ chi
               {isBlocked
                 ? 'Dastur Bloklangan'
                 : isSuspended
-                ? "Klinika Faoliyati To'xtatildi"
-                : 'Obuna Muddati Tugagan'}
+                  ? "Klinika Faoliyati To'xtatildi"
+                  : 'Obuna Muddati Tugagan'}
             </h1>
 
             {/* Detailed Explanation */}
@@ -301,8 +300,8 @@ export const SubscriptionGuard: React.FC<{ children: React.ReactNode }> = ({ chi
               {isBlocked
                 ? "Super Admin tomonidan ushbu klinika uchun xizmat ko'rsatish butunlay bloklangan va qulflangan."
                 : isSuspended
-                ? "Klinika faoliyati ma'muriyat tomonidan vaqtincha to'xtatildi. Barcha bo'limlar faoliyati cheklangan."
-                : "Ushbu klinika uchun taqdim etilgan litsenziya yoki obuna muddati o'z nihoyasiga yetgan."}
+                  ? "Klinika faoliyati ma'muriyat tomonidan vaqtincha to'xtatildi. Barcha bo'limlar faoliyati cheklangan."
+                  : "Ushbu klinika uchun taqdim etilgan litsenziya yoki obuna muddati o'z nihoyasiga yetgan."}
             </p>
 
             {/* ======================================================== */}
