@@ -470,7 +470,8 @@ ipcMain.handle('download-update', async (event, { url, fileName }) => {
       parsedUrl.hostname === 'github.com' ||
       parsedUrl.hostname.endsWith('.github.com') ||
       parsedUrl.hostname === 'github-releases.githubusercontent.com' ||
-      parsedUrl.hostname === 'objects.githubusercontent.com'
+      parsedUrl.hostname === 'objects.githubusercontent.com' ||
+      parsedUrl.hostname.endsWith('.githubusercontent.com')
     )) ||
     ((parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') && (
       parsedUrl.hostname === 'localhost' ||
@@ -488,7 +489,7 @@ ipcMain.handle('download-update', async (event, { url, fileName }) => {
   // Strictly sanitize fileName to prevent path traversal
   const baseName = path.basename(fileName || parsedUrl.pathname || 'Klinika-admin-update');
   const safeFileName = baseName.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
-  
+
   // Verify safe extension
   const ext = path.extname(safeFileName).toLowerCase();
   const allowedExts = ['.exe', '.dmg', '.zip', '.pkg', '.blockmap'];
@@ -506,7 +507,7 @@ ipcMain.handle('download-update', async (event, { url, fileName }) => {
       const downloadWithRedirect = (currentUrl, redirectCount = 0) => {
         if (redirectCount > 5) {
           file.close();
-          fs.unlink(targetPath, () => {});
+          fs.unlink(targetPath, () => { });
           return resolve({ success: false, message: "Juda ko'p redirect amalga oshirildi." });
         }
 
@@ -515,7 +516,7 @@ ipcMain.handle('download-update', async (event, { url, fileName }) => {
           curParsed = new URL(currentUrl);
         } catch (_) {
           file.close();
-          fs.unlink(targetPath, () => {});
+          fs.unlink(targetPath, () => { });
           return resolve({ success: false, message: "Noto'g'ri yo'naltirilgan URL" });
         }
 
@@ -526,7 +527,9 @@ ipcMain.handle('download-update', async (event, { url, fileName }) => {
             curParsed.hostname.endsWith('.github.com') ||
             curParsed.hostname === 'github-releases.githubusercontent.com' ||
             curParsed.hostname === 'objects.githubusercontent.com' ||
-            curParsed.hostname.endsWith('.amazonaws.com')
+            curParsed.hostname.endsWith('.githubusercontent.com') ||
+            curParsed.hostname.endsWith('.amazonaws.com') ||
+            curParsed.hostname.endsWith('.blob.core.windows.net')
           )) ||
           ((curParsed.protocol === 'http:' || curParsed.protocol === 'https:') && (
             curParsed.hostname === 'localhost' ||
@@ -538,7 +541,7 @@ ipcMain.handle('download-update', async (event, { url, fileName }) => {
 
         if (!isAllowedRedirect) {
           file.close();
-          fs.unlink(targetPath, () => {});
+          fs.unlink(targetPath, () => { });
           return resolve({ success: false, message: "Xavfsiz bo'lmagan manzilga yo'naltirish rad etildi." });
         }
 
@@ -551,7 +554,7 @@ ipcMain.handle('download-update', async (event, { url, fileName }) => {
 
           if (response.statusCode !== 200) {
             file.close();
-            fs.unlink(targetPath, () => {});
+            fs.unlink(targetPath, () => { });
             return resolve({ success: false, message: `Server xatosi: HTTP ${response.statusCode}` });
           }
 
@@ -573,13 +576,13 @@ ipcMain.handle('download-update', async (event, { url, fileName }) => {
               // Open directory or trigger installer safely
               try {
                 shell.openPath(targetPath);
-              } catch (e) {}
+              } catch (e) { }
               resolve({ success: true, filePath: targetPath });
             });
           });
         }).on('error', (err) => {
           file.close();
-          fs.unlink(targetPath, () => {});
+          fs.unlink(targetPath, () => { });
           resolve({ success: false, message: err.message });
         });
       };
