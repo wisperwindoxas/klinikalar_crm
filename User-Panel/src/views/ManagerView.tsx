@@ -88,6 +88,7 @@ export const ManagerView: React.FC = () => {
   const currentTabSlug = searchParams.get('tab') || 'bosh-sahifa';
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
@@ -1762,29 +1763,51 @@ export const ManagerView: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-[#F0F4F8] text-[#172B4D] overflow-hidden select-none font-sans">
-      {/* 1. DARK SIDEBAR (100% 1:1 WITH Meneger.png, LARGER ICONS & REAL ROUTING) */}
-      <aside className={`${sidebarCollapsed ? 'w-20' : 'w-64'} bg-[#0B1528] flex flex-col justify-between flex-shrink-0 z-20 transition-all duration-200 border-r border-[#1E293B]`}>
+    <div className="flex h-screen bg-[#F0F4F8] text-[#172B4D] overflow-hidden select-none font-sans relative">
+      {/* Mobile Drawer Backdrop */}
+      {mobileDrawerOpen && (
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 md:hidden transition-opacity"
+          onClick={() => setMobileDrawerOpen(false)}
+        />
+      )}
+
+      {/* 1. DARK SIDEBAR (RESPONSIVE: DRAWER ON MOBILE, COLLAPSIBLE ON DESKTOP) */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 md:static md:z-20 flex flex-col justify-between flex-shrink-0 transition-all duration-300 bg-[#0B1528] border-r border-[#1E293B] ${
+          mobileDrawerOpen ? 'translate-x-0 w-72 shadow-2xl' : '-translate-x-full md:translate-x-0'
+        } ${sidebarCollapsed ? 'md:w-20' : 'md:w-64'}`}
+      >
         {/* Top Brand */}
         <div>
-          <div className="p-5 flex items-center gap-3">
-            <div className="w-12 h-12 bg-transparent flex items-center justify-center flex-shrink-0 filter drop-shadow-md overflow-hidden">
-              <img
-                src={clinicSettings?.logo_url || settingsForm?.logoUrl || APP_LOGO}
-                alt={clinicSettings?.clinic_name || settingsForm?.clinicName || 'Klinika-admin'}
-                className="w-full h-full object-contain bg-transparent rounded-lg"
-              />
-            </div>
-            {!sidebarCollapsed && (
-              <div className="overflow-hidden">
-                <div className="font-bold text-lg text-white tracking-tight leading-tight truncate">
-                  {clinicSettings?.clinic_name || settingsForm?.clinicName || 'Klinika-admin'}
-                </div>
-                <div className="text-xs text-slate-400 font-medium">
-                  Boshqaruv Tizimi
-                </div>
+          <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-transparent flex items-center justify-center flex-shrink-0 filter drop-shadow-md overflow-hidden">
+                <img
+                  src={clinicSettings?.logo_url || settingsForm?.logoUrl || APP_LOGO}
+                  alt={clinicSettings?.clinic_name || settingsForm?.clinicName || 'Klinika-admin'}
+                  className="w-full h-full object-contain bg-transparent rounded-lg"
+                />
               </div>
-            )}
+              {(!sidebarCollapsed || mobileDrawerOpen) && (
+                <div className="overflow-hidden">
+                  <div className="font-bold text-base sm:text-lg text-white tracking-tight leading-tight truncate">
+                    {clinicSettings?.clinic_name || settingsForm?.clinicName || 'Klinika-admin'}
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-medium">
+                    Boshqaruv Tizimi
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* Close button on mobile drawer */}
+            <button
+              onClick={() => setMobileDrawerOpen(false)}
+              className="md:hidden p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer"
+              title="Yopish"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Navigation Items with LARGE ICONS & REAL URL ROUTING */}
@@ -1812,6 +1835,7 @@ export const ManagerView: React.FC = () => {
                           const isAlreadyInGroup = item.children.some(c => c.slug === currentTabSlug);
                           if (!isAlreadyInGroup) {
                             setSearchParams({ tab: item.children[0].slug });
+                            setMobileDrawerOpen(false);
                           }
                         }
                       }}
@@ -1824,15 +1848,15 @@ export const ManagerView: React.FC = () => {
                     >
                       <div className="flex items-center gap-4 min-w-0">
                         <Icon className={`w-6 h-6 stroke-[2.2] flex-shrink-0 ${isGroupActive ? 'text-medical-blue' : 'text-slate-400'}`} />
-                        {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                        {(!sidebarCollapsed || mobileDrawerOpen) && <span className="truncate">{item.label}</span>}
                       </div>
-                      {!sidebarCollapsed && (
+                      {(!sidebarCollapsed || mobileDrawerOpen) && (
                         <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-white' : ''}`} />
                       )}
                     </button>
 
                     {/* Submenu dropdown items */}
-                    {!sidebarCollapsed && isExpanded && (
+                    {(!sidebarCollapsed || mobileDrawerOpen) && isExpanded && (
                       <div className="pl-4 pr-1 space-y-1 py-1">
                         {item.children.map(child => {
                           const ChildIcon = child.icon;
@@ -1840,7 +1864,10 @@ export const ManagerView: React.FC = () => {
                           return (
                             <button
                               key={child.id}
-                              onClick={() => setSearchParams({ tab: child.slug })}
+                              onClick={() => {
+                                setSearchParams({ tab: child.slug });
+                                setMobileDrawerOpen(false);
+                              }}
                               title={child.label}
                               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition text-left cursor-pointer ${
                                 isChildActive
@@ -1873,6 +1900,7 @@ export const ManagerView: React.FC = () => {
                     } else {
                       setSearchParams({ tab: item.slug });
                     }
+                    setMobileDrawerOpen(false);
                   }}
                   title={item.label}
                   className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-[13px] font-semibold transition text-left cursor-pointer ${
@@ -1882,18 +1910,18 @@ export const ManagerView: React.FC = () => {
                   }`}
                 >
                   <Icon className={`w-6 h-6 stroke-[2.2] flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                  {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                  {(!sidebarCollapsed || mobileDrawerOpen) && <span className="truncate">{item.label}</span>}
                 </button>
               );
             })}
           </nav>
         </div>
 
-        {/* Bottom Sidebar Collapse Button */}
-        <div className="p-3 border-t border-slate-800/80">
+        {/* Bottom Sidebar Collapse Button (Desktop only) */}
+        <div className="p-3 border-t border-slate-800/80 hidden md:block">
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="w-full flex items-center justify-center gap-2 p-3 rounded-2xl border border-slate-700/60 text-slate-400 hover:text-white hover:bg-slate-800/50 text-xs font-semibold transition"
+            className="w-full flex items-center justify-center gap-2 p-3 rounded-2xl border border-slate-700/60 text-slate-400 hover:text-white hover:bg-slate-800/50 text-xs font-semibold transition cursor-pointer"
           >
             <ChevronLeft className={`w-4 h-4 transition-transform duration-200 ${sidebarCollapsed ? 'rotate-180' : ''}`} />
             {!sidebarCollapsed && <span>Menyuni yig'ish</span>}
@@ -1903,38 +1931,45 @@ export const ManagerView: React.FC = () => {
 
       {/* 2. MAIN WORKSPACE */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* TOP NAVBAR (100% 1:1 WITH Meneger.png) */}
-        <header className="h-16 bg-white border-b border-slate-200/80 px-6 flex items-center justify-between flex-shrink-0 relative z-40 shadow-sm">
+        {/* TOP NAVBAR (100% RESPONSIVE) */}
+        <header className="h-16 bg-white border-b border-slate-200/80 px-3 sm:px-6 flex items-center justify-between flex-shrink-0 relative z-30 shadow-xs">
           {/* Left Brand / Hamburger */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition"
+              onClick={() => {
+                if (window.innerWidth < 768) {
+                  setMobileDrawerOpen(prev => !prev);
+                } else {
+                  setSidebarCollapsed(prev => !prev);
+                }
+              }}
+              className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition cursor-pointer flex-shrink-0"
+              title="Menyuni ochish/yopish"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div>
-              <h1 className="text-base font-bold text-[#172B4D] leading-tight">
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-base font-bold text-[#172B4D] leading-tight truncate max-w-[130px] sm:max-w-xs md:max-w-none">
                 {clinicSettings?.clinic_name || settingsForm?.clinicName || 'Klinika-admin'}
               </h1>
-              <p className="text-[11px] text-slate-500 font-medium">Navbat Tizimi — Boshqaruv</p>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium hidden xs:block truncate">Navbat Tizimi — Boshqaruv</p>
             </div>
           </div>
 
           {/* Right Header Badges */}
-          <div className="flex items-center gap-3">
-            {/* Date Pill (Kattalashtirilgan va DD.MM.YYYY formatida) */}
-            <div className="flex items-center gap-2.5 px-4 py-2 bg-slate-50 border border-slate-200/90 rounded-xl shadow-2xs hover:bg-slate-100/60 transition">
-              <Calendar className="w-5 h-5 text-[#1677FF] flex-shrink-0" />
-              <span className="text-base font-bold text-slate-800 font-mono tracking-wide">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            {/* Date Pill (Kattalashtirilgan va DD.MM.YYYY formatida, hidden on mobile < 768px) */}
+            <div className="hidden md:flex items-center gap-2.5 px-3.5 sm:px-4 py-2 bg-slate-50 border border-slate-200/90 rounded-xl shadow-2xs hover:bg-slate-100/60 transition">
+              <Calendar className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-[#1677FF] flex-shrink-0" />
+              <span className="text-sm sm:text-base font-bold text-slate-800 font-mono tracking-wide">
                 {dateStr}
               </span>
             </div>
 
-            {/* Live Clock Pill (Kattalashtirilgan va Clock ikonkali) */}
-            <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200/90 rounded-xl shadow-2xs hover:bg-slate-100/60 transition">
-              <Clock className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-              <span className="text-lg font-black text-[#172B4D] font-mono tracking-wider">
+            {/* Live Clock Pill (Kattalashtirilgan va Clock ikonkali, responsive padding) */}
+            <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-4 sm:py-2 bg-slate-50 border border-slate-200/90 rounded-xl shadow-2xs hover:bg-slate-100/60 transition">
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 flex-shrink-0" />
+              <span className="text-sm sm:text-lg font-black text-[#172B4D] font-mono tracking-wider">
                 {time}
               </span>
             </div>
@@ -1943,16 +1978,16 @@ export const ManagerView: React.FC = () => {
             <div className="relative">
               <button
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className="flex items-center gap-2.5 p-1.5 pr-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition shadow-2xs cursor-pointer"
+                className="flex items-center gap-2 p-1.5 sm:pr-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition shadow-2xs cursor-pointer"
               >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#1677FF] to-blue-700 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-tr from-[#1677FF] to-blue-700 text-white flex items-center justify-center font-bold text-xs shadow-sm flex-shrink-0">
                   {getUserInitials(currentUser?.fullName || currentUser?.name || currentUser?.username)}
                 </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-xs font-bold text-[#172B4D] leading-tight max-w-[150px] truncate">
+                <div className="hidden sm:flex flex-col text-left">
+                  <span className="text-xs font-bold text-[#172B4D] leading-tight max-w-[120px] truncate">
                     {currentUser?.fullName || currentUser?.name || currentUser?.username || 'Menejer'}
                   </span>
-                  <span className="text-[10px] text-slate-500 font-semibold">
+                  <span className="text-[10px] text-slate-500 font-semibold truncate">
                     {getRoleDisplayName(currentUser?.role)}
                   </span>
                 </div>
@@ -1993,8 +2028,8 @@ export const ManagerView: React.FC = () => {
           </div>
         </header>
 
-        {/* 3. SCROLLABLE CONTENT AREA */}
-        <main className="flex-1 p-6 overflow-y-auto space-y-6">
+        {/* 3. SCROLLABLE CONTENT AREA (RESPONSIVE PADDING) */}
+        <main className="flex-1 p-3 sm:p-5 lg:p-6 overflow-y-auto space-y-4 sm:space-y-6">
           {/* Super Admin Lock / Suspension Alert Banner */}
           {clinicSubscription?.status === 'BLOCKED' && (
             <div className="p-4 bg-rose-50 border border-rose-300 rounded-2xl flex items-center justify-between text-rose-800 shadow-sm animate-pulse">

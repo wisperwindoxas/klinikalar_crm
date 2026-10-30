@@ -8,7 +8,7 @@ import {
   Home, RotateCw, SkipBack, Search, Users,
   X, Activity, ArrowRight, ShieldCheck, MapPin,
   Sparkles, Star, Bell, Shield, Sliders, Eye,
-  UserCheck, BadgeCheck, VolumeX, MessageSquare
+  UserCheck, BadgeCheck, VolumeX, MessageSquare, Menu
 } from 'lucide-react';
 
 import { showNotification } from '../components/ToastNotification';
@@ -139,19 +139,19 @@ const HeaderLiveClock: React.FC = React.memo(() => {
   }, []);
 
   return (
-    <div className="flex items-center gap-4">
-      {/* Animated Live Date Widget with Big Green Chislo */}
-      <div className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-emerald-50/90 via-white to-emerald-50/40 border border-emerald-200/80 rounded-2xl shadow-xs transition-all hover:border-emerald-300">
-        <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center flex-shrink-0 relative">
-          <Calendar className="w-5 h-5 text-emerald-600" />
+    <div className="flex items-center gap-2 sm:gap-4">
+      {/* Animated Live Date Widget (Hidden on mobile < 768px to prevent overflow) */}
+      <div className="hidden md:flex items-center gap-3 px-3.5 sm:px-4 py-2 bg-gradient-to-r from-emerald-50/90 via-white to-emerald-50/40 border border-emerald-200/80 rounded-2xl shadow-xs transition-all hover:border-emerald-300">
+        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center flex-shrink-0 relative">
+          <Calendar className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-emerald-600" />
           <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
         </div>
         <div className="flex flex-col">
           <div className="flex items-baseline font-mono leading-none">
-            <span className="text-2xl font-black text-emerald-600 tracking-tight drop-shadow-2xs inline-block animate-pulse">
+            <span className="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight drop-shadow-2xs inline-block animate-pulse">
               {timeState.day}
             </span>
-            <span className="text-sm font-extrabold text-slate-700 tracking-wider">
+            <span className="text-xs sm:text-sm font-extrabold text-slate-700 tracking-wider">
               .{timeState.month}.{timeState.year}
             </span>
           </div>
@@ -159,16 +159,16 @@ const HeaderLiveClock: React.FC = React.memo(() => {
         </div>
       </div>
 
-      {/* Animated Live Clock Widget */}
-      <div className="flex items-center gap-3 px-4 py-2 bg-white border border-slate-200/90 rounded-2xl shadow-xs transition-all hover:border-blue-200">
-        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
-          <Clock className="w-5 h-5 animate-[spin_10s_linear_infinite]" />
+      {/* Animated Live Clock Widget (Fully responsive) */}
+      <div className="flex items-center gap-2 sm:gap-3 px-2.5 sm:px-4 py-1.5 sm:py-2 bg-white border border-slate-200/90 rounded-xl sm:rounded-2xl shadow-xs transition-all hover:border-blue-200">
+        <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+          <Clock className="w-4 h-4 sm:w-5 sm:h-5 animate-[spin_10s_linear_infinite]" />
         </div>
         <div className="flex items-baseline font-mono leading-none">
-          <span className="text-2xl font-black text-[#172B4D] tracking-tight">{timeState.hours}</span>
-          <span className="text-2xl font-black text-emerald-500 animate-pulse mx-0.5">:</span>
-          <span className="text-2xl font-black text-[#172B4D] tracking-tight">{timeState.minutes}</span>
-          <span className="text-xs font-bold text-slate-400 ml-1.5 self-end mb-0.5">:{timeState.seconds}</span>
+          <span className="text-lg sm:text-2xl font-black text-[#172B4D] tracking-tight">{timeState.hours}</span>
+          <span className="text-lg sm:text-2xl font-black text-emerald-500 animate-pulse mx-0.5">:</span>
+          <span className="text-lg sm:text-2xl font-black text-[#172B4D] tracking-tight">{timeState.minutes}</span>
+          <span className="text-[10px] sm:text-xs font-bold text-slate-400 ml-1 sm:ml-1.5 self-end mb-0.5 hidden xs:inline-block">:{timeState.seconds}</span>
         </div>
       </div>
     </div>
@@ -190,8 +190,10 @@ export const DoctorView: React.FC = () => {
   }, [searchParams]);
 
   // Instant zero-lag tab switch handler
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const handleTabChange = (newTabId: string) => {
     setCurrentTab(newTabId);
+    setMobileDrawerOpen(false);
     if (newTabId === 'mening-navbatim') {
       setSearchParams({}, { replace: true });
     } else {
@@ -688,25 +690,47 @@ export const DoctorView: React.FC = () => {
   ];
 
   return (
-    <div className="flex min-h-screen bg-[#F0F4F8] p-3 gap-3 select-none font-sans text-[#172B4D]">
-      {/* 1. LEFT SIDEBAR (Standalone floating card, completely separate from top header) */}
-      <aside className="w-64 bg-white rounded-3xl border border-slate-200/90 shadow-sm flex flex-col justify-between flex-shrink-0 sticky top-3 h-[calc(100vh-1.5rem)] overflow-hidden z-20">
+    <div className="flex min-h-screen bg-[#F0F4F8] p-2 sm:p-3 gap-2 sm:gap-3 select-none font-sans text-[#172B4D] relative">
+      {/* Mobile Drawer Backdrop */}
+      {mobileDrawerOpen && (
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 md:hidden transition-opacity"
+          onClick={() => setMobileDrawerOpen(false)}
+        />
+      )}
+
+      {/* 1. LEFT SIDEBAR (RESPONSIVE: DRAWER ON MOBILE, FLOATING CARD ON DESKTOP) */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 md:static md:z-20 w-72 md:w-64 bg-white rounded-r-3xl md:rounded-3xl border border-slate-200/90 shadow-2xl md:shadow-sm flex flex-col justify-between flex-shrink-0 transition-transform duration-300 md:translate-x-0 ${
+          mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'
+        } h-full md:h-[calc(100vh-1.5rem)] md:sticky md:top-3 overflow-hidden`}
+      >
         <div>
           {/* Logo Header */}
-          <div className="p-6 flex items-center gap-3">
-            <div className="w-12 h-12 bg-transparent flex items-center justify-center flex-shrink-0 filter drop-shadow-md overflow-hidden">
-              <img
-                src={clinicSettings?.logo_url || APP_LOGO}
-                alt={clinicSettings?.clinic_name || 'Klinika-admin'}
-                className="w-full h-full object-contain bg-transparent rounded-lg"
-              />
-            </div>
-            <div className="min-w-0">
-              <div className="font-black text-lg tracking-tight leading-tight text-[#172B4D] truncate">
-                {clinicSettings?.clinic_name || 'Klinika-admin'}
+          <div className="p-4 sm:p-6 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-transparent flex items-center justify-center flex-shrink-0 filter drop-shadow-md overflow-hidden">
+                <img
+                  src={clinicSettings?.logo_url || APP_LOGO}
+                  alt={clinicSettings?.clinic_name || 'Klinika-admin'}
+                  className="w-full h-full object-contain bg-transparent rounded-lg"
+                />
               </div>
-              <div className="text-xs text-slate-500 font-medium">Shifokor Paneli</div>
+              <div className="min-w-0">
+                <div className="font-black text-base sm:text-lg tracking-tight leading-tight text-[#172B4D] truncate">
+                  {clinicSettings?.clinic_name || 'Klinika-admin'}
+                </div>
+                <div className="text-xs text-slate-500 font-medium">Shifokor Paneli</div>
+              </div>
             </div>
+            {/* Mobile close button */}
+            <button
+              onClick={() => setMobileDrawerOpen(false)}
+              className="md:hidden p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+              title="Yopish"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Navigation Items */}
@@ -732,7 +756,7 @@ export const DoctorView: React.FC = () => {
           </nav>
         </div>
 
-        {/* Clean Clinic Badge at Bottom (Zero Postgres/database text) */}
+        {/* Clean Clinic Badge at Bottom */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/70 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-medical-blue flex items-center justify-center flex-shrink-0 font-bold">
             <ShieldCheck className="w-6 h-6 stroke-[2.5] text-medical-blue" />
@@ -745,62 +769,70 @@ export const DoctorView: React.FC = () => {
       </aside>
 
       {/* 2. MAIN WORKSPACE */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* TOP HEADER BAR (Standalone floating card, separate from sidebar) */}
-        <header className="h-20 bg-white rounded-2xl border border-slate-200/90 px-6 flex items-center justify-between sticky top-3 z-10 shadow-xs mb-3">
-          {/* Doctor Info */}
-          <div className="flex items-center gap-4">
-            {renderDoctorAvatar(doctorInfo.display_name, doctorInfo.avatar_url)}
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-lg font-black text-[#172B4D] tracking-tight">{doctorInfo.display_name}</h1>
-                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border flex items-center gap-1.5 shadow-2xs ${
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* TOP HEADER BAR (RESPONSIVE) */}
+        <header className="min-h-16 py-2 sm:h-20 bg-white rounded-2xl border border-slate-200/90 px-3 sm:px-6 flex items-center justify-between sticky top-2 sm:top-3 z-10 shadow-xs mb-3 gap-2">
+          {/* Doctor Info & Mobile Menu Button */}
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <button
+              onClick={() => setMobileDrawerOpen(prev => !prev)}
+              className="md:hidden p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition cursor-pointer flex-shrink-0"
+              title="Menyu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            <div className="hidden xs:block flex-shrink-0">
+              {renderDoctorAvatar(doctorInfo.display_name, doctorInfo.avatar_url)}
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2.5 flex-wrap">
+                <h1 className="text-sm sm:text-lg font-black text-[#172B4D] tracking-tight truncate max-w-[130px] sm:max-w-xs">
+                  {doctorInfo.display_name}
+                </h1>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold border flex items-center gap-1 shadow-2xs ${
                   breakMode
                     ? 'bg-amber-50 text-amber-700 border-amber-200'
                     : 'bg-emerald-50 text-emerald-700 border-emerald-200/60'
                 }`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${breakMode ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`} />
-                  <span>{breakMode ? 'Tanaffus' : 'Faol qabul'}</span>
+                  <span>{breakMode ? 'Tanaffus' : 'Faol'}</span>
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-semibold mt-0.5 flex items-center gap-2">
-                <span>{doctorInfo.specialty_name}</span>
+              <p className="text-[11px] sm:text-xs text-slate-500 font-semibold mt-0.5 flex items-center gap-1.5 truncate">
+                <span className="truncate">{doctorInfo.specialty_name}</span>
                 <span className="text-slate-300">•</span>
-                <span className="font-mono text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md font-bold">{doctorInfo.cabinet_number}-kabinet</span>
-                {doctorInfo.phone && (
-                  <>
-                    <span className="text-slate-300">•</span>
-                    <span className="text-slate-500 font-mono text-[11px]">{doctorInfo.phone}</span>
-                  </>
-                )}
+                <span className="font-mono text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded-md font-bold text-[10px] sm:text-xs">{doctorInfo.cabinet_number}-kabinet</span>
               </p>
             </div>
           </div>
 
           {/* Right Badges & Exit Button */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
             <HeaderLiveClock />
 
             {/* Chiqish (Logout) button */}
             <button
               onClick={handleLogout}
-              className="px-4 py-2.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs"
+              className="px-2.5 py-2 sm:px-4 sm:py-2.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Tizimdan chiqish"
             >
               <LogOut className="w-4 h-4" />
-              <span>Chiqish</span>
+              <span className="hidden sm:inline">Chiqish</span>
             </button>
           </div>
         </header>
 
         {/* 3. SUBVIEWS ROUTING */}
 
-        {/* TAB 1: MENING NAVBATIM (100% 1:1 WITH Shifokor.png) */}
+        {/* TAB 1: MENING NAVBATIM (RESPONSIVE) */}
         {currentTab === 'mening-navbatim' && (
-          <main className="p-8 grid grid-cols-12 gap-6 flex-1">
+          <main className="p-3 sm:p-5 lg:p-8 grid grid-cols-12 gap-4 sm:gap-6 flex-1 overflow-y-auto">
             {/* LEFT 2 COLUMNS (Col 1-8): METRICS, ACTIVE PATIENT, PATIENT DETAILS */}
-            <div className="col-span-12 xl:col-span-8 space-y-6">
-              {/* 3 REAL METRIC CARDS (100% Dynamic from PostgreSQL) */}
-              <div className="grid grid-cols-3 gap-5">
+            <div className="col-span-12 xl:col-span-8 space-y-4 sm:space-y-6">
+              {/* 3 REAL METRIC CARDS (Responsive: 1 col on mobile, 3 cols on sm+) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-5">
                 {/* 1. Kutayotgan bemorlar */}
                 <div className="bg-[#F0F7FD] p-5 rounded-3xl border border-[#D0E5F7] shadow-sm flex items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-white text-[#1677FF] flex items-center justify-center shadow-xs">
@@ -1125,7 +1157,7 @@ export const DoctorView: React.FC = () => {
 
         {/* TAB 2: BEMOR MA'LUMOTLARI JADVALI (100% Real from PostgreSQL) */}
         {currentTab === 'bemorlar' && (
-          <main className="p-8 flex-1 space-y-6">
+          <main className="p-3 sm:p-5 lg:p-8 flex-1 space-y-4 sm:space-y-6 overflow-y-auto">
             <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -1297,7 +1329,7 @@ export const DoctorView: React.FC = () => {
 
         {/* TAB 3: CHAQIRUVLAR TARIXI (100% Real from PostgreSQL, 15 items per batch) */}
         {currentTab === 'tarix' && (
-          <main className="p-8 flex-1 space-y-6">
+          <main className="p-3 sm:p-5 lg:p-8 flex-1 space-y-4 sm:space-y-6 overflow-y-auto">
             <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -1413,7 +1445,7 @@ export const DoctorView: React.FC = () => {
 
         {/* TAB 4: KUNDALIK QABUL (100% Real from PostgreSQL, 15 items per batch) */}
         {currentTab === 'kundalik-qabul' && (
-          <main className="p-8 flex-1 space-y-6">
+          <main className="p-3 sm:p-5 lg:p-8 flex-1 space-y-4 sm:space-y-6 overflow-y-auto">
             <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-6 max-w-4xl">
               <div>
                 <h2 className="text-lg font-black text-[#172B4D]">Kundalik Qabul Jurnali</h2>
@@ -1491,7 +1523,7 @@ export const DoctorView: React.FC = () => {
 
         {/* TAB 5: SOZLAMALAR (100% Real from PostgreSQL, Ultra-Modern & Beautiful) */}
         {currentTab === 'sozlamalar' && (
-          <main className="p-8 flex-1 space-y-6">
+          <main className="p-3 sm:p-5 lg:p-8 flex-1 space-y-4 sm:space-y-6 overflow-y-auto">
             <div className="max-w-5xl mx-auto space-y-6">
               {/* Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

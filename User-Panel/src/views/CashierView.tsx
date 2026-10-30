@@ -7,7 +7,7 @@ import {
   Users, BarChart3, Ticket, AlertCircle, RefreshCw, Check, ArrowRight, ArrowLeft, X,
   ShieldCheck, Volume2, Ban, RotateCcw, MapPin, Building2, Home, Sparkles, Download,
   Filter, Eye, DollarSign, Wallet, Award, Activity, Copy, Hash, CheckSquare, SlidersHorizontal,
-  Stethoscope, Layers, FileSpreadsheet, Tv, Lock, ExternalLink
+  Stethoscope, Layers, FileSpreadsheet, Tv, Lock, ExternalLink, Menu
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { TicketIssuedModal } from '../components/TicketIssuedModal';
@@ -54,6 +54,7 @@ export const CashierView: React.FC = () => {
     }
   });
   const [clinicSettings, setClinicSettings] = useState<any>(null);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
 
@@ -683,25 +684,47 @@ export const CashierView: React.FC = () => {
   }, [allTickets]);
 
   return (
-    <div className="flex min-h-screen bg-[#F0F4F8] select-none font-sans text-[#172B4D]">
-      {/* 1. LEFT DARK SIDEBAR (100% 1:1 with Kassir.png, LARGER ICONS & REAL ROUTING) */}
-      <aside className="w-64 bg-[#0B1528] text-white flex flex-col justify-between flex-shrink-0 z-20 sticky top-0 h-screen border-r border-[#1E293B]">
+    <div className="flex min-h-screen bg-[#F0F4F8] select-none font-sans text-[#172B4D] relative">
+      {/* Mobile Drawer Backdrop */}
+      {mobileDrawerOpen && (
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 md:hidden transition-opacity"
+          onClick={() => setMobileDrawerOpen(false)}
+        />
+      )}
+
+      {/* 1. LEFT DARK SIDEBAR (RESPONSIVE: DRAWER ON MOBILE, FIXED ON DESKTOP) */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 md:static md:z-20 w-72 md:w-64 bg-[#0B1528] text-white flex flex-col justify-between flex-shrink-0 transition-transform duration-300 md:translate-x-0 ${
+          mobileDrawerOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+        } h-full md:h-screen md:sticky md:top-0 border-r border-[#1E293B]`}
+      >
         <div>
           {/* Logo Header */}
-          <div className="p-6 flex items-center gap-3">
-            <div className="w-12 h-12 bg-transparent flex items-center justify-center flex-shrink-0 filter drop-shadow-md overflow-hidden">
-              <img
-                src={clinicSettings?.logo_url || APP_LOGO}
-                alt={clinicSettings?.clinic_name || 'Klinika-admin'}
-                className="w-full h-full object-contain bg-transparent rounded-lg"
-              />
-            </div>
-            <div className="min-w-0">
-              <div className="font-black text-lg tracking-tight leading-tight truncate">
-                {clinicSettings?.clinic_name || 'Klinika-admin'}
+          <div className="p-4 sm:p-6 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-transparent flex items-center justify-center flex-shrink-0 filter drop-shadow-md overflow-hidden">
+                <img
+                  src={clinicSettings?.logo_url || APP_LOGO}
+                  alt={clinicSettings?.clinic_name || 'Klinika-admin'}
+                  className="w-full h-full object-contain bg-transparent rounded-lg"
+                />
               </div>
-              <div className="text-xs text-slate-400 font-medium">Kassir Qabulxonasi</div>
+              <div className="min-w-0">
+                <div className="font-black text-base sm:text-lg tracking-tight leading-tight truncate">
+                  {clinicSettings?.clinic_name || 'Klinika-admin'}
+                </div>
+                <div className="text-xs text-slate-400 font-medium">Kassir Qabulxonasi</div>
+              </div>
             </div>
+            {/* Mobile close button */}
+            <button
+              onClick={() => setMobileDrawerOpen(false)}
+              className="md:hidden p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer"
+              title="Yopish"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Navigation Items with LARGE ICONS & REAL ROUTING */}
@@ -713,6 +736,7 @@ export const CashierView: React.FC = () => {
                 <button
                   key={item.id}
                   onClick={() => {
+                    setMobileDrawerOpen(false);
                     if (item.id === 'yangi-bemor') {
                       setSearchParams({});
                     } else {
@@ -735,18 +759,26 @@ export const CashierView: React.FC = () => {
       </aside>
 
       {/* 2. MAIN WORKSPACE */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* TOP HEADER BAR (100% 1:1 with Kassir.png) */}
-        <header className="h-20 bg-white border-b border-slate-200/80 px-8 flex items-center justify-between sticky top-0 z-10 shadow-xs">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-blue-50 text-[#1677FF] flex items-center justify-center">
-              <User className="w-6 h-6 stroke-[2.2]" />
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* TOP HEADER BAR (RESPONSIVE) */}
+        <header className="min-h-16 py-2 sm:h-20 bg-white border-b border-slate-200/80 px-3 sm:px-8 flex items-center justify-between sticky top-0 z-10 shadow-xs gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+            <button
+              onClick={() => setMobileDrawerOpen(prev => !prev)}
+              className="md:hidden p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition cursor-pointer flex-shrink-0"
+              title="Menyu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-blue-50 text-[#1677FF] flex items-center justify-center flex-shrink-0">
+              <User className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.2]" />
             </div>
-            <div>
-              <h1 className="text-xl font-black text-[#172B4D] tracking-tight">
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-xl font-black text-[#172B4D] tracking-tight truncate max-w-[130px] sm:max-w-xs md:max-w-none">
                 {clinicSettings?.clinic_name || 'Klinika-admin'}
               </h1>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-[11px] sm:text-xs text-slate-500 font-medium hidden xs:block truncate">
                 {currentTab === 'yangi-bemor' && "Bemor ma'lumotlarini kiriting va talon bering"}
                 {currentTab === 'talonlar' && "Klinikada berilgan barcha talonlar va ularning holati"}
                 {currentTab === 'tolovlar' && "Kassa to'lovlari va moliyaviy tranzaksiyalar jurnali"}
@@ -757,18 +789,18 @@ export const CashierView: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2.5 sm:gap-6 flex-shrink-0">
             <div className="text-right">
-              <div className="text-xs text-slate-500 font-medium">{dateStr}</div>
-              <div className="text-2xl font-black text-[#172B4D] tracking-tight font-mono">{time}</div>
+              <div className="text-[10px] sm:text-xs text-slate-500 font-medium hidden sm:block">{dateStr}</div>
+              <div className="text-lg sm:text-2xl font-black text-[#172B4D] tracking-tight font-mono">{time}</div>
             </div>
 
-            <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-sm">
+            <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-slate-200">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-sm flex-shrink-0">
                 {getUserInitials(currentUser?.fullName || currentUser?.name || 'Kassir')}
               </div>
-              <div>
-                <span className="text-xs font-bold text-[#172B4D] block truncate max-w-[150px]">
+              <div className="hidden sm:block">
+                <span className="text-xs font-bold text-[#172B4D] block truncate max-w-[120px]">
                   {currentUser?.fullName || currentUser?.name || 'Kassir'}
                 </span>
                 <span className={`text-[10px] font-bold ${currentShift ? 'text-emerald-600' : 'text-slate-400'}`}>
@@ -778,7 +810,7 @@ export const CashierView: React.FC = () => {
               <button
                 onClick={handleLogout}
                 title="Tizimdan chiqish"
-                className="w-9 h-9 rounded-xl hover:bg-red-50 text-red-500 flex items-center justify-center transition ml-2 border border-transparent hover:border-red-200 cursor-pointer"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl hover:bg-red-50 text-red-500 flex items-center justify-center transition sm:ml-2 border border-transparent hover:border-red-200 cursor-pointer flex-shrink-0"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -788,9 +820,9 @@ export const CashierView: React.FC = () => {
 
         {/* 3. CONTENT AREA ROUTING */}
 
-        {/* TAB 1: YANGI BEMOR (100% 1:1 WITH Kassir.png, 100% REAL POSTGRESQL DATA) */}
+        {/* TAB 1: YANGI BEMOR (RESPONSIVE) */}
         {currentTab === 'yangi-bemor' && (
-          <main className="p-8 grid grid-cols-12 gap-6 flex-1">            {/* LEFT 2 COLUMNS (Col 1-8): STEP-BY-STEP SEQUENTIAL WIZARD */}
+          <main className="p-3 sm:p-5 lg:p-8 grid grid-cols-12 gap-4 sm:gap-6 flex-1 overflow-y-auto">            {/* LEFT 2 COLUMNS (Col 1-8): STEP-BY-STEP SEQUENTIAL WIZARD */}
             <div className="col-span-12 xl:col-span-8 space-y-6">
 
               {/* STEP PROGRESS NAVIGATION BAR */}
@@ -1531,7 +1563,7 @@ export const CashierView: React.FC = () => {
 
         {/* TAB 2: TALONLAR TARIXI (100% REAL FROM POSTGRESQL queue_tickets) */}
         {currentTab === 'talonlar' && (
-          <main className="p-8 flex-1 space-y-6">
+          <main className="p-3 sm:p-5 lg:p-8 flex-1 space-y-4 sm:space-y-6 overflow-y-auto">
             {/* Top Stat Cards */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center justify-between">
@@ -1827,7 +1859,7 @@ export const CashierView: React.FC = () => {
 
         {/* TAB 3: TO'LOVLAR JURNALI (100% REAL FROM POSTGRESQL payments) */}
         {currentTab === 'tolovlar' && (
-          <main className="p-8 flex-1 space-y-6">
+          <main className="p-3 sm:p-5 lg:p-8 flex-1 space-y-4 sm:space-y-6 overflow-y-auto">
             {/* Top Revenue Summary Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center justify-between">
@@ -2072,7 +2104,7 @@ export const CashierView: React.FC = () => {
 
         {/* TAB 4: BEMORLAR BAZASI (100% REAL FROM POSTGRESQL patients) */}
         {currentTab === 'bemorlar' && (
-          <main className="p-8 flex-1 space-y-6">
+          <main className="p-3 sm:p-5 lg:p-8 flex-1 space-y-4 sm:space-y-6 overflow-y-auto">
             {/* Top Stat Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center justify-between">
@@ -2333,7 +2365,7 @@ export const CashierView: React.FC = () => {
 
         {/* TAB 5: HISOBOTLAR (100% REAL FROM POSTGRESQL) */}
         {currentTab === 'hisobotlar' && (
-          <main className="p-8 flex-1 space-y-6">
+          <main className="p-3 sm:p-5 lg:p-8 flex-1 space-y-4 sm:space-y-6 overflow-y-auto">
             {/* Shift Status Banner */}
             <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 rounded-3xl p-6 text-white shadow-md relative overflow-hidden">
               <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -2497,7 +2529,7 @@ export const CashierView: React.FC = () => {
 
         {/* TAB 6: SOZLAMALAR - TV TABLO TESTI VA KASSIR PROFILI */}
         {currentTab === 'sozlamalar' && (
-          <main className="p-8 flex-1 space-y-6">
+          <main className="p-3 sm:p-5 lg:p-8 flex-1 space-y-4 sm:space-y-6 overflow-y-auto">
             <div className="max-w-4xl mx-auto space-y-6">
               
               {/* Centered Sozlamalar Navigation Menu */}
