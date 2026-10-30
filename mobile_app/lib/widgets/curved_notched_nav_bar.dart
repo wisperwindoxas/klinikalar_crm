@@ -13,7 +13,7 @@ class CurvedNotchedNavItem {
   });
 }
 
-class CurvedNotchedNavBar extends StatefulWidget {
+class CurvedNotchedNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
   final List<CurvedNotchedNavItem> items;
@@ -28,194 +28,154 @@ class CurvedNotchedNavBar extends StatefulWidget {
     required this.onTap,
     required this.items,
     this.selectedColor = AppColors.primary,
-    this.unselectedColor = const Color(0xFF94A3B8),
+    this.unselectedColor = const Color(0xFF64748B),
     this.backgroundColor = Colors.white,
     this.height = 68.0,
   });
 
   @override
-  State<CurvedNotchedNavBar> createState() => _CurvedNotchedNavBarState();
-}
-
-class _CurvedNotchedNavBarState extends State<CurvedNotchedNavBar>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-  double _currentFraction = 0.5;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentFraction = _indexToFraction(widget.currentIndex);
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 320),
-    );
-    _animation = Tween<double>(
-      begin: _currentFraction,
-      end: _currentFraction,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOutCubic,
-    ));
-  }
-
-  double _indexToFraction(int index) {
-    if (widget.items.isEmpty) return 0.5;
-    return (index + 0.5) / widget.items.length;
-  }
-
-  @override
-  void didUpdateWidget(CurvedNotchedNavBar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.currentIndex != widget.currentIndex) {
-      final newFraction = _indexToFraction(widget.currentIndex);
-      _animation = Tween<double>(
-        begin: _animation.value,
-        end: newFraction,
-      ).animate(CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeInOutCubic,
-      ));
-      _controller.forward(from: 0.0);
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    final totalHeight = widget.height + bottomPadding;
+    final totalHeight = height + bottomPadding;
+    final centerIndex = items.length ~/ 2;
 
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            final notchCenter = width * _animation.value;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final notchCenter = width * 0.5; // Always dead-center for balanced symmetry
+        final centerItem = items[centerIndex];
+        final isCenterSelected = currentIndex == centerIndex;
 
-            return SizedBox(
-              width: width,
-              height: totalHeight + 18, // extra room for the elevated floating circle
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.bottomCenter,
-                children: [
-                  // 1. Notched Custom Painter Background Bar
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    height: totalHeight,
-                    child: CustomPaint(
-                      painter: _CurvedNotchPainter(
-                        notchCenter: notchCenter,
-                        backgroundColor: widget.backgroundColor,
-                        notchRadius: 29.0,
-                        notchDepth: 20.0,
-                        notchSmoothWidth: 42.0,
-                        cornerRadius: 24.0,
-                      ),
-                    ),
+        return SizedBox(
+          width: width,
+          height: totalHeight + 18, // extra room for elevated floating button
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.bottomCenter,
+            children: [
+              // 1. Notched Custom Painter Background Bar
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: totalHeight,
+                child: CustomPaint(
+                  painter: _CurvedNotchPainter(
+                    notchCenter: notchCenter,
+                    backgroundColor: backgroundColor,
+                    notchDepth: 22.0,
+                    notchSmoothWidth: 44.0,
+                    cornerRadius: 24.0,
                   ),
+                ),
+              ),
 
-                  // 2. Tab Items (Icons & Labels)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: bottomPadding,
-                    height: widget.height,
-                    child: Row(
-                      children: List.generate(widget.items.length, (index) {
-                        final item = widget.items[index];
-                        final isSelected = index == widget.currentIndex;
+              // 2. Tab Items Row (Side items + Center Label)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: bottomPadding,
+                height: height,
+                child: Row(
+                  children: List.generate(items.length, (index) {
+                    final item = items[index];
+                    final isSelected = index == currentIndex;
 
-                        return Expanded(
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () => widget.onTap(index),
-                            child: SizedBox(
-                              height: widget.height,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  // Inactive Icon slot (when selected, icon is inside the floating circle)
-                                  if (!isSelected)
-                                    Padding(
-                                      padding: const EdgeInsets.only(bottom: 4.0),
-                                      child: Icon(
-                                        item.icon,
-                                        size: 24,
-                                        color: widget.unselectedColor,
-                                      ),
-                                    )
-                                  else
-                                    const SizedBox(height: 28), // spacer under the floating circle
-
-                                  // Label
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 10.0),
-                                    child: Text(
-                                      item.label,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                        color: isSelected ? widget.selectedColor : const Color(0xFF64748B),
-                                        letterSpacing: -0.2,
-                                      ),
-                                    ),
+                    if (index == centerIndex) {
+                      // Center item space: only show label at bottom, icon is in floating circle
+                      return Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => onTap(index),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: Text(
+                                  item.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: isCenterSelected ? FontWeight.w700 : FontWeight.w600,
+                                    color: isCenterSelected ? selectedColor : const Color(0xFF64748B),
+                                    letterSpacing: -0.2,
                                   ),
-                                ],
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                        );
-                      }),
-                    ),
-                  ),
+                        ),
+                      );
+                    }
 
-                  // 3. Floating Elevated Green Circle
-                  Positioned(
-                    left: notchCenter - 27.0,
-                    bottom: totalHeight - 39.0, // floats ~16dp above the top edge
-                    child: GestureDetector(
-                      onTap: () => widget.onTap(widget.currentIndex),
-                      child: Container(
-                        width: 54,
-                        height: 54,
-                        decoration: BoxDecoration(
-                          color: widget.selectedColor,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: widget.selectedColor.withValues(alpha: 0.35),
-                              blurRadius: 12,
-                              offset: const Offset(0, 5),
+                    // Regular side items
+                    return Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => onTap(index),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(height: 6),
+                            Icon(
+                              item.icon,
+                              size: 24,
+                              color: isSelected ? selectedColor : unselectedColor,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              item.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                color: isSelected ? selectedColor : const Color(0xFF64748B),
+                                letterSpacing: -0.2,
+                              ),
                             ),
                           ],
                         ),
-                        child: Center(
-                          child: Icon(
-                            widget.items[widget.currentIndex].icon,
-                            color: Colors.white,
-                            size: 27,
-                          ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+
+              // 3. Floating Elevated Center Circle
+              Positioned(
+                left: notchCenter - 27.0,
+                bottom: totalHeight - 38.0, // floats ~16dp above the top edge
+                child: GestureDetector(
+                  onTap: () => onTap(centerIndex),
+                  child: Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      color: selectedColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: selectedColor.withValues(alpha: isCenterSelected ? 0.38 : 0.25),
+                          blurRadius: isCenterSelected ? 12 : 8,
+                          offset: const Offset(0, 4),
                         ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Icon(
+                        centerItem.icon,
+                        color: Colors.white,
+                        size: 27,
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
-            );
-          },
+            ],
+          ),
         );
       },
     );
@@ -225,7 +185,6 @@ class _CurvedNotchedNavBarState extends State<CurvedNotchedNavBar>
 class _CurvedNotchPainter extends CustomPainter {
   final double notchCenter;
   final Color backgroundColor;
-  final double notchRadius;
   final double notchDepth;
   final double notchSmoothWidth;
   final double cornerRadius;
@@ -233,7 +192,6 @@ class _CurvedNotchPainter extends CustomPainter {
   _CurvedNotchPainter({
     required this.notchCenter,
     required this.backgroundColor,
-    required this.notchRadius,
     required this.notchDepth,
     required this.notchSmoothWidth,
     required this.cornerRadius,
@@ -247,7 +205,7 @@ class _CurvedNotchPainter extends CustomPainter {
 
     final shadowPaint = Paint()
       ..color = Colors.black.withValues(alpha: 0.06)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
 
     final path = Path();
 
@@ -256,8 +214,8 @@ class _CurvedNotchPainter extends CustomPainter {
     path.quadraticBezierTo(0, 0, cornerRadius, 0);
 
     // Left flat top edge before notch
-    final startNotch = (notchCenter - notchSmoothWidth).clamp(cornerRadius, size.width - cornerRadius);
-    final endNotch = (notchCenter + notchSmoothWidth).clamp(cornerRadius, size.width - cornerRadius);
+    final startNotch = notchCenter - notchSmoothWidth;
+    final endNotch = notchCenter + notchSmoothWidth;
 
     path.lineTo(startNotch, 0);
 
@@ -292,7 +250,7 @@ class _CurvedNotchPainter extends CustomPainter {
 
     // Draw shadow first
     canvas.save();
-    canvas.translate(0, -2);
+    canvas.translate(0, -3);
     canvas.drawPath(path, shadowPaint);
     canvas.restore();
 
