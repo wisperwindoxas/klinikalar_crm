@@ -226,31 +226,36 @@ apiRouter.get('/app/latest-release', (req, res) => {
   res.json({
     success: true,
     data: {
-      tag_name: 'v1.0.1',
-      name: 'Klinika-admin v1.0.1',
-      body: "• Kiberxavfsizlik to'liq mustahkamlandi (OWASP, SQLi, Backdoor bartaraf etildi)\n• Talon qog'oz o'lchami almashtirishdagi qotish (lag) bartaraf etildi\n• TV tablo va ovozli chaqiruv barqarorlashtirildi\n• macOS va Windows uchun yangi o'rnatuvchi paketlar",
+      tag_name: 'v1.0.2',
+      name: 'Klinika-admin v1.0.2',
+      body: "• ManagerView to'liq modullashtirildi (tabs & modals)\n• Bemorlar, Hisobotlar va To'lovlar sahifalariga yangi sana oralig'i filtri (Bugun, Kecha, 1 hafta, 1 oy) qo'shildi\n• Login sahifasida telefon raqamini o'chirishda +998 prefiksi o'chmaydigan qilindi\n• Mobil ilovada zamonaviy qavariq (Curved Notched) navigatsiya paneli joriy qilindi\n• macOS, Windows va Android o'rnatuvchi paketlar yangilandi",
       published_at: new Date().toISOString(),
-      html_url: 'https://github.com/wisperwindoxas/klinikalar_crm/releases/tag/v1.0.1',
+      html_url: 'https://github.com/wisperwindoxas/klinikalar_crm/releases/tag/v1.0.2',
       assets: [
         {
-          name: 'Klinika-admin-1.0.1.dmg',
-          browser_download_url: `${baseUrl}/app/download/Klinika-admin-1.0.1.dmg`,
+          name: 'Klinika-admin-1.0.2.dmg',
+          browser_download_url: `${baseUrl}/app/download/Klinika-admin-1.0.2.dmg`,
           size: 113622259
         },
         {
-          name: 'Klinika-admin Setup 1.0.1.exe',
-          browser_download_url: `${baseUrl}/app/download/Klinika-admin%20Setup%201.0.1.exe`,
+          name: 'Klinika-admin Setup 1.0.2.exe',
+          browser_download_url: `${baseUrl}/app/download/Klinika-admin%20Setup%201.0.2.exe`,
           size: 94102295
         },
         {
-          name: 'Klinika-admin-1.0.1-mac.zip',
-          browser_download_url: `${baseUrl}/app/download/Klinika-admin-1.0.1-mac.zip`,
+          name: 'Klinika-admin-1.0.2-mac.zip',
+          browser_download_url: `${baseUrl}/app/download/Klinika-admin-1.0.2-mac.zip`,
           size: 108843437
         },
         {
-          name: 'Klinika-admin-1.0.1-win.zip',
-          browser_download_url: `${baseUrl}/app/download/Klinika-admin-1.0.1-win.zip`,
+          name: 'Klinika-admin-1.0.2-win.zip',
+          browser_download_url: `${baseUrl}/app/download/Klinika-admin-1.0.2-win.zip`,
           size: 119411433
+        },
+        {
+          name: 'Sadaf-Klinika-Mobile-1.0.2.apk',
+          browser_download_url: `${baseUrl}/app/download/Sadaf-Klinika-Mobile-1.0.2.apk`,
+          size: 59768832
         }
       ]
     }
