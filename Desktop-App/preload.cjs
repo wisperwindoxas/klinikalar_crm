@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // GitHub Updates & Installer downloader
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   downloadUpdate: (options) => ipcRenderer.invoke('download-update', options),
+  installUpdate: (filePath) => ipcRenderer.invoke('install-update', filePath),
   onUpdateDownloadProgress: (callback) => {
     const handler = (_event, percent) => callback(percent);
     ipcRenderer.on('update-download-progress', handler);

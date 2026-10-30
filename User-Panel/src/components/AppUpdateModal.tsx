@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Download, RefreshCw, CheckCircle2, AlertCircle, ExternalLink,
-  Sparkles, X, ShieldCheck, ArrowRight, Tag, Calendar, FileText
+  Sparkles, X, ShieldCheck, ArrowRight, Tag, Calendar, FileText, Play, Rocket
 } from 'lucide-react';
 import { APP_VERSION, GITHUB_REPO } from '../utils/brand';
 
@@ -51,12 +51,16 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({ isOpen, onClose,
   const [hasUpdate, setHasUpdate] = useState<boolean | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
+  const [downloadedFilePath, setDownloadedFilePath] = useState<string | null>(null);
+  const [isInstalling, setIsInstalling] = useState(false);
 
   const checkUpdates = async () => {
     setLoading(true);
     setError(null);
     setDownloadProgress(null);
     setDownloadSuccess(null);
+    setDownloadedFilePath(null);
+    setIsInstalling(false);
 
     try {
       let data: GithubRelease | null = null;
@@ -138,7 +142,7 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({ isOpen, onClose,
 
   const relevantAsset = getRelevantAsset();
 
-  const handleDownloadAndInstall = async () => {
+  const handleDownload = async () => {
     if (!relevantAsset) {
       if (release?.html_url) {
         window.open(release.html_url, '_blank');
@@ -163,17 +167,52 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({ isOpen, onClose,
 
         if (res?.success) {
           setDownloadProgress(100);
-          setDownloadSuccess(res.filePath || "Fayl muvaffaqiyatli yuklab olindi");
+          setDownloadedFilePath(res.filePath);
+          setDownloadSuccess(res.fileName || "Fayl muvaffaqiyatli yuklab olindi");
         } else {
           throw new Error(res?.message || 'Yuklab olishda xatolik yuz berdi');
         }
       } catch (e: any) {
-        console.error('Desktop download error, fallback to browser:', e);
-        window.open(relevantAsset.browser_download_url, '_blank');
+        console.error('Desktop download error, fallback to browser link:', e);
+        // Fallback: direct download via browser anchor tag
+        const a = document.createElement('a');
+        a.href = relevantAsset.browser_download_url;
+        a.download = relevantAsset.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setDownloadSuccess("Fayl brauzer yuklamalariga uzatildi.");
+        setDownloadProgress(100);
       }
     } else {
-      // Browser fallback
-      window.open(relevantAsset.browser_download_url, '_blank');
+      // Browser environment: trigger direct download
+      const a = document.createElement('a');
+      a.href = relevantAsset.browser_download_url;
+      a.download = relevantAsset.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setDownloadSuccess("Fayl brauzer yuklamalariga yuborildi. Yuklab olish tugagach, uni ishga tushiring.");
+      setDownloadProgress(100);
+    }
+  };
+
+  const handleInstallNow = async () => {
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI && typeof electronAPI.installUpdate === 'function' && downloadedFilePath) {
+      setIsInstalling(true);
+      try {
+        await electronAPI.installUpdate(downloadedFilePath);
+      } catch (err: any) {
+        console.error('Install error:', err);
+        setError("O'rnatishda xatolik: " + (err?.message || 'Noma\'lum xatolik'));
+        setIsInstalling(false);
+      }
+    } else {
+      // Browser or no path: open downloaded asset directly
+      if (relevantAsset) {
+        window.open(relevantAsset.browser_download_url, '_blank');
+      }
     }
   };
 
@@ -238,7 +277,7 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({ isOpen, onClose,
                 </p>
               </div>
               <div className="w-full pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                <span>Manba: GitHub Releases</span>
+                <span>Manba: Rasmiy GitHub Releases</span>
                 <button
                   onClick={checkUpdates}
                   className="text-medical-blue hover:underline font-bold flex items-center gap-1 cursor-pointer"
@@ -280,16 +319,16 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({ isOpen, onClose,
                   <FileText className="w-3.5 h-3.5 text-medical-blue" />
                   O'zgarishlar va Yangiliklar
                 </label>
-                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 max-h-40 overflow-y-auto whitespace-pre-wrap leading-relaxed font-sans">
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 max-h-36 overflow-y-auto whitespace-pre-wrap leading-relaxed font-sans">
                   {release.body || "Yangi imkoniyatlar qo'shildi va tizim barqarorligi oshirildi."}
                 </div>
               </div>
 
-              {/* Progress or Download Status */}
+              {/* Progress Bar & Installation Prompt */}
               {downloadProgress !== null && (
-                <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 space-y-2">
+                <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 space-y-3">
                   <div className="flex items-center justify-between text-xs font-bold text-blue-900">
-                    <span>{downloadProgress === 100 ? "O'rnatishga tayyor!" : "Yuklab olinmoqda..."}</span>
+                    <span>{downloadProgress === 100 ? "Yuklab olish yakunlandi!" : "Yuklab olinmoqda..."}</span>
                     <span>{downloadProgress}%</span>
                   </div>
                   <div className="w-full bg-blue-200/60 rounded-full h-2.5 overflow-hidden">
@@ -298,10 +337,17 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({ isOpen, onClose,
                       style={{ width: `${downloadProgress}%` }}
                     />
                   </div>
-                  {downloadSuccess && (
-                    <p className="text-[11px] text-emerald-700 font-semibold pt-1">
-                      ✓ Fayl yuklandi: {downloadSuccess}
-                    </p>
+
+                  {downloadProgress === 100 && (
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 space-y-1 animate-fade-in">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                        <span className="text-xs font-black">Yangilanish o'rnatishga tayyor!</span>
+                      </div>
+                      <p className="text-[11px] text-emerald-700 leading-snug">
+                        Fayl muvaffaqiyatli saqlandi: <b>{downloadSuccess}</b>. Hozir o'rnatish oynasiga o'tishni xohlaysizmi?
+                      </p>
+                    </div>
                   )}
                 </div>
               )}
@@ -315,7 +361,7 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({ isOpen, onClose,
             onClick={onClose}
             className="px-5 py-2.5 rounded-2xl border border-slate-300 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
           >
-            Yopish
+            {downloadProgress === 100 ? 'Keyinroq' : 'Yopish'}
           </button>
 
           <div className="flex items-center gap-2">
@@ -332,18 +378,31 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({ isOpen, onClose,
               </a>
             )}
 
-            {hasUpdate && (
+            {hasUpdate && downloadProgress !== 100 && (
               <button
-                onClick={handleDownloadAndInstall}
+                onClick={handleDownload}
                 disabled={downloadProgress !== null && downloadProgress < 100}
                 className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-medical-blue to-teal-600 hover:opacity-95 text-white font-black text-xs transition shadow-lg shadow-medical-blue/20 flex items-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
               >
                 <Download className="w-4 h-4" />
                 <span>
-                  {relevantAsset
-                    ? `${relevantAsset.name.endsWith('.dmg') ? 'macOS DMG' : relevantAsset.name.endsWith('.exe') ? 'Windows EXE' : 'Faylni'} Yuklab olish`
-                    : 'Yangilashni olish'}
+                  {downloadProgress !== null
+                    ? `${downloadProgress}% Yuklanmoqda...`
+                    : relevantAsset
+                      ? `${relevantAsset.name.endsWith('.dmg') ? 'macOS DMG' : relevantAsset.name.endsWith('.exe') ? 'Windows EXE' : 'Faylni'} Yuklab olish`
+                      : 'Yangilashni olish'}
                 </span>
+              </button>
+            )}
+
+            {downloadProgress === 100 && (
+              <button
+                onClick={handleInstallNow}
+                disabled={isInstalling}
+                className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white font-black text-xs transition shadow-lg shadow-emerald-600/25 flex items-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer animate-pulse"
+              >
+                <Rocket className="w-4 h-4" />
+                <span>{isInstalling ? "O'rnatuvchi ochilmoqda..." : "Hoziroq O'rnatish"}</span>
               </button>
             )}
           </div>

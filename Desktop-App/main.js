@@ -497,99 +497,91 @@ ipcMain.handle('download-update', async (event, { url, fileName }) => {
     return { success: false, message: `Ruxsat etilmagan fayl turi: ${ext}` };
   }
 
-  return new Promise((resolve) => {
-    try {
-      const downloadDir = app.getPath('downloads');
-      const targetPath = path.join(downloadDir, safeFileName);
+  const downloadDir = app.getPath('downloads');
+  const targetPath = path.join(downloadDir, safeFileName);
 
-      const file = fs.createWriteStream(targetPath);
+  try {
+    event.sender.send('update-download-progress', 5);
 
-      const downloadWithRedirect = (currentUrl, redirectCount = 0) => {
-        if (redirectCount > 5) {
-          file.close();
-          fs.unlink(targetPath, () => { });
-          return resolve({ success: false, message: "Juda ko'p redirect amalga oshirildi." });
-        }
+    const response = await fetch(url, {
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Klinika-Admin-Updater/1.0.1'
+      }
+    });
 
-        let curParsed;
-        try {
-          curParsed = new URL(currentUrl);
-        } catch (_) {
-          file.close();
-          fs.unlink(targetPath, () => { });
-          return resolve({ success: false, message: "Noto'g'ri yo'naltirilgan URL" });
-        }
-
-        // Validate redirect host
-        const isAllowedRedirect = (
-          (curParsed.protocol === 'https:' && (
-            curParsed.hostname === 'github.com' ||
-            curParsed.hostname.endsWith('.github.com') ||
-            curParsed.hostname === 'github-releases.githubusercontent.com' ||
-            curParsed.hostname === 'objects.githubusercontent.com' ||
-            curParsed.hostname.endsWith('.githubusercontent.com') ||
-            curParsed.hostname.endsWith('.amazonaws.com') ||
-            curParsed.hostname.endsWith('.blob.core.windows.net')
-          )) ||
-          ((curParsed.protocol === 'http:' || curParsed.protocol === 'https:') && (
-            curParsed.hostname === 'localhost' ||
-            curParsed.hostname === '127.0.0.1' ||
-            curParsed.hostname.startsWith('192.168.') ||
-            curParsed.hostname.startsWith('10.')
-          ))
-        );
-
-        if (!isAllowedRedirect) {
-          file.close();
-          fs.unlink(targetPath, () => { });
-          return resolve({ success: false, message: "Xavfsiz bo'lmagan manzilga yo'naltirish rad etildi." });
-        }
-
-        const clientLib = curParsed.protocol === 'http:' ? http : https;
-        clientLib.get(currentUrl, (response) => {
-          // Handle HTTP redirect (GitHub release assets redirect to AWS S3)
-          if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-            return downloadWithRedirect(response.headers.location, redirectCount + 1);
-          }
-
-          if (response.statusCode !== 200) {
-            file.close();
-            fs.unlink(targetPath, () => { });
-            return resolve({ success: false, message: `Server xatosi: HTTP ${response.statusCode}` });
-          }
-
-          const totalBytes = parseInt(response.headers['content-length'] || '0', 10);
-          let receivedBytes = 0;
-
-          response.on('data', (chunk) => {
-            receivedBytes += chunk.length;
-            if (totalBytes > 0) {
-              const percent = Math.round((receivedBytes / totalBytes) * 100);
-              event.sender.send('update-download-progress', percent);
-            }
-          });
-
-          response.pipe(file);
-
-          file.on('finish', () => {
-            file.close(() => {
-              // Open directory or trigger installer safely
-              try {
-                shell.openPath(targetPath);
-              } catch (e) { }
-              resolve({ success: true, filePath: targetPath });
-            });
-          });
-        }).on('error', (err) => {
-          file.close();
-          fs.unlink(targetPath, () => { });
-          resolve({ success: false, message: err.message });
-        });
-      };
-
-      downloadWithRedirect(url);
-    } catch (e) {
-      resolve({ success: false, message: e.message });
+    if (!response.ok) {
+      throw new Error(`Server xatosi: HTTP ${response.status}`);
     }
-  });
+
+    const totalBytes = parseInt(response.headers.get('content-length') || '0', 10);
+    let receivedBytes = 0;
+
+    const fileStream = fs.createWriteStream(targetPath);
+    const reader = response.body.getReader();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      receivedBytes += value.length;
+      fileStream.write(Buffer.from(value));
+
+      if (totalBytes > 0) {
+        const percent = Math.min(99, Math.round((receivedBytes / totalBytes) * 100));
+        event.sender.send('update-download-progress', percent);
+      }
+    }
+
+    await new Promise((resolve) => fileStream.end(resolve));
+
+    event.sender.send('update-download-progress', 100);
+
+    return {
+      success: true,
+      filePath: targetPath,
+      fileName: safeFileName,
+      fileSize: receivedBytes
+    };
+  } catch (err) {
+    console.error('Download update error:', err);
+    try {
+      if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
+    } catch (_) { }
+    return { success: false, message: err?.message || "Yuklab olishda xatolik yuz berdi" };
+  }
+});
+
+ipcMain.handle('install-update', async (_event, filePath) => {
+  if (!filePath || !fs.existsSync(filePath)) {
+    return { success: false, message: "O'rnatuvchi fayl topilmadi" };
+  }
+
+  try {
+    const ext = path.extname(filePath).toLowerCase();
+
+    if (process.platform === 'win32') {
+      const { spawn } = require('child_process');
+      const child = spawn(filePath, [], {
+        detached: true,
+        stdio: 'ignore'
+      });
+      child.unref();
+
+      setTimeout(() => {
+        app.quit();
+      }, 1200);
+
+      return { success: true, message: "Windows o'rnatuvchisi ishga tushirildi. Dastur yangilanmoqda..." };
+    } else if (process.platform === 'darwin') {
+      await shell.openPath(filePath);
+      return { success: true, message: "macOS o'rnatish oynasi ochildi" };
+    } else {
+      await shell.openPath(filePath);
+      return { success: true, message: "O'rnatuvchi ochildi" };
+    }
+  } catch (err) {
+    console.error('Install update error:', err);
+    return { success: false, message: err?.message || "O'rnatishda xatolik yuz berdi" };
+  }
 });
