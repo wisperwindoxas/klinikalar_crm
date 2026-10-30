@@ -9,7 +9,7 @@ const fs = require('fs');
 const http = require('http');
 const https = require('https');
 
-app.setName('Klinika-admin');
+app.setName('Klinika-Offline');
 
 let mainWindow = null;
 let tvWindow = null;

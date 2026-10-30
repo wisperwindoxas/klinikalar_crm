@@ -58,6 +58,11 @@ dist/
 build/
 **/build/
 !Desktop-App/build/
+!Offline-Edition/Desktop-App/build/
+release/
+**/release/
+clinic_offline_pgdata/
+**/clinic_offline_pgdata/
 .next/
 out/
 .turbo/

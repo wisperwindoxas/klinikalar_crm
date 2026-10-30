@@ -73,3 +73,4 @@ npm run build:mac
 ```
 
 Yig‘ilgan tayyor fayllar `Offline-Edition/Desktop-App/release/` jildida hosil bo‘ladi va uni mijozga fleshkada yoki telegram orqali topshirishingiz mumkin.
+
