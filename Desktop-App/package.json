@@ -1,6 +1,6 @@
 {
   "name": "klinika-admin",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Klinika-admin — Elektron Navbat va Boshqaruv Tizimi",
   "main": "main.js",
   "repository": {
