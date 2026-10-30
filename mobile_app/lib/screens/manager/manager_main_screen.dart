@@ -10,6 +10,7 @@ import '../../services/auth_service.dart';
 import '../../services/security_service.dart';
 import '../../widgets/responsive_frame.dart';
 import '../../widgets/user_profile_sheet.dart';
+import '../../widgets/curved_notched_nav_bar.dart';
 import '../auth/login_screen.dart';
 import '../auth/pin_setup_sheet.dart';
 import 'manager_doctor_sheet.dart';
@@ -1596,27 +1597,17 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
   }
 
   Widget _buildBottomNav() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.border, width: 1)),
-      ),
-      child: BottomNavigationBar(
-        currentIndex: _currentTabIndex,
-        onTap: (index) => setState(() => _currentTabIndex = index),
-        backgroundColor: Colors.white,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.textMuted,
-        type: BottomNavigationBarType.fixed,
-        elevation: 0,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Boshqaruv'),
-          BottomNavigationBarItem(icon: Icon(Icons.format_list_numbered_rounded), label: 'Navbatlar'),
-          BottomNavigationBarItem(icon: Icon(Icons.medical_services_rounded), label: 'Shifokorlar'),
-          BottomNavigationBarItem(icon: Icon(Icons.people_alt_rounded), label: 'Bemorlar'),
-          BottomNavigationBarItem(icon: Icon(Icons.tv_rounded), label: 'TV & Sozlama'),
-        ],
-      ),
+    return CurvedNotchedNavBar(
+      currentIndex: _currentTabIndex,
+      onTap: (index) => setState(() => _currentTabIndex = index),
+      selectedColor: AppColors.primary,
+      items: const [
+        CurvedNotchedNavItem(icon: Icons.grid_view_rounded, label: 'Boshqaruv'),
+        CurvedNotchedNavItem(icon: Icons.receipt_long_rounded, label: 'Navbatlar'),
+        CurvedNotchedNavItem(icon: Icons.medical_services_rounded, label: 'Shifokorlar'),
+        CurvedNotchedNavItem(icon: Icons.people_alt_rounded, label: 'Bemorlar'),
+        CurvedNotchedNavItem(icon: Icons.tv_rounded, label: 'TV & Sozlama'),
+      ],
     );
   }
 }

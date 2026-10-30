@@ -12,6 +12,7 @@ import '../../services/auth_service.dart';
 import '../../widgets/responsive_frame.dart';
 import '../../services/security_service.dart';
 import '../../widgets/user_profile_sheet.dart';
+import '../../widgets/curved_notched_nav_bar.dart';
 import '../auth/login_screen.dart';
 import '../auth/pin_setup_sheet.dart';
 import '../manager/manager_patient_detail_sheet.dart';
@@ -2108,28 +2109,16 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
   }
 
   Widget _buildBottomNav() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.border, width: 1)),
-      ),
-      child: BottomNavigationBar(
-        currentIndex: _currentTabIndex,
-        onTap: (index) => setState(() => _currentTabIndex = index),
-        backgroundColor: Colors.white,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.textMuted,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 11),
-        type: BottomNavigationBarType.fixed,
-        elevation: 0,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Navbatim'),
-          BottomNavigationBarItem(icon: Icon(Icons.people_alt_rounded), label: 'Bemorlar'),
-          BottomNavigationBarItem(icon: Icon(Icons.history_edu_rounded), label: 'Tarix'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profil'),
-        ],
-      ),
+    return CurvedNotchedNavBar(
+      currentIndex: _currentTabIndex,
+      onTap: (index) => setState(() => _currentTabIndex = index),
+      selectedColor: AppColors.primary,
+      items: const [
+        CurvedNotchedNavItem(icon: Icons.grid_view_rounded, label: 'Navbatim'),
+        CurvedNotchedNavItem(icon: Icons.people_alt_rounded, label: 'Bemorlar'),
+        CurvedNotchedNavItem(icon: Icons.history_edu_rounded, label: 'Tarix'),
+        CurvedNotchedNavItem(icon: Icons.person_rounded, label: 'Profil'),
+      ],
     );
   }
 }

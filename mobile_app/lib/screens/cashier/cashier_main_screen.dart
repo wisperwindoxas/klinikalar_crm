@@ -9,6 +9,7 @@ import '../../services/auth_service.dart';
 import '../../widgets/responsive_frame.dart';
 import '../../services/security_service.dart';
 import '../../widgets/user_profile_sheet.dart';
+import '../../widgets/curved_notched_nav_bar.dart';
 import '../auth/login_screen.dart';
 import '../auth/pin_setup_sheet.dart';
 import '../manager/manager_patient_detail_sheet.dart';
@@ -2243,29 +2244,17 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
   }
 
   Widget _buildBottomNav() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.border, width: 1)),
-      ),
-      child: BottomNavigationBar(
-        currentIndex: _currentTabIndex,
-        onTap: (index) => setState(() => _currentTabIndex = index),
-        backgroundColor: Colors.white,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.textMuted,
-        type: BottomNavigationBarType.fixed,
-        elevation: 0,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 11),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Bosh sahifa'),
-          BottomNavigationBarItem(icon: Icon(Icons.receipt_long_rounded), label: 'Talonlar'),
-          BottomNavigationBarItem(icon: Icon(Icons.people_alt_rounded), label: 'Bemorlar'),
-          BottomNavigationBarItem(icon: Icon(Icons.payment_rounded), label: 'To‘lovlar'),
-          BottomNavigationBarItem(icon: Icon(Icons.point_of_sale_rounded), label: 'Smena'),
-        ],
-      ),
+    return CurvedNotchedNavBar(
+      currentIndex: _currentTabIndex,
+      onTap: (index) => setState(() => _currentTabIndex = index),
+      selectedColor: AppColors.primary,
+      items: const [
+        CurvedNotchedNavItem(icon: Icons.grid_view_rounded, label: 'Bosh sahifa'),
+        CurvedNotchedNavItem(icon: Icons.receipt_long_rounded, label: 'Talonlar'),
+        CurvedNotchedNavItem(icon: Icons.people_alt_rounded, label: 'Bemorlar'),
+        CurvedNotchedNavItem(icon: Icons.credit_card_rounded, label: 'To‘lovlar'),
+        CurvedNotchedNavItem(icon: Icons.point_of_sale_rounded, label: 'Smena'),
+      ],
     );
   }
 }
