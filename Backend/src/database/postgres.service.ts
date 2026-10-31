@@ -1496,7 +1496,19 @@ export class PostgresService {
   }
 
   public async deletePatient(id: string) {
-    await this.query('DELETE FROM patients WHERE id = $1', [id]);
+    // 1. Mark archived_at = CURRENT_TIMESTAMP (immediately hides from getPatients)
+    await this.query('UPDATE patients SET archived_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [id]);
+
+    // 2. Unlink references so that hard delete can also succeed
+    try {
+      await this.query('UPDATE appointments SET patient_id = NULL WHERE patient_id = $1', [id]);
+      await this.query('UPDATE queue_tickets SET patient_id = NULL WHERE patient_id = $1', [id]);
+      await this.query('UPDATE payments SET patient_id = NULL WHERE patient_id = $1', [id]);
+      await this.query('DELETE FROM patients WHERE id = $1', [id]);
+    } catch (err) {
+      console.warn('Patient soft-deleted with archived_at due to constraint:', err);
+    }
+
     return { success: true };
   }
 

@@ -1254,11 +1254,16 @@ export const ManagerView: React.FC = () => {
       itemDetails: `Karta: #${patient.patient_number || patient.id?.substring(0, 6)} • Tel: ${patient.phone || '-'}`,
       onConfirm: async () => {
         try {
-          await fetch(`${API_BASE_URL}/patients/${patient.id}`, { method: 'DELETE', headers: getAuthHeaders() });
+          const res = await fetch(`${API_BASE_URL}/patients/${patient.id}`, { method: 'DELETE', headers: getAuthHeaders() });
+          const resData = await res.json().catch(() => ({}));
+          if (!res.ok || resData.success === false) {
+            showNotification('Xatolik', resData.message || 'Bemorni o\'chirishda xatolik yuz berdi', 'error');
+            return;
+          }
           loadManagerData();
           showNotification('Bemor o\'chirildi', `${patient.full_name} bazadan muvaffaqiyatli o'chirildi.`, 'success');
-        } catch (e) {
-          showNotification('Xatolik', 'Bemorni o\'chirishda xatolik yuz berdi', 'error');
+        } catch (e: any) {
+          showNotification('Xatolik', e?.message || 'Bemorni o\'chirishda xatolik yuz berdi', 'error');
         }
       }
     });
