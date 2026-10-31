@@ -1157,7 +1157,7 @@ export class PostgresService {
         await this.query(`
           INSERT INTO cabinets (id, clinic_id, number, name, department, floor, is_active)
           VALUES ($1, $2, $3, $4, $5, $6, true)
-          ON CONFLICT (number) DO NOTHING
+          ON CONFLICT (clinic_id, number) DO NOTHING
         `, [cabId, targetClinicId, data.cabinetNumber, `${data.cabinetNumber}-kabinet`, 'Ambulatoriya', floor]);
         cabinetId = cabId;
       }
@@ -1222,9 +1222,9 @@ export class PostgresService {
         const cabId = `cab_${data.cabinetNumber.replace(/\s+/g, '_')}`;
         const floor = Math.max(1, parseInt(data.cabinetNumber) >= 10 ? Math.floor(parseInt(data.cabinetNumber) / 10) : 1);
         await this.query(`
-          INSERT INTO cabinets (id, number, name, department, floor, is_active)
-          VALUES ($1, $2, $3, $4, $5, true)
-          ON CONFLICT (number) DO NOTHING
+          INSERT INTO cabinets (id, clinic_id, number, name, department, floor, is_active)
+          VALUES ($1, 'tenant_sadaf_01', $2, $3, $4, $5, true)
+          ON CONFLICT (clinic_id, number) DO NOTHING
         `, [cabId, data.cabinetNumber, `${data.cabinetNumber}-kabinet`, 'Ambulatoriya', floor]);
         cabinetId = cabId;
       }
@@ -1305,7 +1305,30 @@ export class PostgresService {
   }
 
   public async deleteDoctor(id: string) {
+    // 1. Get user_id of doctor
+    const docRes = await this.query('SELECT user_id FROM doctors WHERE id = $1', [id]);
+    const userId = docRes.rows[0]?.user_id;
+
+    // 2. Clear current_ticket_id on doctor
+    await this.query('UPDATE doctors SET current_ticket_id = NULL WHERE id = $1', [id]);
+
+    // 3. Unlink from appointments and queue_tickets, delete call events
+    await this.query('UPDATE appointments SET doctor_id = NULL WHERE doctor_id = $1', [id]);
+    await this.query('UPDATE queue_tickets SET doctor_id = NULL WHERE doctor_id = $1', [id]);
+    await this.query('DELETE FROM queue_call_events WHERE doctor_id = $1', [id]);
+
+    // 4. Delete doctor record
     await this.query('DELETE FROM doctors WHERE id = $1', [id]);
+
+    // 5. Delete or deactivate user account
+    if (userId) {
+      try {
+        await this.query('DELETE FROM users WHERE id = $1', [userId]);
+      } catch (_) {
+        await this.query('UPDATE users SET is_active = false WHERE id = $1', [userId]);
+      }
+    }
+
     return { success: true };
   }
 

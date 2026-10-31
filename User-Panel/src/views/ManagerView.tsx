@@ -623,25 +623,31 @@ export const ManagerView: React.FC = () => {
         password: doctorForm.password ? doctorForm.password.trim() : undefined
       };
 
+      let res;
       if (editingDoctorId) {
-        await fetch(`${API_BASE_URL}/doctors/${editingDoctorId}`, {
+        res = await fetch(`${API_BASE_URL}/doctors/${editingDoctorId}`, {
           method: 'PUT',
           headers: getAuthHeaders(),
           body: JSON.stringify(payload)
         });
       } else {
-        await fetch(`${API_BASE_URL}/doctors`, {
+        res = await fetch(`${API_BASE_URL}/doctors`, {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify(payload)
         });
       }
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok || resData.success === false) {
+        showNotification('Xatolik', resData.message || 'Shifokorni saqlashda xatolik yuz berdi', 'error');
+        return;
+      }
       setIsDoctorModalOpen(false);
       setEditingDoctorId(null);
       loadManagerData();
       showNotification('Shifokor saqlandi', `${doctorForm.displayName} ma'lumotlari muvaffaqiyatli saqlandi.`, 'success');
-    } catch (e) {
-      showNotification('Xatolik', 'Shifokorni saqlashda xatolik yuz berdi', 'error');
+    } catch (e: any) {
+      showNotification('Xatolik', e?.message || 'Shifokorni saqlashda xatolik yuz berdi', 'error');
     }
   };
 
@@ -654,11 +660,16 @@ export const ManagerView: React.FC = () => {
       itemDetails: `${doc.specialty_name || 'Umumiy'} • ${doc.cabinet_number || doc.room_number || '-'}-kabinet`,
       onConfirm: async () => {
         try {
-          await fetch(`${API_BASE_URL}/doctors/${doc.id}`, { method: 'DELETE', headers: getAuthHeaders() });
+          const res = await fetch(`${API_BASE_URL}/doctors/${doc.id}`, { method: 'DELETE', headers: getAuthHeaders() });
+          const resData = await res.json().catch(() => ({}));
+          if (!res.ok || resData.success === false) {
+            showNotification('Xatolik', resData.message || 'Shifokorni o\'chirishda xatolik yuz berdi', 'error');
+            return;
+          }
           loadManagerData();
           showNotification('Shifokor o\'chirildi', `${doc.display_name} muvaffaqiyatli o'chirildi.`, 'success');
-        } catch (e) {
-          showNotification('Xatolik', 'Shifokorni o\'chirishda xatolik yuz berdi', 'error');
+        } catch (e: any) {
+          showNotification('Xatolik', e?.message || 'Shifokorni o\'chirishda xatolik yuz berdi', 'error');
         }
       }
     });

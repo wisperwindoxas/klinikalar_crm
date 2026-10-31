@@ -9,6 +9,7 @@ ON CONFLICT (id) DO UPDATE SET clinic_name = EXCLUDED.clinic_name;
 
 -- 2. ROLES
 INSERT INTO roles (id, name, code, description) VALUES
+('role_super_admin', 'Super Administrator', 'SUPER_ADMIN', 'Tizim boshqaruvchisi, barcha klinika va obunalarni nazorat qiladi'),
 ('role_manager', 'Menejer (Administrator)', 'MANAGER', 'Klinika barcha jarayonlarini to''liq boshqarish'),
 ('role_cashier', 'Kassir / Qabulxona', 'CASHIER', 'Bemorlarni ro''yxatga olish, to''lov qabul qilish va talon berish'),
 ('role_doctor', 'Shifokor', 'DOCTOR', 'O''z qabul navbatini boshqarish va chaqirish'),
@@ -17,6 +18,7 @@ ON CONFLICT (code) DO NOTHING;
 
 -- 3. USERS (bcrypt for 'admin123' / 'kassir123' / 'doctor123')
 INSERT INTO users (id, full_name, username, password_hash, role_id, phone, is_active) VALUES
+('usr_super_admin', 'Bosh Administrator', 'superadmin', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_super_admin', '+998 99 000 00 00', true),
 ('usr_manager', 'Azizbek Rahimov (Menejer)', 'admin', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_manager', '+998 90 123 45 67', true),
 ('usr_cashier1', 'Dilnoza Karimova (Kassir)', 'kassir1', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_cashier', '+998 93 555 44 33', true),
 ('usr_cashier2', 'Malika Tursunova (Kassir)', 'kassir2', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_cashier', '+998 93 444 33 22', true)
