@@ -203,13 +203,31 @@ export const DoctorView: React.FC = () => {
 
   // Doctor session & all clinic doctors for switcher
   const [allDoctors, setAllDoctors] = useState<any[]>([]);
-  const [doctorInfo, setDoctorInfo] = useState<any>({
-    id: 'doc_karimova_malika',
-    display_name: 'Dr. Karimova Malika',
-    specialty_name: 'Kardiologiya',
-    cabinet_number: '3',
-    avg_consultation_minutes: 15,
-    phone: '+998 90 123 45 67'
+  const [doctorInfo, setDoctorInfo] = useState<any>(() => {
+    const stored = localStorage.getItem('sadaf_user');
+    if (stored) {
+      try {
+        const u = JSON.parse(stored);
+        if (u.role === 'DOCTOR') {
+          return {
+            id: u.doctorId || u.id,
+            display_name: u.fullName || u.full_name || 'Shifokor',
+            specialty_name: u.specialtyName || u.specialty_name || 'Mutaxassislik',
+            cabinet_number: u.roomNumber || u.room_number || '1',
+            avg_consultation_minutes: 15,
+            phone: u.phone || ''
+          };
+        }
+      } catch (_) {}
+    }
+    return {
+      id: '',
+      display_name: 'Shifokor',
+      specialty_name: 'Klinika',
+      cabinet_number: '1',
+      avg_consultation_minutes: 15,
+      phone: ''
+    };
   });
 
   // Real Database Tickets
@@ -294,7 +312,7 @@ export const DoctorView: React.FC = () => {
 
   const fetchDoctorsCatalog = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/doctors`);
+      const res = await fetch(`${API_BASE_URL}/doctors`, { headers: getAuthHeaders() });
       const json = await res.json();
       if (json.data && Array.isArray(json.data)) {
         setAllDoctors(json.data);
@@ -304,34 +322,25 @@ export const DoctorView: React.FC = () => {
         if (stored) {
           try {
             const u = JSON.parse(stored);
-            if (u.role === 'DOCTOR' && u.doctorId) {
-              const matched = json.data.find((d: any) => d.id === u.doctorId);
+            if (u.role === 'DOCTOR') {
+              const matched = json.data.find((d: any) => 
+                (u.doctorId && d.id === u.doctorId) || 
+                (u.id && d.user_id === u.id) ||
+                (u.fullName && d.display_name === u.fullName)
+              );
               if (matched) {
                 setDoctorInfo({
                   id: matched.id,
                   display_name: matched.display_name,
-                  specialty_name: matched.specialty_name,
-                  cabinet_number: matched.room_number || matched.cabinet_number || '3',
+                  specialty_name: matched.specialty_name || u.specialtyName || 'Shifokor',
+                  cabinet_number: matched.room_number || matched.cabinet_number || u.roomNumber || '1',
                   avg_consultation_minutes: matched.avg_consultation_minutes || 15,
-                  phone: matched.phone
+                  phone: matched.phone || u.phone || ''
                 });
                 return;
               }
             }
           } catch (e) {}
-        }
-
-        // Default to Dr. Karimova Malika if present, or first doctor
-        const defaultDoc = json.data.find((d: any) => d.id === 'doc_karimova_malika') || json.data[0];
-        if (defaultDoc) {
-          setDoctorInfo({
-            id: defaultDoc.id,
-            display_name: defaultDoc.display_name,
-            specialty_name: defaultDoc.specialty_name,
-            cabinet_number: defaultDoc.room_number || defaultDoc.cabinet_number || '3',
-            avg_consultation_minutes: defaultDoc.avg_consultation_minutes || 15,
-            phone: defaultDoc.phone
-          });
         }
       }
     } catch (e) {
@@ -367,7 +376,7 @@ export const DoctorView: React.FC = () => {
   const loadDoctorData = async () => {
     if (!doctorInfo?.id) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/queues/tickets?doctorId=${doctorInfo.id}`);
+      const res = await fetch(`${API_BASE_URL}/queues/tickets?doctorId=${doctorInfo.id}`, { headers: getAuthHeaders() });
       const json = await res.json();
       if (json.data && Array.isArray(json.data)) {
         const allList: any[] = json.data;
@@ -404,7 +413,7 @@ export const DoctorView: React.FC = () => {
     }
     try {
       const currentOffset = isAppend ? patientsList.length : 0;
-      const res = await fetch(`${API_BASE_URL}/patients?limit=15&offset=${currentOffset}${query ? `&search=${encodeURIComponent(query)}` : ''}`);
+      const res = await fetch(`${API_BASE_URL}/patients?limit=15&offset=${currentOffset}${query ? `&search=${encodeURIComponent(query)}` : ''}`, { headers: getAuthHeaders() });
       const json = await res.json();
       if (json.data && Array.isArray(json.data)) {
         if (isAppend) {
@@ -440,7 +449,7 @@ export const DoctorView: React.FC = () => {
     setDoctorVisitsDetail(patient.doctor_visits || []);
     setConsultationNotes(patient.notes || '');
     try {
-      const res = await fetch(`${API_BASE_URL}/patients/${patient.id}`);
+      const res = await fetch(`${API_BASE_URL}/patients/${patient.id}`, { headers: getAuthHeaders() });
       const json = await res.json();
       if (json.data) {
         const pat = json.data.patient || json.data;
@@ -475,7 +484,7 @@ export const DoctorView: React.FC = () => {
     try {
       const res = await fetch(`${API_BASE_URL}/patients/${selectedPatientModal.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ notes: consultationNotes })
       });
       if (res.ok) {
@@ -508,7 +517,7 @@ export const DoctorView: React.FC = () => {
     try {
       const res = await fetch(`${API_BASE_URL}/queues/call-next`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ doctorId: doctorInfo.id })
       });
       const json = await res.json();
@@ -533,7 +542,10 @@ export const DoctorView: React.FC = () => {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE_URL}/queues/tickets/${activeTicket.id}/recall`, { method: 'POST' });
+      const res = await fetch(`${API_BASE_URL}/queues/tickets/${activeTicket.id}/recall`, { 
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
       const json = await res.json();
       if (res.ok) {
         showToast(`${activeTicket.full_number} qayta chaqirildi! TV monitorida ovozli e'lon yangradi.`);
@@ -563,7 +575,7 @@ export const DoctorView: React.FC = () => {
     try {
       const res = await fetch(`${API_BASE_URL}/queues/tickets/${activeTicket.id}/complete`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ 
           doctorId: doctorInfo.id,
           notes: finalConclusion,
@@ -599,7 +611,7 @@ export const DoctorView: React.FC = () => {
     try {
       const res = await fetch(`${API_BASE_URL}/queues/tickets/${activeTicket.id}/skip`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ doctorId: doctorInfo.id })
       });
       const json = await res.json();
@@ -632,7 +644,7 @@ export const DoctorView: React.FC = () => {
     setConsultationNotes('');
     if (ticket.patient_id) {
       try {
-        const res = await fetch(`${API_BASE_URL}/patients/${ticket.patient_id}`);
+        const res = await fetch(`${API_BASE_URL}/patients/${ticket.patient_id}`, { headers: getAuthHeaders() });
         const json = await res.json();
         if (json.data) {
           const pat = json.data.patient || json.data;
