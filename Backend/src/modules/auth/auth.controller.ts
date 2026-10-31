@@ -453,6 +453,43 @@ export class AuthController {
       res.status(401).json({ success: false, message: 'Not authorized' });
       return;
     }
+    const pg = PostgresService.getInstance();
+    try {
+      const pgUser = await pg.query(
+        `SELECT u.*, r.code as role_code, cs.clinic_name 
+         FROM users u 
+         LEFT JOIN roles r ON u.role_id = r.id 
+         LEFT JOIN clinic_settings cs ON (u.clinic_id = cs.clinic_id OR u.clinic_id = cs.id)
+         WHERE u.id = $1 LIMIT 1`,
+        [req.user.userId]
+      );
+      if (pgUser.rows.length > 0) {
+        const u = pgUser.rows[0];
+        res.json({
+          success: true,
+          data: {
+            user: {
+              id: u.id,
+              fullName: u.full_name,
+              email: u.username,
+              phone: u.phone,
+              role: u.role_code || req.user.role || 'SUPER_ADMIN',
+              avatarUrl: null,
+              branchId: u.branch_id,
+              tenantId: u.clinic_id
+            },
+            clinic: {
+              id: u.clinic_id,
+              name: u.clinic_name || 'Klinika'
+            }
+          }
+        });
+        return;
+      }
+    } catch (e) {
+      console.warn('Postgres getMe fallback:', e);
+    }
+
     const db = DatabaseService.getInstance();
     const user = db.getUserById(req.user.userId);
     if (!user) {
@@ -479,5 +516,94 @@ export class AuthController {
         subscription
       }
     });
+  }
+
+  public static async updateProfile(req: AuthenticatedRequest, res: Response): Promise<void> {
+    if (!req.user) {
+      res.status(401).json({ success: false, message: 'Not authorized' });
+      return;
+    }
+
+    const { fullName, phone, email, currentPassword, newPassword } = req.body;
+    const pg = PostgresService.getInstance();
+
+    try {
+      const uRes = await pg.query('SELECT * FROM users WHERE id = $1 LIMIT 1', [req.user.userId]);
+      if (uRes.rows.length > 0) {
+        const u = uRes.rows[0];
+
+        // If changing password, verify current password
+        let newHash = null;
+        if (newPassword && String(newPassword).trim()) {
+          if (currentPassword && u.password_hash) {
+            let valid = false;
+            try {
+              valid = bcrypt.compareSync(currentPassword, u.password_hash) || currentPassword === u.password_hash;
+            } catch (_) {}
+            if (!valid) {
+              res.status(400).json({ success: false, message: 'Amaldagi parol noto‘g‘ri kiritildi.' });
+              return;
+            }
+          }
+          newHash = bcrypt.hashSync(String(newPassword).trim(), 10);
+        }
+
+        const updateFields: string[] = ['updated_at = CURRENT_TIMESTAMP'];
+        const params: any[] = [];
+        let idx = 1;
+
+        if (fullName !== undefined) {
+          updateFields.push(`full_name = $${idx++}`);
+          params.push(fullName);
+        }
+        if (phone !== undefined) {
+          updateFields.push(`phone = $${idx++}`);
+          params.push(phone);
+        }
+        if (email !== undefined) {
+          updateFields.push(`username = $${idx++}`);
+          params.push(email);
+        }
+        if (newHash) {
+          updateFields.push(`password_hash = $${idx++}`);
+          params.push(newHash);
+        }
+
+        params.push(req.user.userId);
+        const updateSql = `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${idx} RETURNING id, full_name, username, phone`;
+        const updatedRes = await pg.query(updateSql, params);
+        const updated = updatedRes.rows[0];
+
+        // Sync with DatabaseService
+        try {
+          const db = DatabaseService.getInstance();
+          const dbUser = db.getUserById(req.user.userId);
+          if (dbUser) {
+            if (fullName) dbUser.fullName = fullName;
+            if (phone) dbUser.phone = phone;
+            if (email) dbUser.email = email;
+            if (newHash) dbUser.passwordHash = newHash;
+            db.updateUser(dbUser);
+          }
+        } catch (_) {}
+
+        res.json({
+          success: true,
+          message: 'Profil ma\'lumotlari muvaffaqiyatli saqlandi.',
+          data: {
+            id: updated.id,
+            fullName: updated.full_name,
+            email: updated.username,
+            phone: updated.phone
+          }
+        });
+        return;
+      }
+    } catch (e: any) {
+      res.status(500).json({ success: false, message: e.message });
+      return;
+    }
+
+    res.status(404).json({ success: false, message: 'Foydalanuvchi topilmadi.' });
   }
 }

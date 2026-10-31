@@ -27,6 +27,13 @@ export class ApiClient {
     localStorage.setItem('sadaf_super_admin_token', t);
   }
 
+  public static logout() {
+    this.token = '';
+    localStorage.removeItem('sadaf_super_admin_token');
+    localStorage.removeItem('sadaf_super_admin_user');
+    this.clearCache();
+  }
+
   public static getToken(): string {
     if (!this.token) {
       this.token = localStorage.getItem('sadaf_super_admin_token') || '';
@@ -92,8 +99,28 @@ export class ApiClient {
     });
     if (res.data?.token) {
       this.setToken(res.data.token);
+      if (res.data?.user) {
+        localStorage.setItem('sadaf_super_admin_user', JSON.stringify(res.data.user));
+      }
     }
     return res;
+  }
+
+  public static async getMe() {
+    return this.request('/auth/me');
+  }
+
+  public static async updateProfile(data: {
+    fullName?: string;
+    phone?: string;
+    email?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }) {
+    return this.request('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
   }
 
   public static async getDashboard() {

@@ -65,6 +65,7 @@ const CASHIER_ROLES = [UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.CASHIER]
 apiRouter.post('/auth/login', authRateLimiter, AuthController.login);
 apiRouter.post('/auth/register-clinic', AuthController.registerClinic);
 apiRouter.get('/auth/me', authenticateJwt, AuthController.getMe);
+apiRouter.put('/auth/profile', authenticateJwt, AuthController.updateProfile);
 
 // 2. Super Admin Endpoints (Strictly Restricted to SUPER_ADMIN)
 const superAdminAuth = [authenticateJwt, requireRoles([UserRole.SUPER_ADMIN])];
