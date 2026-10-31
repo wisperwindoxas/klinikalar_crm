@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { 
-  Sliders, Printer, RotateCcw, RefreshCw, Save, Check, CheckSquare, 
-  Sparkles, SlidersHorizontal, Tag, FileText, QrCode 
+  Sliders, Printer, RotateCcw, RefreshCw, Save, Check,
+  Sparkles, SlidersHorizontal, Tag, FileText, QrCode,
+  Image as ImageIcon, Upload, Trash2
 } from 'lucide-react';
+import { APP_LOGO } from '../../../utils/brand';
 
 interface ManagerPrinterSettingsTabProps {
   printerSettings: any;
@@ -27,6 +29,56 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
   setPreviewPaperSize,
   onNavigateTab,
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Logo yuklash va canvas orqali ixchamlashtirish (optimal termal o'lcham max 300px)
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 300;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
+          height = Math.round((height * MAX_WIDTH) / width);
+          width = MAX_WIDTH;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/png', 0.9);
+          setPrinterSettings((prev: any) => ({
+            ...prev,
+            logoUrl: dataUrl,
+            showLogo: true
+          }));
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleResetLogo = () => {
+    setPrinterSettings((prev: any) => ({
+      ...prev,
+      logoUrl: '',
+      showLogo: true
+    }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="space-y-6 w-full">
       {/* Settings Sub-navigation Pills */}
@@ -65,7 +117,7 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Kassirlar tomonidan chiqariladigan termal chek va navbat talonlarining parametrlari, qog'oz formati (80 mm / 58 mm) va elementlar tarkibini to'liq boshqarish
+                Kassirlar tomonidan chiqariladigan termal navbat talonlarining parametrlari, logotipi, qog'oz formati (80 mm / 58 mm) va barcha elementlarini to'liq boshqarish
               </p>
             </div>
           </div>
@@ -136,7 +188,7 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
                     setPreviewPaperSize('80mm');
                   }}
                   className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-start justify-between ${
-                    printerSettings.paperSize === '80mm'
+                    (printerSettings.paperSize || previewPaperSize) === '80mm'
                       ? 'border-[#0F766E] bg-teal-50/40 ring-2 ring-teal-500/20'
                       : 'border-slate-200 hover:border-slate-300 bg-white'
                   }`}
@@ -151,9 +203,9 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
                     </p>
                   </div>
                   <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                    printerSettings.paperSize === '80mm' ? 'bg-[#0F766E] text-white' : 'border border-slate-300'
+                    (printerSettings.paperSize || previewPaperSize) === '80mm' ? 'bg-[#0F766E] text-white' : 'border border-slate-300'
                   }`}>
-                    {printerSettings.paperSize === '80mm' && <Check className="w-3.5 h-3.5" />}
+                    {(printerSettings.paperSize || previewPaperSize) === '80mm' && <Check className="w-3.5 h-3.5" />}
                   </div>
                 </div>
 
@@ -163,7 +215,7 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
                     setPreviewPaperSize('58mm');
                   }}
                   className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-start justify-between ${
-                    printerSettings.paperSize === '58mm'
+                    (printerSettings.paperSize || previewPaperSize) === '58mm'
                       ? 'border-[#0F766E] bg-teal-50/40 ring-2 ring-teal-500/20'
                       : 'border-slate-200 hover:border-slate-300 bg-white'
                   }`}
@@ -177,9 +229,9 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
                     </p>
                   </div>
                   <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                    printerSettings.paperSize === '58mm' ? 'bg-[#0F766E] text-white' : 'border border-slate-300'
+                    (printerSettings.paperSize || previewPaperSize) === '58mm' ? 'bg-[#0F766E] text-white' : 'border border-slate-300'
                   }`}>
-                    {printerSettings.paperSize === '58mm' && <Check className="w-3.5 h-3.5" />}
+                    {(printerSettings.paperSize || previewPaperSize) === '58mm' && <Check className="w-3.5 h-3.5" />}
                   </div>
                 </div>
               </div>
@@ -211,7 +263,7 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
                   </div>
                   <input
                     type="checkbox"
-                    checked={!!printerSettings.autoPrint}
+                    checked={printerSettings.autoPrint !== false}
                     onChange={e => setPrinterSettings((prev: any) => ({ ...prev, autoPrint: e.target.checked }))}
                     className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500"
                   />
@@ -228,7 +280,7 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
                 </div>
                 <input
                   type="checkbox"
-                  checked={!!printerSettings.soundAlert}
+                  checked={printerSettings.soundAlert !== false}
                   onChange={e => setPrinterSettings((prev: any) => ({ ...prev, soundAlert: e.target.checked }))}
                   className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500"
                 />
@@ -236,27 +288,97 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
             </div>
           </div>
 
-          {/* Card 2: Talon sarlavhasi va klinika rekvizitlari */}
+          {/* Card 2: Talon sarlavhasi, Logotip va klinika rekvizitlari */}
           <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
             <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
               <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
                 2
               </div>
               <div>
-                <h4 className="text-sm font-bold text-[#172B4D]">Klinika Rekvizitlari & Sarlavha</h4>
-                <p className="text-[11px] text-slate-500">Talon yuqori qismida chiqadigan matnlar</p>
+                <h4 className="text-sm font-bold text-[#172B4D]">Klinika Rekvizitlari & Logotip</h4>
+                <p className="text-[11px] text-slate-500">Talon yuqori qismida chiqadigan logotip va ma'lumotlar</p>
               </div>
             </div>
 
-            <div className="space-y-3">
+            {/* LOGO MANAGEMENT BOX */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-teal-600" />
+                  <span className="text-xs font-bold text-slate-800">Klinika Logotipi</span>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={printerSettings.showLogo !== false}
+                    onChange={e => setPrinterSettings((prev: any) => ({ ...prev, showLogo: e.target.checked }))}
+                    className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500"
+                  />
+                  <span className="text-xs font-bold text-slate-700">Talonda ko'rsatish</span>
+                </label>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-4 pt-1">
+                {/* Logo Preview Box */}
+                <div className="w-32 h-20 bg-white rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center p-2 shrink-0 shadow-2xs overflow-hidden">
+                  {printerSettings.showLogo !== false ? (
+                    <img
+                      src={printerSettings.logoUrl || APP_LOGO}
+                      alt="Logo"
+                      className="w-full h-full object-contain filter grayscale contrast-125"
+                    />
+                  ) : (
+                    <span className="text-[10px] text-slate-400 font-semibold italic text-center">Logotip o'chiq</span>
+                  )}
+                </div>
+
+                {/* Upload & Reset Buttons */}
+                <div className="flex-1 space-y-2 w-full">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Logotip yuklash</span>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/png, image/jpeg, image/svg+xml, image/webp"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {printerSettings.logoUrl && (
+                      <button
+                        type="button"
+                        onClick={handleResetLogo}
+                        className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                        title="Standart klinika logotipiga qaytarish"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Standartga qaytarish</span>
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-snug">
+                    Format: PNG, JPG yoki SVG. Termoprinterda chop etilishi sababli qora-oq yoki shaffof fondagi kontrastli logotip tavsiya etiladi.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-1">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Talon Sarlavhasi (Klinika nomi)
                 </label>
                 <input
                   type="text"
-                  value={printerSettings.headerTitle || ''}
-                  onChange={e => setPrinterSettings((prev: any) => ({ ...prev, headerTitle: e.target.value }))}
+                  value={printerSettings.headerTitle || printerSettings.clinicName || ''}
+                  onChange={e => setPrinterSettings((prev: any) => ({
+                    ...prev,
+                    headerTitle: e.target.value,
+                    clinicName: e.target.value
+                  }))}
                   placeholder="SADAF TIBBIYOT MARKAZI"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-[#0F766E]"
                 />
@@ -268,8 +390,12 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
                 </label>
                 <input
                   type="text"
-                  value={printerSettings.headerSubtitle || ''}
-                  onChange={e => setPrinterSettings((prev: any) => ({ ...prev, headerSubtitle: e.target.value }))}
+                  value={printerSettings.headerSubtitle || printerSettings.welcomeNote || ''}
+                  onChange={e => setPrinterSettings((prev: any) => ({
+                    ...prev,
+                    headerSubtitle: e.target.value,
+                    welcomeNote: e.target.value
+                  }))}
                   placeholder="Salomatligingiz — bizning oliy maqsadimiz!"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-[#0F766E]"
                 />
@@ -342,7 +468,17 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
                     type="checkbox"
                     checked={item.required || printerSettings[item.key] !== false}
                     disabled={item.required}
-                    onChange={e => setPrinterSettings((prev: any) => ({ ...prev, [item.key]: e.target.checked }))}
+                    onChange={e => {
+                      const isChecked = e.target.checked;
+                      setPrinterSettings((prev: any) => {
+                        const updated = { ...prev, [item.key]: isChecked };
+                        if (item.key === 'showDoctorName') updated.showDoctor = isChecked;
+                        if (item.key === 'showDepartment') updated.showSpecialty = isChecked;
+                        if (item.key === 'showServicePrice') updated.showPaymentStatus = isChecked;
+                        if (item.key === 'showWaitingCount' || item.key === 'showEstimatedTime') updated.showWaitTime = isChecked;
+                        return updated;
+                      });
+                    }}
                     className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500"
                   />
                   <span className="text-xs font-bold text-slate-700 flex-1">
@@ -366,18 +502,32 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Eslatma matni
-              </label>
-              <textarea
-                rows={2}
-                value={printerSettings.footerNote || ''}
-                onChange={e => setPrinterSettings((prev: any) => ({ ...prev, footerNote: e.target.value }))}
-                placeholder="Iltimos, navbatingizni ekranda kuzatib boring! Salomat bo'ling!"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-[#0F766E]"
-              />
-              <span className="text-[10px] text-slate-400 mt-0.5 block">Termoprinterda ixcham shriftda chiqariladi</span>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Minnatdorchilik sarlavhasi
+                </label>
+                <input
+                  type="text"
+                  value={printerSettings.footerText || ''}
+                  onChange={e => setPrinterSettings((prev: any) => ({ ...prev, footerText: e.target.value }))}
+                  placeholder="Tashrifingiz uchun rahmat! Salomat bo'ling!"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-[#0F766E]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Qo'shimcha eslatma matni
+                </label>
+                <textarea
+                  rows={2}
+                  value={printerSettings.footerNote || ''}
+                  onChange={e => setPrinterSettings((prev: any) => ({ ...prev, footerNote: e.target.value }))}
+                  placeholder="Iltimos, navbatingizni ekranda kuzatib boring! Salomat bo'ling!"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-[#0F766E]"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -393,18 +543,24 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
               <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200">
                 <button
                   type="button"
-                  onClick={() => setPreviewPaperSize('80mm')}
+                  onClick={() => {
+                    setPreviewPaperSize('80mm');
+                    setPrinterSettings((prev: any) => ({ ...prev, paperSize: '80mm' }));
+                  }}
                   className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
-                    previewPaperSize === '80mm' ? 'bg-[#0F766E] text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                    (printerSettings.paperSize || previewPaperSize) === '80mm' ? 'bg-[#0F766E] text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   80 mm
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPreviewPaperSize('58mm')}
+                  onClick={() => {
+                    setPreviewPaperSize('58mm');
+                    setPrinterSettings((prev: any) => ({ ...prev, paperSize: '58mm' }));
+                  }}
                   className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
-                    previewPaperSize === '58mm' ? 'bg-[#0F766E] text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                    (printerSettings.paperSize || previewPaperSize) === '58mm' ? 'bg-[#0F766E] text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   58 mm
@@ -412,25 +568,36 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
               </div>
             </div>
 
-            {/* Thermal Receipt Paper Mockup */}
+            {/* Thermal Receipt Paper Mockup (100% matched to thermal print output) */}
             <div className="flex justify-center p-2 overflow-x-auto">
               <div
                 style={{
-                  width: previewPaperSize === '80mm' ? '300px' : '230px',
+                  width: (printerSettings.paperSize || previewPaperSize) === '80mm' ? '300px' : '230px',
                   fontFamily: '"Courier New", Courier, monospace',
                   letterSpacing: '-0.3px'
                 }}
                 className="bg-white text-black p-4 rounded-xl shadow-md border border-slate-300 text-xs space-y-2 select-none transition-all duration-200"
               >
-                {/* RECEIPT HEADER */}
+                {/* 1. CLINIC LOGO */}
+                {printerSettings.showLogo !== false && (
+                  <div className="text-center pb-1">
+                    <img
+                      src={printerSettings.logoUrl || APP_LOGO}
+                      alt="Klinika Logotipi"
+                      className="h-9 max-w-[130px] mx-auto object-contain filter grayscale contrast-125"
+                    />
+                  </div>
+                )}
+
+                {/* 2. RECEIPT HEADER */}
                 {printerSettings.showHeader !== false && (
                   <div className="text-center pb-2 border-b border-dashed border-black/40 space-y-0.5">
                     <div className="font-extrabold text-sm uppercase tracking-wide">
-                      {printerSettings.headerTitle || "SADAF TIBBIYOT MARKAZI"}
+                      {printerSettings.headerTitle || printerSettings.clinicName || "SADAF TIBBIYOT MARKAZI"}
                     </div>
-                    {printerSettings.headerSubtitle && (
+                    {(printerSettings.headerSubtitle || printerSettings.welcomeNote) && (
                       <div className="text-[10px] font-medium text-slate-600">
-                        {printerSettings.headerSubtitle}
+                        {printerSettings.headerSubtitle || printerSettings.welcomeNote}
                       </div>
                     )}
                     {printerSettings.phone && (
@@ -446,7 +613,7 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
                   </div>
                 )}
 
-                {/* DATE & TIME */}
+                {/* 3. DATE & TIME BAR */}
                 {printerSettings.showDate !== false && (
                   <div className="flex items-center justify-between text-[10px] font-mono border-b border-black/20 pb-1 text-slate-700">
                     <span>{new Date().toLocaleDateString('uz-UZ')}</span>
@@ -454,34 +621,38 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
                   </div>
                 )}
 
-                {/* TICKET NUMBER - BIG & BOLD */}
-                <div className="text-center py-2 border-b-2 border-black space-y-0.5">
-                  <div className="text-[10px] uppercase font-bold tracking-wider text-slate-600">Sizning Navbatingiz</div>
-                  <div className="text-4xl font-black font-mono tracking-tight text-black py-0.5">
-                    A-012
+                {/* 4. TICKET NUMBER - BIG & BOLD */}
+                {printerSettings.showTicketNumber !== false && (
+                  <div className="text-center py-2 border-b-2 border-black space-y-0.5">
+                    <div className="text-[10px] uppercase font-bold tracking-wider text-slate-600">Sizning Navbatingiz</div>
+                    <div className="text-4xl font-black font-mono tracking-tight text-black py-0.5">
+                      A-012
+                    </div>
+                    {printerSettings.showCabinet !== false && (
+                      <div className="text-[10px] font-bold text-slate-700">
+                        KABINET № 7 • 2-QAVAT
+                      </div>
+                    )}
                   </div>
-                  <div className="text-[10px] font-bold text-slate-700">
-                    KABINET № 7 • 2-QAVAT
-                  </div>
-                </div>
+                )}
 
-                {/* DOCTOR & SERVICE DETAILS */}
+                {/* 5. DOCTOR & SERVICE DETAILS */}
                 <div className="space-y-1.5 py-1 text-[11px] border-b border-dashed border-black/40">
-                  {printerSettings.showDoctorName !== false && (
+                  {printerSettings.showDoctorName !== false && printerSettings.showDoctor !== false && (
                     <div className="flex items-start justify-between">
                       <span className="text-slate-500 text-[10px]">Shifokor:</span>
                       <span className="font-bold text-right text-slate-900">Dr. Bobur Ergashev</span>
                     </div>
                   )}
 
-                  {printerSettings.showDepartment !== false && (
+                  {printerSettings.showDepartment !== false && printerSettings.showSpecialty !== false && (
                     <div className="flex items-start justify-between">
                       <span className="text-slate-500 text-[10px]">Bo'lim:</span>
                       <span className="font-semibold text-right text-slate-800">Kardiologiya</span>
                     </div>
                   )}
 
-                  {printerSettings.showCabinet !== false && (
+                  {printerSettings.showCabinet !== false && printerSettings.showTicketNumber === false && (
                     <div className="flex items-start justify-between">
                       <span className="text-slate-500 text-[10px]">Xona:</span>
                       <span className="font-mono font-bold text-right text-slate-900">7-kabinet (2-etaj)</span>
@@ -495,15 +666,15 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
                     </div>
                   )}
 
-                  {printerSettings.showServicePrice !== false && (
+                  {printerSettings.showServicePrice !== false && printerSettings.showPaymentStatus !== false && (
                     <div className="flex items-start justify-between pt-1 border-t border-dotted border-black/20 font-bold">
                       <span className="text-slate-600 text-[10px]">Xizmat:</span>
-                      <span className="font-mono text-right text-slate-900">150,000 so'm (Naqd)</span>
+                      <span className="font-mono text-right text-slate-900">150,000 so'm (To'langan)</span>
                     </div>
                   )}
                 </div>
 
-                {/* WAITING STATS */}
+                {/* 6. WAITING STATS */}
                 {(printerSettings.showWaitingCount !== false || printerSettings.showEstimatedTime !== false) && (
                   <div className="bg-slate-50 p-2 rounded border border-black/15 text-[10px] space-y-1">
                     {printerSettings.showWaitingCount !== false && (
@@ -521,12 +692,12 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
                   </div>
                 )}
 
-                {/* QR CODE MOCKUP */}
+                {/* 7. QR CODE MOCKUP */}
                 {printerSettings.showQrCode !== false && (
                   <div className="text-center py-2 border-b border-dashed border-black/40">
                     <div className="inline-block p-1.5 bg-white border border-black/40 rounded">
-                      <div className="w-16 h-16 bg-slate-900 mx-auto flex items-center justify-center text-white text-[9px] font-mono">
-                        [QR-KOD]
+                      <div className="w-14 h-14 bg-white border border-slate-300 mx-auto flex items-center justify-center text-slate-900">
+                        <QrCode className="w-10 h-10" />
                       </div>
                     </div>
                     <div className="text-[9px] text-slate-500 mt-1">
@@ -535,10 +706,10 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
                   </div>
                 )}
 
-                {/* FOOTER NOTE */}
+                {/* 8. FOOTER NOTE */}
                 {printerSettings.showFooter !== false && (
                   <div className="text-center pt-1 text-[10px] text-slate-700 leading-tight space-y-1">
-                    <div className="font-bold">Tashrifingiz uchun rahmat!</div>
+                    <div className="font-bold">{printerSettings.footerText || "Tashrifingiz uchun rahmat! Salomat bo'ling!"}</div>
                     {printerSettings.footerNote && (
                       <div className="text-[9px] text-slate-500 italic">
                         {printerSettings.footerNote}
@@ -547,7 +718,7 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
                   </div>
                 )}
 
-                {/* CUT LINE GUIDE */}
+                {/* 9. CUT LINE GUIDE */}
                 {printerSettings.showCutLine !== false && (
                   <div className="pt-3 pb-1 border-b-2 border-dashed border-black/50 text-[10px] text-slate-500 font-sans text-center">
                     - - - Qirqish chizig'i - - -
@@ -564,7 +735,7 @@ export const ManagerPrinterSettingsTab: React.FC<ManagerPrinterSettingsTabProps>
                 className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm cursor-pointer"
               >
                 <Printer className="w-4 h-4" />
-                <span>Sinov chop etish ({previewPaperSize})</span>
+                <span>Sinov chop etish ({printerSettings.paperSize || previewPaperSize})</span>
               </button>
             </div>
           </div>

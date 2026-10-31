@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS clinic_settings (
     tv_instruction_1 VARCHAR(255) DEFAULT 'Iltimos, navbatingizni kuting',
     tv_instruction_2 VARCHAR(255) DEFAULT 'Navbat raqami ovozli e''lon qilinadi',
     tv_instruction_3 VARCHAR(255) DEFAULT 'Talon raqamini va kabinet raqamini diqqat bilan tinglang',
+    printer_settings JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

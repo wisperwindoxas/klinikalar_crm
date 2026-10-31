@@ -204,6 +204,7 @@ apiRouter.post('/tv/test-call', authenticateJwt, enforceTenantBoundary, requireR
 apiRouter.get('/reports/manager-dashboard', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.getManagerDashboard);
 apiRouter.get('/clinic/settings', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.getSettings);
 apiRouter.patch('/clinic/settings', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.updateSettings);
+apiRouter.put('/clinic/settings', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.updateSettings);
 apiRouter.get('/clinic/subscription', ClinicQueueController.getSubscription);
 apiRouter.get('/clinic/audit-logs', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.getAuditLogs);
 

@@ -72,14 +72,16 @@ const getAuthHeaders = (extra: Record<string, string> = {}): Record<string, stri
 };
 
 const TEST_TICKETS_ARRAY = [{
-  ticket_number: 'S-001',
-  full_number: 'S-001',
-  specialty_name: 'STOMATOLOGIYA',
-  doctor_name: 'Dr. Alisher Alimov',
-  cabinet_number: '4',
-  patient_name: 'Malika Alimova',
+  ticket_number: 'A-012',
+  full_number: 'A-012',
+  specialty_name: 'Kardiologiya',
+  doctor_name: 'Dr. Bobur Ergashev',
+  cabinet_number: '7',
+  patient_name: 'Rustamov O. (+998 90 *** 45)',
   payment_status: 'PAID',
-  estimated_wait_minutes: 15
+  service_price: 150000,
+  waiting_count: 3,
+  estimated_wait_minutes: 20
 }];
 
 export const ManagerView: React.FC = () => {
@@ -349,19 +351,28 @@ export const ManagerView: React.FC = () => {
     autoPrint: boolean;
     soundAlert: boolean;
     clinicName: string;
+    headerTitle?: string;
+    headerSubtitle?: string;
     showLogo: boolean;
+    logoUrl?: string;
     address: string;
     phone: string;
     welcomeNote: string;
     showDate: boolean;
     showTicketNumber: boolean;
     showSpecialty: boolean;
+    showDepartment?: boolean;
     showDoctor: boolean;
+    showDoctorName?: boolean;
     showCabinet: boolean;
     showPatientName: boolean;
     showPaymentStatus: boolean;
+    showServicePrice?: boolean;
     showWaitTime: boolean;
+    showWaitingCount?: boolean;
+    showEstimatedTime?: boolean;
     showQrCode: boolean;
+    showFooter?: boolean;
     showCutLine: boolean;
     footerText: string;
     footerNote: string;
@@ -372,20 +383,29 @@ export const ManagerView: React.FC = () => {
     copies: 1,
     autoPrint: true,
     soundAlert: true,
-    clinicName: '',
+    clinicName: 'SADAF TIBBIYOT MARKAZI',
+    headerTitle: 'SADAF TIBBIYOT MARKAZI',
+    headerSubtitle: "Navbat talonini qabul yakunigacha saqlang",
     showLogo: true,
-    address: '',
-    phone: '',
+    logoUrl: '',
+    address: "Toshkent sh., Chilonzor tumani, Bunyodkor ko'chasi 15-uy",
+    phone: "+998 71 200 00 20",
     welcomeNote: "Navbat talonini qabul yakunigacha saqlang",
     showDate: true,
     showTicketNumber: true,
     showSpecialty: true,
+    showDepartment: true,
     showDoctor: true,
+    showDoctorName: true,
     showCabinet: true,
     showPatientName: true,
     showPaymentStatus: true,
+    showServicePrice: true,
     showWaitTime: true,
+    showWaitingCount: true,
+    showEstimatedTime: true,
     showQrCode: true,
+    showFooter: true,
     showCutLine: true,
     footerText: "Tashrifingiz uchun rahmat! Salomat bo'ling!",
     footerNote: "Navbatingizni zal monitorida kuzatib boring"
@@ -2552,7 +2572,11 @@ export const ManagerView: React.FC = () => {
         isOpen={isTestTicketModalOpen}
         tickets={TEST_TICKETS_ARRAY}
         initialPaperSize={previewPaperSize}
-        onPaperSizeChange={setPreviewPaperSize}
+        config={printerSettings}
+        onPaperSizeChange={(size) => {
+          setPreviewPaperSize(size);
+          setPrinterSettings(prev => ({ ...prev, paperSize: size }));
+        }}
         onClose={() => setIsTestTicketModalOpen(false)}
       />
       {/* App Update Modal */}

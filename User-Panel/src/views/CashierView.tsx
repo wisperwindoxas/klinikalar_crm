@@ -236,6 +236,12 @@ export const CashierView: React.FC = () => {
       if (shiftRes.data) setCurrentShift(shiftRes.data);
       if (setRes.data) {
         setClinicSettings(setRes.data);
+        if (setRes.data.printer_settings && typeof setRes.data.printer_settings === 'object') {
+          localStorage.setItem('sadaf_ticket_settings', JSON.stringify(setRes.data.printer_settings));
+          if (setRes.data.printer_settings.paperSize) {
+            setPrinterPaperSize(setRes.data.printer_settings.paperSize);
+          }
+        }
         if (!clinicCustomName) setClinicCustomName(setRes.data.clinic_name || '');
         if (!clinicCustomPhone) setClinicCustomPhone(setRes.data.phone || '');
         if (!clinicCustomAddress) setClinicCustomAddress(setRes.data.address || '');

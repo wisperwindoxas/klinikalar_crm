@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { X, Printer, Ticket, QrCode, FileText, Check } from 'lucide-react';
 import { printThermalTicket } from '../utils/thermalPrinter';
+import { APP_LOGO } from '../utils/brand';
 
 interface TicketIssuedModalProps {
   isOpen: boolean;
   tickets: any[];
   payment?: any;
   initialPaperSize?: '58mm' | '80mm';
+  config?: any;
   onPaperSizeChange?: (size: '58mm' | '80mm') => void;
   onClose: () => void;
 }
@@ -16,30 +18,41 @@ export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = React.memo(({
   tickets,
   payment,
   initialPaperSize,
+  config: propConfig,
   onPaperSizeChange,
   onClose
 }) => {
   const [activeTab, setActiveTab] = useState<'TICKETS' | 'RECEIPT'>('TICKETS');
   const [config, setConfig] = useState<any>(() => {
+    if (propConfig) return propConfig;
     try {
       const saved = localStorage.getItem('sadaf_ticket_settings');
       if (saved) return JSON.parse(saved);
     } catch {}
     return {
-      clinicName: 'KLINIKA-ADMIN',
+      clinicName: 'SADAF TIBBIYOT MARKAZI',
+      headerTitle: 'SADAF TIBBIYOT MARKAZI',
+      headerSubtitle: "Navbat talonini qabul yakunigacha saqlang",
       showLogo: true,
+      logoUrl: '',
       address: "Toshkent sh., Chilonzor tumani, Bunyodkor ko'chasi 15-uy",
       phone: "+998 71 200 00 20",
       welcomeNote: "Navbat talonini qabul yakunigacha saqlang",
       showDate: true,
       showTicketNumber: true,
       showSpecialty: true,
+      showDepartment: true,
       showDoctor: true,
+      showDoctorName: true,
       showCabinet: true,
       showPatientName: true,
       showPaymentStatus: true,
+      showServicePrice: true,
       showWaitTime: true,
+      showWaitingCount: true,
+      showEstimatedTime: true,
       showQrCode: true,
+      showFooter: true,
       showCutLine: true,
       footerText: "Tashrifingiz uchun rahmat! Salomat bo'ling!",
       footerNote: "Navbatingizni zal monitorida kuzatib boring"
@@ -68,11 +81,15 @@ export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = React.memo(({
     if (initialPaperSize) {
       setPaperSize(initialPaperSize);
     }
+    if (propConfig) {
+      setConfig(propConfig);
+      return;
+    }
     try {
       const saved = localStorage.getItem('sadaf_ticket_settings');
       if (saved) setConfig(JSON.parse(saved));
     } catch {}
-  }, [isOpen]);
+  }, [isOpen, initialPaperSize, propConfig]);
 
   if (!isOpen || !tickets || tickets.length === 0) return null;
 
@@ -119,13 +136,19 @@ export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = React.memo(({
     const specialty = tck.specialty_name || tck.specialtyName || 'Qabul';
     const cabinetNumber = tck.cabinet_number || tck.cabinetNumber || '1';
     const doctorName = tck.doctor_name || tck.doctorName || 'Shifokor';
-    const ticketNum = tck.full_number || tck.fullNumber || tck.ticketNumber || '001';
-    const paymentText = tck.payment_status === 'PAID'
-      ? "To'langan"
-      : tck.payment_status === 'EXEMPT'
-      ? 'Imtiyozli (Bepul)'
-      : "To'lov qabulda";
-    const waitMinutes = tck.estimated_wait_minutes || tck.estimatedWaitMinutes || 15;
+    const ticketNum = tck.full_number || tck.fullNumber || tck.ticketNumber || tck.ticket_number || '001';
+    
+    let paymentText = "To'lov qabulda";
+    if (tck.payment_status === 'PAID') {
+      paymentText = tck.service_price ? `${Number(tck.service_price).toLocaleString()} so'm (To'langan)` : "To'langan";
+    } else if (tck.payment_status === 'EXEMPT') {
+      paymentText = 'Imtiyozli (Bepul)';
+    } else if (tck.service_price) {
+      paymentText = `${Number(tck.service_price).toLocaleString()} so'm (To'lov qabulda)`;
+    }
+
+    const waitCount = tck.waiting_count ?? tck.ahead_count ?? 3;
+    const waitMinutes = tck.estimated_wait_minutes || tck.estimatedWaitMinutes || 20;
 
     return (
       <div
@@ -133,99 +156,139 @@ export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = React.memo(({
         className="thermal-ticket-card text-center space-y-2 pb-1"
         style={{ width: '100%', boxSizing: 'border-box' }}
       >
-        {/* HEADER */}
-        <div className="space-y-0.5 border-b-2 border-dashed border-black pb-2 text-center">
-          <div className={`font-black uppercase tracking-wider text-black ${is80mm ? 'text-base' : 'text-sm'}`}>
-            {config.clinicName || 'KLINIKA-ADMIN'}
+        {/* 1. CLINIC LOGO */}
+        {config.showLogo !== false && (config.logoUrl || APP_LOGO) && (
+          <div className="text-center pb-1">
+            <img
+              src={config.logoUrl || APP_LOGO}
+              alt="Klinika Logotipi"
+              className="h-9 max-w-[130px] mx-auto object-contain filter grayscale contrast-125"
+            />
           </div>
-          {config.address && (
-            <div className={`text-black font-sans leading-tight ${is80mm ? 'text-[11px]' : 'text-[9.5px]'}`}>
-              {config.address}
-            </div>
-          )}
-          <div className={`text-black font-sans font-medium ${is80mm ? 'text-[11px]' : 'text-[9.5px]'}`}>
-            {config.phone && `Tel: ${config.phone}`}
-            {config.phone && config.showDate !== false && ' • '}
-            {config.showDate !== false && now}
-          </div>
-          {config.welcomeNote && (
-            <div className={`text-black font-sans italic pt-0.5 ${is80mm ? 'text-[10px]' : 'text-[8.5px]'}`}>
-              {config.welcomeNote}
-            </div>
-          )}
-        </div>
+        )}
 
-        {/* BIG QUEUE NUMBER - ULTRA PROMINENT FOR EASY READING */}
+        {/* 2. CLINIC HEADER */}
+        {config.showHeader !== false && (
+          <div className="space-y-0.5 border-b-2 border-dashed border-black pb-2 text-center">
+            <div className={`font-black uppercase tracking-wider text-black ${is80mm ? 'text-base' : 'text-sm'}`}>
+              {config.headerTitle || config.clinicName || 'SADAF TIBBIYOT MARKAZI'}
+            </div>
+            {(config.headerSubtitle || config.welcomeNote) && (
+              <div className={`text-black font-sans leading-tight ${is80mm ? 'text-[10px]' : 'text-[8.5px]'}`}>
+                {config.headerSubtitle || config.welcomeNote}
+              </div>
+            )}
+            {config.phone && (
+              <div className={`text-black font-sans font-medium ${is80mm ? 'text-[10px]' : 'text-[8.5px]'}`}>
+                Tel: {config.phone}
+              </div>
+            )}
+            {config.address && (
+              <div className={`text-black font-sans leading-tight ${is80mm ? 'text-[9.5px]' : 'text-[8px]'}`}>
+                {config.address}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 3. DATE & TIME BAR */}
+        {config.showDate !== false && (
+          <div className="flex items-center justify-between text-[10px] font-mono border-b border-black/20 pb-1 text-black">
+            <span>{new Date().toLocaleDateString('uz-UZ')}</span>
+            <span>{new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+        )}
+
+        {/* 4. BIG QUEUE NUMBER - ULTRA PROMINENT FOR EASY READING */}
         {config.showTicketNumber !== false && (
-          <div className="py-1 text-center">
+          <div className="py-1 text-center border-b-2 border-black space-y-0.5">
+            <div className="text-[10px] uppercase font-bold tracking-wider text-black">SIZNING NAVBATINGIZ</div>
             <div
               className={`font-black text-black font-mono leading-none tracking-tight ${
-                is80mm ? 'text-[72px] sm:text-[76px]' : 'text-[50px] sm:text-[54px]'
+                is80mm ? 'text-[54px] sm:text-[60px]' : 'text-[42px] sm:text-[46px]'
               }`}
               style={{ letterSpacing: '-0.04em' }}
             >
               {ticketNum}
             </div>
-            {config.showSpecialty !== false && (
-              <div
-                className={`font-sans font-black text-black uppercase mt-1 tracking-wider ${
-                  is80mm ? 'text-sm' : 'text-xs'
-                }`}
-              >
-                {specialty}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* CABINET AND DOCTOR */}
-        {(config.showCabinet !== false || config.showDoctor !== false) && (
-          <div className="w-full p-2 border-2 border-black rounded-lg text-center space-y-0.5 font-sans bg-transparent my-1">
             {config.showCabinet !== false && (
-              <div className={`font-black text-black ${is80mm ? 'text-base' : 'text-sm'}`}>
+              <div className={`font-bold text-black mt-1 ${is80mm ? 'text-xs' : 'text-[11px]'}`}>
                 KABINET № {cabinetNumber}
               </div>
             )}
-            {config.showDoctor !== false && (
-              <div className={`font-bold text-black break-words ${is80mm ? 'text-xs' : 'text-[11px]'}`}>
-                {doctorName}
+          </div>
+        )}
+
+        {/* 5. DETAILS LIST (DOCTOR, DEPARTMENT, ROOM, PATIENT, SERVICE) */}
+        <div className="space-y-1.5 py-1 text-[11px] border-b border-dashed border-black/40 text-left font-sans">
+          {config.showDoctorName !== false && config.showDoctor !== false && (
+            <div className="flex items-start justify-between">
+              <span className="text-black/70 text-[10px]">Shifokor:</span>
+              <span className="font-bold text-right text-black">{doctorName}</span>
+            </div>
+          )}
+
+          {config.showDepartment !== false && config.showSpecialty !== false && (
+            <div className="flex items-start justify-between">
+              <span className="text-black/70 text-[10px]">Bo'lim:</span>
+              <span className="font-semibold text-right text-black">{specialty}</span>
+            </div>
+          )}
+
+          {config.showCabinet !== false && config.showTicketNumber === false && (
+            <div className="flex items-start justify-between">
+              <span className="text-black/70 text-[10px]">Xona:</span>
+              <span className="font-mono font-bold text-right text-black">{cabinetNumber}-kabinet</span>
+            </div>
+          )}
+
+          {config.showPatientName !== false && (
+            <div className="flex items-start justify-between">
+              <span className="text-black/70 text-[10px]">Bemor:</span>
+              <span className="font-medium text-right text-black break-words">{patientName}</span>
+            </div>
+          )}
+
+          {config.showServicePrice !== false && config.showPaymentStatus !== false && (
+            <div className="flex items-start justify-between pt-1 border-t border-dotted border-black/20 font-bold">
+              <span className="text-black/80 text-[10px]">Xizmat:</span>
+              <span className="font-mono text-right text-black">{paymentText}</span>
+            </div>
+          )}
+        </div>
+
+        {/* 6. WAITING STATS */}
+        {(config.showWaitingCount !== false || config.showEstimatedTime !== false) && (
+          <div className="bg-slate-50 p-2 rounded border border-black/15 text-[10px] space-y-1">
+            {config.showWaitingCount !== false && (
+              <div className="flex items-center justify-between">
+                <span className="text-black/70">Oldingizda:</span>
+                <span className="font-mono font-black text-black">{waitCount} nafar bemor</span>
+              </div>
+            )}
+            {config.showEstimatedTime !== false && (
+              <div className="flex items-center justify-between">
+                <span className="text-black/70">Taxminiy vaqt:</span>
+                <span className="font-mono font-bold text-black">~ {waitMinutes} daqiqa</span>
               </div>
             )}
           </div>
         )}
 
-        {/* PATIENT SECTION - LEFT-ALIGNED & CLEARLY GROUPED */}
-        {config.showPatientName !== false && (
-          <div className="w-full text-left font-sans py-2 border-t-2 border-b-2 border-dashed border-black space-y-1 my-1">
-            <div className="text-[10px] font-black text-black uppercase tracking-wider">
-              Bemor:
-            </div>
-            <div className={`font-black text-black leading-snug break-words ${is80mm ? 'text-sm' : 'text-xs'}`}>
-              {patientName}
-            </div>
-            {(config.showPaymentStatus !== false || config.showWaitTime !== false) && (
-              <div className="flex items-center justify-between text-[11px] text-black pt-1 border-t border-dotted border-black/40 font-mono">
-                {config.showPaymentStatus !== false && <span>To'lov: <b>{paymentText}</b></span>}
-                {config.showWaitTime !== false && <span>Kutish: <b>~{waitMinutes} daq</b></span>}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* QR CODE & INSTRUCTION */}
+        {/* 7. QR CODE & INSTRUCTION */}
         {config.showQrCode !== false && (
-          <div className="pt-1.5 flex flex-col items-center justify-center space-y-1 text-center">
+          <div className="pt-1.5 flex flex-col items-center justify-center space-y-1 text-center border-b border-dashed border-black/40 pb-2">
             <div className={`border-2 border-black rounded-lg flex items-center justify-center text-black p-1 bg-white ${is80mm ? 'w-14 h-14' : 'w-12 h-12'}`}>
               <QrCode className={is80mm ? 'w-10 h-10' : 'w-9 h-9'} />
             </div>
             <div className={`text-black font-sans leading-tight text-center ${is80mm ? 'text-[10px]' : 'text-[8.5px]'}`}>
-              Navbatni smartfonda kuzatish uchun QR-kodni skanerlang
+              Navbatingizni telefonda kuzatish uchun skanerlang
             </div>
           </div>
         )}
 
-        {/* FOOTER TEXT */}
-        {(config.footerText || config.footerNote) && (
+        {/* 8. FOOTER TEXT */}
+        {config.showFooter !== false && (config.footerText || config.footerNote) && (
           <div className="pt-1 text-center font-sans space-y-0.5">
             {config.footerText && (
               <div className={`text-black font-bold leading-tight ${is80mm ? 'text-[10px]' : 'text-[8.5px]'}`}>
@@ -240,7 +303,7 @@ export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = React.memo(({
           </div>
         )}
 
-        {/* CUT GUIDE */}
+        {/* 9. CUT GUIDE */}
         {config.showCutLine !== false && (
           <div className="pt-2 pb-0.5 border-b-2 border-dashed border-black/60 text-[9.5px] text-black font-sans text-center">
             - - - Qirqish chizig'i - - -
@@ -253,9 +316,18 @@ export const TicketIssuedModal: React.FC<TicketIssuedModalProps> = React.memo(({
   // Render Payment Receipt
   const renderReceiptItem = () => (
     <div className="thermal-ticket-card text-center space-y-2 pb-2" style={{ width: '100%', boxSizing: 'border-box' }}>
+      {config.showLogo !== false && (config.logoUrl || APP_LOGO) && (
+        <div className="text-center pb-1">
+          <img
+            src={config.logoUrl || APP_LOGO}
+            alt="Klinika Logotipi"
+            className="h-9 max-w-[130px] mx-auto object-contain filter grayscale contrast-125"
+          />
+        </div>
+      )}
       <div className="space-y-0.5 border-b-2 border-dashed border-black pb-2 text-center">
         <div className={`font-black uppercase tracking-wider text-black ${is80mm ? 'text-base' : 'text-sm'}`}>
-          {config.clinicName || 'KLINIKA-ADMIN'}
+          {config.headerTitle || config.clinicName || 'SADAF TIBBIYOT MARKAZI'}
         </div>
         <div className="text-[10px] text-black font-sans font-bold">KASSA NOFISKAL KVITANSIYASI</div>
         <div className="text-[10px] text-black font-mono">

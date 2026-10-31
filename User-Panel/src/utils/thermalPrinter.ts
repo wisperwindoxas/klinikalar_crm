@@ -1,22 +1,43 @@
 // Thermal Receipt & Ticket Printing Engine
 // Provides zero-margin, exact-height printing for 80mm & 58mm thermal printers in both Web and Electron
+import { APP_LOGO } from './brand';
 
 export interface TicketConfig {
+  paperSize?: '80mm' | '58mm';
+  copies?: number;
+  autoPrint?: boolean;
+  soundAlert?: boolean;
+
+  // Header & Clinic Info
   clinicName?: string;
-  showLogo?: boolean;
+  headerTitle?: string;
+  headerSubtitle?: string;
+  welcomeNote?: string;
   address?: string;
   phone?: string;
-  welcomeNote?: string;
-  showDate?: boolean;
+  logoUrl?: string;
+
+  // Toggle Visibility
+  showLogo?: boolean;
+  showHeader?: boolean;
   showTicketNumber?: boolean;
   showSpecialty?: boolean;
+  showDepartment?: boolean;
   showDoctor?: boolean;
+  showDoctorName?: boolean;
   showCabinet?: boolean;
   showPatientName?: boolean;
+  showDate?: boolean;
   showPaymentStatus?: boolean;
+  showServicePrice?: boolean;
   showWaitTime?: boolean;
+  showWaitingCount?: boolean;
+  showEstimatedTime?: boolean;
   showQrCode?: boolean;
+  showFooter?: boolean;
   showCutLine?: boolean;
+
+  // Footer text & notes
   footerText?: string;
   footerNote?: string;
 }
@@ -51,133 +72,173 @@ export function generateThermalHtml({
   mode = 'TICKETS',
   payment
 }: PrintThermalOptions): string {
-  const is80 = paperSize === '80mm';
+  const effectivePaperSize = config.paperSize || paperSize || '80mm';
+  const is80 = effectivePaperSize === '80mm';
   const paperWidthMm = is80 ? '80mm' : '58mm';
   const contentWidthMm = is80 ? '76mm' : '52mm';
 
-  const clinicName = config.clinicName || 'KLINIKA-ADMIN';
+  // Resolved config values with full fallback support
+  const clinicName = config.headerTitle || config.clinicName || 'SADAF TIBBIYOT MARKAZI';
+  const headerSubtitle = config.headerSubtitle || config.welcomeNote || '';
   const address = config.address || '';
   const phone = config.phone || '';
-  const welcomeNote = config.welcomeNote || '';
-  const footerText = config.footerText || "Tashrifingiz uchun rahmat! Salomat bo'ling!";
-  const footerNote = config.footerNote || 'Navbatingizni zal monitorida kuzatib boring';
+  const logoUrl = config.logoUrl || APP_LOGO;
+  
+  const showLogo = config.showLogo !== false && !!logoUrl;
+  const showHeader = config.showHeader !== false;
+  const showTicketNumber = config.showTicketNumber !== false;
+  const showDoctorName = config.showDoctorName !== false && config.showDoctor !== false;
+  const showDepartment = config.showDepartment !== false && config.showSpecialty !== false;
+  const showCabinet = config.showCabinet !== false;
+  const showPatientName = config.showPatientName !== false;
+  const showDate = config.showDate !== false;
+  const showWaitingCount = config.showWaitingCount !== false && config.showWaitTime !== false;
+  const showEstimatedTime = config.showEstimatedTime !== false && config.showWaitTime !== false;
+  const showServicePrice = config.showServicePrice !== false && config.showPaymentStatus !== false;
+  const showQrCode = config.showQrCode !== false;
+  const showFooter = config.showFooter !== false;
+  const showCutLine = config.showCutLine !== false;
 
-  const now = new Date().toLocaleString('uz-UZ', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  const footerText = config.footerText || "Tashrifingiz uchun rahmat! Salomat bo'ling!";
+  const footerNote = config.footerNote || '';
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('uz-UZ');
+  const timeStr = now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
 
   const renderSingleTicket = (tck: any) => {
-    const patientName = tck.patient_name || tck.patientName || "Noma'lum bemor";
-    const specialty = tck.specialty_name || tck.specialtyName || 'Qabul';
-    const cabinetNumber = tck.cabinet_number || tck.cabinetNumber || '1';
-    const doctorName = tck.doctor_name || tck.doctorName || 'Shifokor';
-    const ticketNum = tck.full_number || tck.fullNumber || tck.ticketNumber || '001';
-    const paymentText =
-      tck.payment_status === 'PAID'
-        ? "To'langan"
-        : tck.payment_status === 'EXEMPT'
-        ? 'Imtiyozli (Bepul)'
-        : "To'lov qabulda";
-    const waitMinutes = tck.estimated_wait_minutes || tck.estimatedWaitMinutes || 15;
+    const patientName = tck.patient_name || tck.patientName || "Rustamov O. (+998 90 *** 45)";
+    const specialty = tck.specialty_name || tck.specialtyName || 'Kardiologiya';
+    const cabinetNumber = tck.cabinet_number || tck.cabinetNumber || '7 • 2-QAVAT';
+    const doctorName = tck.doctor_name || tck.doctorName || 'Dr. Bobur Ergashev';
+    const ticketNum = tck.full_number || tck.fullNumber || tck.ticketNumber || tck.ticket_number || 'A-012';
+
+    let paymentText = "150,000 so'm (To'langan)";
+    if (tck.payment_status === 'PAID') {
+      paymentText = tck.service_price ? `${Number(tck.service_price).toLocaleString()} so'm (To'langan)` : "To'langan";
+    } else if (tck.payment_status === 'EXEMPT') {
+      paymentText = "Imtiyozli (Bepul)";
+    } else if (tck.service_price) {
+      paymentText = `${Number(tck.service_price).toLocaleString()} so'm (To'lov qabulda)`;
+    }
+
+    const waitCount = tck.waiting_count ?? tck.ahead_count ?? 3;
+    const waitMinutes = tck.estimated_wait_minutes || tck.estimatedWaitMinutes || 20;
 
     return `
       <div class="ticket-card">
-        <!-- HEADER -->
-        <div class="ticket-header">
-          <div class="clinic-name">${clinicName}</div>
-          ${address ? `<div class="clinic-sub">${address}</div>` : ''}
-          <div class="clinic-sub">
-            ${phone ? `Tel: ${phone}` : ''}
-            ${phone && config.showDate !== false ? ' • ' : ''}
-            ${config.showDate !== false ? now : ''}
+        <!-- 1. CLINIC LOGO -->
+        ${showLogo ? `
+          <div class="ticket-logo-box">
+            <img src="${logoUrl}" alt="Klinika Logotipi" class="ticket-logo-img" />
           </div>
-          ${welcomeNote ? `<div class="clinic-welcome">${welcomeNote}</div>` : ''}
+        ` : ''}
+
+        <!-- 2. CLINIC HEADER -->
+        ${showHeader ? `
+          <div class="ticket-header">
+            <div class="clinic-name">${clinicName}</div>
+            ${headerSubtitle ? `<div class="clinic-subtitle">${headerSubtitle}</div>` : ''}
+            ${phone ? `<div class="clinic-phone">Tel: ${phone}</div>` : ''}
+            ${address ? `<div class="clinic-address">${address}</div>` : ''}
+          </div>
+        ` : ''}
+
+        <!-- 3. DATE & TIME BAR -->
+        ${showDate ? `
+          <div class="datetime-bar">
+            <span>${dateStr}</span>
+            <span>${timeStr}</span>
+          </div>
+        ` : ''}
+
+        <!-- 4. BIG TICKET NUMBER -->
+        ${showTicketNumber ? `
+          <div class="ticket-num-box">
+            <div class="ticket-label">SIZNING NAVBATINGIZ</div>
+            <div class="ticket-number">${ticketNum}</div>
+            ${showCabinet ? `
+              <div class="ticket-cabinet-badge">KABINET № ${cabinetNumber}</div>
+            ` : ''}
+          </div>
+        ` : ''}
+
+        <!-- 5. DETAILS LIST (DOCTOR, DEPARTMENT, ROOM, PATIENT, SERVICE) -->
+        <div class="ticket-details-list">
+          ${showDoctorName ? `
+            <div class="detail-row">
+              <span class="detail-label">Shifokor:</span>
+              <span class="detail-value font-bold">${doctorName}</span>
+            </div>
+          ` : ''}
+
+          ${showDepartment ? `
+            <div class="detail-row">
+              <span class="detail-label">Bo'lim:</span>
+              <span class="detail-value">${specialty}</span>
+            </div>
+          ` : ''}
+
+          ${showCabinet && !showTicketNumber ? `
+            <div class="detail-row">
+              <span class="detail-label">Xona:</span>
+              <span class="detail-value font-bold">${cabinetNumber}</span>
+            </div>
+          ` : ''}
+
+          ${showPatientName ? `
+            <div class="detail-row">
+              <span class="detail-label">Bemor:</span>
+              <span class="detail-value">${patientName}</span>
+            </div>
+          ` : ''}
+
+          ${showServicePrice ? `
+            <div class="detail-row border-top-dotted">
+              <span class="detail-label">Xizmat:</span>
+              <span class="detail-value font-bold">${paymentText}</span>
+            </div>
+          ` : ''}
         </div>
 
-        <div class="divider-dashed"></div>
-
-        <!-- TICKET NUMBER -->
-        ${
-          config.showTicketNumber !== false
-            ? `
-          <div class="ticket-num-box">
-            <div class="ticket-number">${ticketNum}</div>
-            ${config.showSpecialty !== false ? `<div class="ticket-specialty">${specialty}</div>` : ''}
-          </div>
-        `
-            : ''
-        }
-
-        <!-- CABINET & DOCTOR -->
-        ${
-          config.showCabinet !== false || config.showDoctor !== false
-            ? `
-          <div class="cabinet-box">
-            ${config.showCabinet !== false ? `<div class="cabinet-num">KABINET № ${cabinetNumber}</div>` : ''}
-            ${config.showDoctor !== false ? `<div class="doctor-name">${doctorName}</div>` : ''}
-          </div>
-        `
-            : ''
-        }
-
-        <!-- PATIENT INFO -->
-        ${
-          config.showPatientName !== false
-            ? `
-          <div class="patient-section">
-            <div class="patient-label">Bemor:</div>
-            <div class="patient-name">${patientName}</div>
-            ${
-              config.showPaymentStatus !== false || config.showWaitTime !== false
-                ? `
-              <div class="patient-meta">
-                ${config.showPaymentStatus !== false ? `<span>To'lov: <b>${paymentText}</b></span>` : ''}
-                ${config.showWaitTime !== false ? `<span>Kutish: <b>~${waitMinutes} daq</b></span>` : ''}
+        <!-- 6. WAITING STATS -->
+        ${(showWaitingCount || showEstimatedTime) ? `
+          <div class="waiting-stats-box">
+            ${showWaitingCount ? `
+              <div class="waiting-row">
+                <span>Oldingizda:</span>
+                <span class="font-bold">${waitCount} nafar bemor</span>
               </div>
-            `
-                : ''
-            }
+            ` : ''}
+            ${showEstimatedTime ? `
+              <div class="waiting-row">
+                <span>Taxminiy vaqt:</span>
+                <span class="font-bold">~ ${waitMinutes} daqiqa</span>
+              </div>
+            ` : ''}
           </div>
-        `
-            : ''
-        }
+        ` : ''}
 
-        <!-- QR CODE -->
-        ${
-          config.showQrCode !== false
-            ? `
+        <!-- 7. QR CODE -->
+        ${showQrCode ? `
           <div class="qr-section">
             <div class="qr-box">${QR_CODE_SVG}</div>
-            <div class="qr-sub">Navbatni smartfonda kuzatish uchun QR-kodni skanerlang</div>
+            <div class="qr-sub">Navbatingizni telefonda kuzatish uchun skanerlang</div>
           </div>
-        `
-            : ''
-        }
+        ` : ''}
 
-        <!-- FOOTER -->
-        ${
-          footerText || footerNote
-            ? `
+        <!-- 8. FOOTER NOTE -->
+        ${showFooter ? `
           <div class="footer-section">
-            ${footerText ? `<div class="footer-main">${footerText}</div>` : ''}
+            <div class="footer-main">${footerText}</div>
             ${footerNote ? `<div class="footer-note">${footerNote}</div>` : ''}
           </div>
-        `
-            : ''
-        }
+        ` : ''}
 
-        <!-- CUT LINE -->
-        ${
-          config.showCutLine !== false
-            ? `
+        <!-- 9. CUT LINE -->
+        ${showCutLine ? `
           <div class="cut-line">- - - Qirqish chizig'i - - -</div>
-        `
-            : ''
-        }
+        ` : ''}
       </div>
     `;
   };
@@ -192,10 +253,16 @@ export function generateThermalHtml({
 
     return `
       <div class="ticket-card">
+        ${showLogo ? `
+          <div class="ticket-logo-box">
+            <img src="${logoUrl}" alt="Klinika Logotipi" class="ticket-logo-img" />
+          </div>
+        ` : ''}
+
         <div class="ticket-header">
           <div class="clinic-name">${clinicName}</div>
           <div class="receipt-badge">KASSA NOFISKAL KVITANSIYASI</div>
-          <div class="clinic-sub">${receiptNum} • ${now}</div>
+          <div class="clinic-sub">${receiptNum} • ${dateStr} ${timeStr}</div>
         </div>
 
         <div class="divider-dashed"></div>
@@ -284,7 +351,7 @@ export function generateThermalHtml({
       width: ${contentWidthMm};
       max-width: ${contentWidthMm};
       margin: 0 auto;
-      padding: ${is80 ? '1mm 1mm 2mm 1mm' : '1mm 0.5mm 1.5mm 0.5mm'};
+      padding: ${is80 ? '2mm 1mm 3mm 1mm' : '1.5mm 0.5mm 2mm 0.5mm'};
       text-align: center;
     }
     .ticket-card {
@@ -298,9 +365,24 @@ export function generateThermalHtml({
       break-before: page;
       height: 3mm;
     }
+    .ticket-logo-box {
+      text-align: center;
+      margin: 0 auto 3px auto;
+      padding: 0;
+    }
+    .ticket-logo-img {
+      max-height: ${is80 ? '42px' : '32px'};
+      max-width: 80%;
+      object-fit: contain;
+      margin: 0 auto;
+      display: block;
+      filter: grayscale(100%) contrast(140%);
+    }
     .ticket-header {
       text-align: center;
       margin-bottom: 4px;
+      padding-bottom: 4px;
+      border-bottom: 1.5px dashed #000000;
     }
     .clinic-name {
       font-size: ${is80 ? '15px' : '12px'};
@@ -310,16 +392,155 @@ export function generateThermalHtml({
       margin-bottom: 2px;
       line-height: 1.2;
     }
-    .clinic-sub {
+    .clinic-subtitle {
       font-size: ${is80 ? '10px' : '8.5px'};
-      line-height: 1.25;
+      font-style: italic;
+      color: #333333;
+      margin-bottom: 2px;
+    }
+    .clinic-phone {
+      font-size: ${is80 ? '10px' : '8.5px'};
+      font-weight: 700;
+      font-family: "Courier New", Courier, monospace;
       color: #000000;
     }
-    .clinic-welcome {
+    .clinic-address {
       font-size: ${is80 ? '9.5px' : '8px'};
-      font-style: italic;
-      margin-top: 2px;
+      color: #333333;
       line-height: 1.2;
+    }
+    .datetime-bar {
+      display: flex;
+      justify-content: space-between;
+      font-size: ${is80 ? '10px' : '8.5px'};
+      font-family: "Courier New", Courier, monospace;
+      padding: 2px 0 3px 0;
+      border-bottom: 1px dotted #888888;
+      color: #000000;
+    }
+    .ticket-num-box {
+      margin: 4px 0 4px 0;
+      padding: 4px 0 6px 0;
+      border-bottom: 2px solid #000000;
+      text-align: center;
+    }
+    .ticket-label {
+      font-size: ${is80 ? '10px' : '8.5px'};
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #444444;
+      margin-bottom: 1px;
+    }
+    .ticket-number {
+      font-size: ${is80 ? '60px' : '44px'};
+      font-weight: 900;
+      font-family: "Courier New", Courier, monospace;
+      letter-spacing: -2px;
+      line-height: 0.95;
+      margin: 0;
+      color: #000000;
+    }
+    .ticket-cabinet-badge {
+      font-size: ${is80 ? '12px' : '10px'};
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+      color: #000000;
+    }
+    .ticket-details-list {
+      padding: 4px 0;
+      border-bottom: 1.5px dashed #000000;
+      font-size: ${is80 ? '11px' : '9.5px'};
+      line-height: 1.35;
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 2px;
+    }
+    .detail-label {
+      color: #555555;
+      font-size: ${is80 ? '10px' : '8.5px'};
+      flex-shrink: 0;
+      margin-right: 6px;
+    }
+    .detail-value {
+      text-align: right;
+      color: #000000;
+      word-break: break-word;
+    }
+    .font-bold {
+      font-weight: 700 !important;
+    }
+    .border-top-dotted {
+      border-top: 1px dotted #888888;
+      padding-top: 3px;
+      margin-top: 2px;
+    }
+    .waiting-stats-box {
+      margin: 4px 0;
+      padding: 4px 6px;
+      background: #f8f8f8;
+      border: 1px solid #cccccc;
+      border-radius: 4px;
+      font-size: ${is80 ? '10px' : '8.5px'};
+    }
+    .waiting-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 1px;
+    }
+    .qr-section {
+      margin: 4px 0 2px 0;
+      text-align: center;
+      padding-bottom: 4px;
+      border-bottom: 1.5px dashed #000000;
+    }
+    .qr-box {
+      display: inline-block;
+      padding: 2px;
+      border: 1.5px solid #000000;
+      border-radius: 4px;
+      background: #ffffff;
+      margin-bottom: 2px;
+    }
+    .qr-box svg {
+      width: ${is80 ? '40px' : '32px'};
+      height: ${is80 ? '40px' : '32px'};
+      display: block;
+    }
+    .qr-sub {
+      font-size: ${is80 ? '9px' : '7.5px'};
+      line-height: 1.2;
+      color: #555555;
+    }
+    .footer-section {
+      margin-top: 4px;
+      text-align: center;
+      font-size: ${is80 ? '10px' : '8.5px'};
+      line-height: 1.3;
+    }
+    .footer-main {
+      font-weight: 800;
+      color: #000000;
+    }
+    .footer-note {
+      font-size: ${is80 ? '9px' : '7.5px'};
+      color: #555555;
+      font-style: italic;
+      margin-top: 1px;
+    }
+    .cut-line {
+      border-bottom: 1.5px dashed #666666;
+      font-size: ${is80 ? '9px' : '7.5px'};
+      padding: 6px 0 1px 0;
+      text-align: center;
+      margin-top: 4px;
+      color: #666666;
+      font-family: sans-serif;
     }
     .receipt-badge {
       font-size: ${is80 ? '10.5px' : '9px'};
@@ -331,43 +552,6 @@ export function generateThermalHtml({
       border-bottom: 1.5px dashed #000000;
       margin: 4px 0;
       width: 100%;
-    }
-    .ticket-num-box {
-      margin: 3px 0 2px 0;
-      text-align: center;
-    }
-    .ticket-number {
-      font-size: ${is80 ? '68px' : '48px'};
-      font-weight: 900;
-      font-family: "Courier New", Courier, monospace;
-      letter-spacing: -2px;
-      line-height: 0.95;
-      margin: 0;
-    }
-    .ticket-specialty {
-      font-size: ${is80 ? '13px' : '11px'};
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-top: 3px;
-    }
-    .cabinet-box {
-      border: 1.5px solid #000000;
-      border-radius: 6px;
-      padding: ${is80 ? '5px 4px' : '4px 2px'};
-      margin: 5px 0;
-      text-align: center;
-    }
-    .cabinet-num {
-      font-size: ${is80 ? '15px' : '12px'};
-      font-weight: 900;
-      letter-spacing: 0.5px;
-    }
-    .doctor-name {
-      font-size: ${is80 ? '11px' : '9.5px'};
-      font-weight: 700;
-      margin-top: 2px;
-      word-break: break-word;
     }
     .patient-section {
       text-align: left;
@@ -398,48 +582,6 @@ export function generateThermalHtml({
       border-top: 1px dotted #888888;
       font-family: "Courier New", Courier, monospace;
     }
-    .qr-section {
-      margin: 4px 0 2px 0;
-      text-align: center;
-    }
-    .qr-box {
-      display: inline-block;
-      padding: 2px;
-      border: 1.5px solid #000000;
-      border-radius: 6px;
-      background: #ffffff;
-      margin-bottom: 2px;
-    }
-    .qr-box svg {
-      width: ${is80 ? '38px' : '30px'};
-      height: ${is80 ? '38px' : '30px'};
-      display: block;
-    }
-    .qr-sub {
-      font-size: ${is80 ? '9px' : '7.5px'};
-      line-height: 1.2;
-    }
-    .footer-section {
-      margin-top: 3px;
-      text-align: center;
-    }
-    .footer-main {
-      font-size: ${is80 ? '9.5px' : '8px'};
-      font-weight: 700;
-      line-height: 1.2;
-    }
-    .footer-note {
-      font-size: ${is80 ? '8.5px' : '7px'};
-      margin-top: 1px;
-      line-height: 1.2;
-    }
-    .cut-line {
-      border-bottom: 1.5px dashed #555555;
-      font-size: ${is80 ? '9px' : '7.5px'};
-      padding: 5px 0 1px 0;
-      text-align: center;
-      margin-top: 3px;
-    }
     .receipt-items {
       padding: 4px 0;
       text-align: left;
@@ -448,25 +590,23 @@ export function generateThermalHtml({
       display: flex;
       justify-content: space-between;
       font-size: ${is80 ? '10.5px' : '9px'};
-      padding: 1.5px 0;
+      margin-bottom: 2px;
     }
     .receipt-row-title {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      padding-right: 4px;
+      color: #333333;
     }
     .receipt-row-price {
       font-weight: 700;
-      flex-shrink: 0;
+      font-family: "Courier New", Courier, monospace;
     }
     .total-row {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      padding: 4px 0;
-      font-size: ${is80 ? '14px' : '11.5px'};
+      font-size: ${is80 ? '12px' : '10.5px'};
       font-weight: 900;
+      padding: 4px 0;
+      margin: 3px 0;
+      font-family: "Courier New", Courier, monospace;
     }
   </style>
 </head>
@@ -485,7 +625,7 @@ export function generateThermalHtml({
  */
 export async function printThermalTicket(options: PrintThermalOptions): Promise<{ success: boolean; error?: string }> {
   const html = generateThermalHtml(options);
-  const paperSize = options.paperSize || '80mm';
+  const paperSize = options.paperSize || options.config?.paperSize || '80mm';
 
   // 1. Electron Desktop Environment
   if (typeof window !== 'undefined' && (window as any).electronAPI?.printTicket) {
@@ -554,4 +694,3 @@ export async function printThermalTicket(options: PrintThermalOptions): Promise<
     }
   });
 }
-
