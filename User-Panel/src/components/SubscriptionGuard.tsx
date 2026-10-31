@@ -37,8 +37,14 @@ export const SubscriptionGuard: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       } catch (e) { }
 
+      const token = localStorage.getItem('sadaf_user_token') || localStorage.getItem('token') || '';
+      const headers: Record<string, string> = { 'x-tenant-id': tenantId };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch(`${API_BASE_URL}/clinic/subscription?tenantId=${tenantId}`, {
-        headers: { 'x-tenant-id': tenantId }
+        headers
       }).then(r => r.json());
       if (res && res.data) {
         setSubscription(res.data);

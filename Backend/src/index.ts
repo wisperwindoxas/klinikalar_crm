@@ -136,7 +136,7 @@ apiRouter.get('/super-admin/reports', ...superAdminAuth, SuperAdminController.ge
 apiRouter.get('/super-admin/system-status', ...superAdminAuth, SuperAdminController.getSystemStatus);
 
 // Real SMS Gateway & Management
-apiRouter.get('/super-admin/sms/settings', ...superAdminAuth, SuperAdminController.getSmsSettings);
+apiRouter.get('/super-admin/sms/settings', authenticateJwt, requireRoles(ADMIN_ROLES), SuperAdminController.getSmsSettings);
 apiRouter.put('/super-admin/sms/settings', ...superAdminAuth, SuperAdminController.updateSmsSettings);
 apiRouter.get('/super-admin/sms/templates', ...superAdminAuth, SuperAdminController.getSmsTemplates);
 apiRouter.put('/super-admin/sms/templates/:eventType', ...superAdminAuth, SuperAdminController.updateSmsTemplate);
@@ -203,7 +203,7 @@ apiRouter.post('/tv/test-call', authenticateJwt, enforceTenantBoundary, requireR
 apiRouter.get('/reports/manager-dashboard', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.getManagerDashboard);
 apiRouter.get('/clinic/settings', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.getSettings);
 apiRouter.patch('/clinic/settings', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.updateSettings);
-apiRouter.get('/clinic/subscription', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.getSubscription);
+apiRouter.get('/clinic/subscription', authenticateJwt, enforceTenantBoundary, requireRoles(STAFF_ROLES), ClinicQueueController.getSubscription);
 apiRouter.get('/clinic/audit-logs', authenticateJwt, enforceTenantBoundary, requireRoles(ADMIN_ROLES), ClinicQueueController.getAuditLogs);
 
 // 11. Users & Shifts Management
