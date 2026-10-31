@@ -73,15 +73,15 @@ export const SubscriptionGuard: React.FC<{ children: React.ReactNode }> = ({ chi
 
       socket.on('clinic.subscription_updated', handleSubscriptionUpdated);
 
-      // Periodic check every 6 seconds as a backup
-      const interval = setInterval(fetchSubscription, 6000);
+      // Periodic check every 60 seconds as a backup
+      const interval = setInterval(fetchSubscription, 60000);
 
       return () => {
         socket.off('clinic.subscription_updated', handleSubscriptionUpdated);
         clearInterval(interval);
       };
     } catch (e) {
-      const interval = setInterval(fetchSubscription, 6000);
+      const interval = setInterval(fetchSubscription, 60000);
       return () => clearInterval(interval);
     }
   }, [fetchSubscription]);
