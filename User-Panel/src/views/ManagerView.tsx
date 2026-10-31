@@ -53,7 +53,7 @@ import { APP_LOGO, APP_VERSION } from '../utils/brand';
 import { printThermalTicket } from '../utils/thermalPrinter';
 import * as XLSX from 'xlsx';
 
-const API_BASE_URL = 'http://localhost:5001/api/v1';
+const API_BASE_URL = 'http://189.74.99.251:5001/api/v1';
 
 const getAuthToken = (): string => {
   return localStorage.getItem('sadaf_user_token') || localStorage.getItem('token') || '';

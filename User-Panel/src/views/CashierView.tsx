@@ -20,7 +20,7 @@ import { formatUzbekPhone } from '../utils/phone';
 import { APP_LOGO, APP_VERSION } from '../utils/brand';
 import { printThermalTicket } from '../utils/thermalPrinter';
 
-const API_BASE_URL = 'http://localhost:5001/api/v1';
+const API_BASE_URL = 'http://189.74.99.251:5001/api/v1';
 const EMPTY_TICKETS: any[] = [];
 
 const getAuthToken = (): string => {

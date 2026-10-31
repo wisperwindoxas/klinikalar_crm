@@ -41,6 +41,8 @@ desktop.ini
 .env
 .env.*
 !.env.example
+eskizvps.env
+*.env
 *.pem
 *.key
 *.cert

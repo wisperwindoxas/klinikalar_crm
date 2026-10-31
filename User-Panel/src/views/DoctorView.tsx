@@ -16,7 +16,7 @@ import { CompleteVisitModal } from '../components/CompleteVisitModal';
 import { AppUpdateModal } from '../components/AppUpdateModal';
 import { APP_LOGO, APP_VERSION } from '../utils/brand';
 
-const API_BASE_URL = 'http://localhost:5001/api/v1';
+const API_BASE_URL = 'http://189.74.99.251:5001/api/v1';
 
 const getAuthHeaders = (extra: Record<string, string> = {}): Record<string, string> => {
   const token = localStorage.getItem('sadaf_user_token') || localStorage.getItem('token') || '';

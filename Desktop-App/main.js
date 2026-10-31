@@ -31,7 +31,7 @@ let tvWindow = null;
 const isDev = process.argv.includes('--dev') || process.env.NODE_ENV === 'development' || !app.isPackaged;
 const USER_PANEL_DEV_URL = 'http://localhost:3001';
 const TV_DISPLAY_DEV_URL = 'http://localhost:3002';
-const BACKEND_URL = 'http://localhost:5001';
+const BACKEND_URL = 'http://189.74.99.251:5001';
 
 // Format display object for IPC
 function formatDisplays() {

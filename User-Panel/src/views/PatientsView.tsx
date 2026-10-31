@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { NewPatientModal } from '../components/NewPatientModal';
 
-const API_BASE_URL = 'http://localhost:5001/api/v1';
+const API_BASE_URL = 'http://189.74.99.251:5001/api/v1';
 
 interface PatientsViewProps {
   patients: any[];

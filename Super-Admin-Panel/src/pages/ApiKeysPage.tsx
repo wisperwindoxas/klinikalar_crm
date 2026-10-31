@@ -202,7 +202,7 @@ export const ApiKeysPage: React.FC = () => {
         </div>
 
         <a
-          href="http://localhost:5001/health"
+          href="http://189.74.99.251:5001/health"
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition border border-slate-200 self-start sm:self-auto"

@@ -16,11 +16,10 @@ INSERT INTO roles (id, name, code, description) VALUES
 ON CONFLICT (code) DO NOTHING;
 
 -- 3. USERS (bcrypt for 'admin123' / 'kassir123' / 'doctor123')
--- '$2a$10$fV3.kK9GZ2q5f7Zc.v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC'
 INSERT INTO users (id, full_name, username, password_hash, role_id, phone, is_active) VALUES
-('usr_manager', 'Azizbek Rahimov (Menejer)', 'admin', '$2a$10$f/9Z8d0P9q0k0v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC', 'role_manager', '+998 90 123 45 67', true),
-('usr_cashier1', 'Dilnoza Karimova (Kassir)', 'kassir1', '$2a$10$f/9Z8d0P9q0k0v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC', 'role_cashier', '+998 93 555 44 33', true),
-('usr_cashier2', 'Malika Tursunova (Kassir)', 'kassir2', '$2a$10$f/9Z8d0P9q0k0v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC', 'role_cashier', '+998 93 444 33 22', true)
+('usr_manager', 'Azizbek Rahimov (Menejer)', 'admin', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_manager', '+998 90 123 45 67', true),
+('usr_cashier1', 'Dilnoza Karimova (Kassir)', 'kassir1', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_cashier', '+998 93 555 44 33', true),
+('usr_cashier2', 'Malika Tursunova (Kassir)', 'kassir2', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_cashier', '+998 93 444 33 22', true)
 ON CONFLICT (username) DO NOTHING;
 
 -- 4. SPECIALTIES (Prefixes matching design.md: K, T, N, U, J, P, S, O, L, D, E, G, TR, GA)
@@ -67,16 +66,16 @@ ON CONFLICT (number) DO NOTHING;
 
 -- 6. 20+ DOCTORS & THEIR USERS
 INSERT INTO users (id, full_name, username, password_hash, role_id, phone, is_active) VALUES
-('usr_doc_01', 'Dr. Aliyev Jahongir Rustamovich', 'doc_kardio1', '$2a$10$f/9Z8d0P9q0k0v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC', 'role_doctor', '+998 90 111 22 33', true),
-('usr_doc_02', 'Dr. Qosimova Nilufar Anvarovna', 'doc_kardio2', '$2a$10$f/9Z8d0P9q0k0v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC', 'role_doctor', '+998 90 222 33 44', true),
-('usr_doc_03', 'Dr. Saidova Dilnoza Farxodovna', 'doc_terapevt1', '$2a$10$f/9Z8d0P9q0k0v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC', 'role_doctor', '+998 90 333 44 55', true),
-('usr_doc_04', 'Dr. Mirzayev Aziz Akmalovich', 'doc_terapevt2', '$2a$10$f/9Z8d0P9q0k0v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC', 'role_doctor', '+998 90 444 55 66', true),
-('usr_doc_05', 'Dr. Rashidov Akmal Botirovich', 'doc_nevro1', '$2a$10$f/9Z8d0P9q0k0v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC', 'role_doctor', '+998 90 555 66 77', true),
-('usr_doc_06', 'Dr. Karimova Sevara Ulug''bekovna', 'doc_nevro2', '$2a$10$f/9Z8d0P9q0k0v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC', 'role_doctor', '+998 90 666 77 88', true),
-('usr_doc_07', 'Dr. Nurmatov Bekzod Sharifovich', 'doc_uro1', '$2a$10$f/9Z8d0P9q0k0v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC', 'role_doctor', '+998 90 777 88 99', true),
-('usr_doc_08', 'Dr. Umarov Jasur Shuhratovich', 'doc_jarroh1', '$2a$10$f/9Z8d0P9q0k0v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC', 'role_doctor', '+998 90 888 99 00', true),
-('usr_doc_09', 'Dr. Xoliqova Umida Bobirovna', 'doc_pediatr1', '$2a$10$f/9Z8d0P9q0k0v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC', 'role_doctor', '+998 91 111 22 33', true),
-('usr_doc_10', 'Dr. Ismoilov Otabek Rustamovich', 'doc_pediatr2', '$2a$10$f/9Z8d0P9q0k0v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC', 'role_doctor', '+998 91 222 33 44', true),
+('usr_doc_01', 'Dr. Aliyev Jahongir Rustamovich', 'doc_kardio1', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_doctor', '+998 90 111 22 33', true),
+('usr_doc_02', 'Dr. Qosimova Nilufar Anvarovna', 'doc_kardio2', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_doctor', '+998 90 222 33 44', true),
+('usr_doc_03', 'Dr. Saidova Dilnoza Farxodovna', 'doc_terapevt1', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_doctor', '+998 90 333 44 55', true),
+('usr_doc_04', 'Dr. Mirzayev Aziz Akmalovich', 'doc_terapevt2', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_doctor', '+998 90 444 55 66', true),
+('usr_doc_05', 'Dr. Rashidov Akmal Botirovich', 'doc_nevro1', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_doctor', '+998 90 555 66 77', true),
+('usr_doc_06', 'Dr. Karimova Sevara Ulug''bekovna', 'doc_nevro2', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_doctor', '+998 90 666 77 88', true),
+('usr_doc_07', 'Dr. Nurmatov Bekzod Sharifovich', 'doc_uro1', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_doctor', '+998 90 777 88 99', true),
+('usr_doc_08', 'Dr. Umarov Jasur Shuhratovich', 'doc_jarroh1', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_doctor', '+998 90 888 99 00', true),
+('usr_doc_09', 'Dr. Xoliqova Umida Bobirovna', 'doc_pediatr1', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_doctor', '+998 91 111 22 33', true),
+('usr_doc_10', 'Dr. Ismoilov Otabek Rustamovich', 'doc_pediatr2', '$2a$10$wgfdKOw7el3cJ2nNmUVPEeMuKtYLcqj8plVDEA4GGYEdiskMoFwlO', 'role_doctor', '+998 91 222 33 44', true),
 ('usr_doc_11', 'Dr. Ergashev Bobur Odilovich', 'doc_stomat1', '$2a$10$f/9Z8d0P9q0k0v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC', 'role_doctor', '+998 91 333 44 55', true),
 ('usr_doc_12', 'Dr. Yo''ldoshev Sardor Bahodirovich', 'doc_stomat2', '$2a$10$f/9Z8d0P9q0k0v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC', 'role_doctor', '+998 91 444 55 66', true),
 ('usr_doc_13', 'Dr. Mahmudova Shahlo Anvarovna', 'doc_oftalm1', '$2a$10$f/9Z8d0P9q0k0v6E.eQGvO1C9B.K4A1L6H3M2.H7eG1x0zWkC', 'role_doctor', '+998 91 555 66 77', true),

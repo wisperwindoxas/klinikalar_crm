@@ -1,4 +1,4 @@
--- Clinic Queue Management System (PostgreSQL 16 Schema)
+-- Clinic Queue Management System (Embedded PostgreSQL Schema)
 -- As per Documentation/dasturchi.md & design.md
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -6,6 +6,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- 1. CLINIC SETTINGS
 CREATE TABLE IF NOT EXISTS clinic_settings (
     id VARCHAR(50) PRIMARY KEY DEFAULT 'default',
+    clinic_id VARCHAR(50) DEFAULT 'tenant_sadaf_01',
     clinic_name VARCHAR(255) NOT NULL DEFAULT 'SADAF KLINIKA',
     default_queue_prefix VARCHAR(5) NOT NULL DEFAULT 'A',
     timezone VARCHAR(50) NOT NULL DEFAULT 'Asia/Tashkent',
@@ -69,6 +70,7 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 -- 3. USERS
 CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(50) PRIMARY KEY,
+    clinic_id VARCHAR(50) DEFAULT 'tenant_sadaf_01',
     full_name VARCHAR(255) NOT NULL,
     username VARCHAR(100) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -83,6 +85,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- 4. PATIENTS
 CREATE TABLE IF NOT EXISTS patients (
     id VARCHAR(50) PRIMARY KEY,
+    clinic_id VARCHAR(50) DEFAULT 'tenant_sadaf_01',
     patient_number VARCHAR(50) UNIQUE NOT NULL,
     full_name VARCHAR(255) NOT NULL,
     phone VARCHAR(50),
@@ -99,6 +102,7 @@ CREATE INDEX IF NOT EXISTS idx_patients_search ON patients(full_name, phone, pat
 -- 5. SPECIALTIES
 CREATE TABLE IF NOT EXISTS specialties (
     id VARCHAR(50) PRIMARY KEY,
+    clinic_id VARCHAR(50) DEFAULT 'tenant_sadaf_01',
     name VARCHAR(100) NOT NULL,
     prefix VARCHAR(5) NOT NULL,
     description TEXT,
@@ -109,6 +113,7 @@ CREATE TABLE IF NOT EXISTS specialties (
 -- 6. CABINETS
 CREATE TABLE IF NOT EXISTS cabinets (
     id VARCHAR(50) PRIMARY KEY,
+    clinic_id VARCHAR(50) DEFAULT 'tenant_sadaf_01',
     number VARCHAR(20) UNIQUE NOT NULL,
     name VARCHAR(100) NOT NULL,
     department VARCHAR(100) DEFAULT 'Ambulatoriya',
@@ -120,6 +125,7 @@ CREATE TABLE IF NOT EXISTS cabinets (
 -- 7. DOCTORS (20+ doctors capability)
 CREATE TABLE IF NOT EXISTS doctors (
     id VARCHAR(50) PRIMARY KEY,
+    clinic_id VARCHAR(50) DEFAULT 'tenant_sadaf_01',
     user_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
     specialty_id VARCHAR(50) REFERENCES specialties(id),
     cabinet_id VARCHAR(50) REFERENCES cabinets(id),

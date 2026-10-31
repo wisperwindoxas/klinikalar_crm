@@ -1,7 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 
-const API_BASE_URL = 'http://localhost:5001/api/v1';
-const WS_BASE_URL = 'http://localhost:5001';
+const API_BASE_URL = 'http://189.74.99.251:5001/api/v1';
+const WS_BASE_URL = 'http://189.74.99.251:5001';
 
 export class UserApiClient {
   private static token: string = '';

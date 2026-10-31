@@ -4,8 +4,8 @@ import { io, Socket } from 'socket.io-client';
 import { playChime } from './audio/chime';
 import appLogo from './assets/logo.png';
 
-const API_BASE_URL = 'http://localhost:5001/api/v1';
-const WS_BASE_URL = 'http://localhost:5001';
+const API_BASE_URL = 'http://189.74.99.251:5001/api/v1';
+const WS_BASE_URL = 'http://189.74.99.251:5001';
 
 // O'zbek tili sonlari va tartib raqamlari
 const UZ_NUMBERS: Record<string, string> = {
