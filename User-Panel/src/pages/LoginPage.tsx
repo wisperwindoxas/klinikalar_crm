@@ -2,19 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Lock,
-  User,
   ArrowRight,
   ShieldCheck,
-  Stethoscope,
   Ticket,
   AlertCircle,
   Eye,
   EyeOff,
   Phone,
   Activity,
-  CheckCircle2,
-  Tv,
-  HeartPulse,
   Sparkles,
   Building2,
   LockKeyhole,
@@ -26,166 +21,101 @@ import { APP_LOGO } from '../utils/brand';
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
 
-  // Input states
-  const [identifier, setIdentifier] = useState('');
+  // Input states - faqat telefon raqam (9 ta raqam) va parol
+  const [phoneDigits, setPhoneDigits] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
-  const [inputMode, setInputMode] = useState<'smart' | 'phone' | 'username'>('smart');
 
   // UI status
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [capsLockActive, setCapsLockActive] = useState(false);
 
-  // Load remembered identifier on mount
+  // Eslab qolingan telefon raqamni yuklash
   useEffect(() => {
-    const saved = localStorage.getItem('sadaf_remember_identifier');
+    const saved = localStorage.getItem('sadaf_remember_phone');
     if (saved) {
-      setIdentifier(saved);
+      const digits = saved.replace(/\D/g, '').slice(-9);
+      setPhoneDigits(digits);
       setRememberMe(true);
+      return;
+    }
+    // Eski saqlangan identifier bo'lsa undan faqat raqamlarini olish
+    const oldSaved = localStorage.getItem('sadaf_remember_identifier');
+    if (oldSaved) {
+      const raw = oldSaved.replace(/\D/g, '');
+      const digits = raw.startsWith('998') ? raw.slice(3) : raw;
+      if (digits.length === 9) {
+        setPhoneDigits(digits);
+        setRememberMe(true);
+      }
     }
   }, []);
 
-  // Format Uzbekistan phone numbers dynamically
-  const formatUzbekPhone = (input: string): string => {
-    let digits = input.replace(/\D/g, '');
-
-    // If starts with country code 998, strip it to work with remaining 9 digits
-    if (digits.startsWith('998')) {
-      digits = digits.slice(3);
-    }
-
-    // Limit to 9 digits (2 digits code + 7 digits number)
-    digits = digits.slice(0, 9);
-
-    if (digits.length === 0) {
-      return '+998 ';
-    }
-
-    let res = '+998';
-    if (digits.length > 0) {
-      res += ` (${digits.slice(0, 2)}`;
-      if (digits.length > 2) {
-        res += `) ${digits.slice(2, 5)}`;
-        if (digits.length > 5) {
-          res += `-${digits.slice(5, 7)}`;
-        }
-        if (digits.length > 7) {
-          res += `-${digits.slice(7, 9)}`;
-        }
-      } else if (digits.length === 2) {
-        res += `) `;
-      }
-    }
-    return res;
+  // O'zbekiston telefon raqamini formatlash: (90) 123-45-67
+  const formatPhoneDigits = (raw: string): string => {
+    const d = raw.replace(/\D/g, '').slice(0, 9);
+    if (d.length === 0) return '';
+    if (d.length <= 2) return `(${d}`;
+    if (d.length <= 5) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+    if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2, 5)}-${d.slice(5)}`;
+    return `(${d.slice(0, 2)}) ${d.slice(2, 5)}-${d.slice(5, 7)}-${d.slice(7, 9)}`;
   };
 
-  // Smart input change handler
-  const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
+  // Telefon raqami kiritish va paste qilish hodisasi
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError('');
+    const val = e.target.value;
+    let raw = val.replace(/\D/g, '');
 
-    // If empty
-    if (!val || val.trim() === '') {
-      if (inputMode === 'phone') {
-        // Telefon rejimida bo'lsa +998 o'chmasin
-        setIdentifier('+998 ');
-        return;
-      }
-      setIdentifier('');
-      setInputMode('smart');
-      return;
+    // Agar foydalanuvchi +998 yoki 998 bilan boshlangan to'liq raqamni paste qilsa
+    if (val.trim().startsWith('+998') || (raw.length > 9 && raw.startsWith('998'))) {
+      raw = raw.slice(3);
     }
 
-    // Check if input is likely a phone number
-    const isPhoneLike = val.startsWith('+') || /^\d/.test(val) || val.startsWith('998') || val.startsWith('(') || inputMode === 'phone';
-
-    if (isPhoneLike) {
-      const rawDigits = val.replace(/\D/g, '');
-      const phoneDigits = rawDigits.startsWith('998') ? rawDigits.slice(3) : rawDigits;
-
-      // Agar raqamlar qolmagan bo'lsa ham +998 saqlanadi
-      if (phoneDigits.length === 0) {
-        setIdentifier('+998 ');
-        setInputMode('phone');
-        return;
-      }
-
-      const formatted = formatUzbekPhone(val);
-      setIdentifier(formatted);
-      setInputMode('phone');
-    } else {
-      // It's a text username like 'admin', 'doctor', 'kassir', 'doc_kardio1'
-      setIdentifier(val);
-      setInputMode('username');
-    }
+    const digits = raw.slice(0, 9);
+    setPhoneDigits(digits);
   };
 
-  // Backspace, Delete and Caps lock handling
-  const handleIdentifierKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  // Backspace va klaviatura hodisasi (hech qachon qotib qolmaydi, o'chirish bemalol ishlaydi)
+  const handlePhoneKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.getModifierState && e.getModifierState('CapsLock')) {
       setCapsLockActive(true);
     } else {
       setCapsLockActive(false);
     }
 
-    // Telefon rejimida +998 o'chib ketishidan himoyalash
-    if (inputMode === 'phone') {
+    if (e.key === 'Backspace') {
       const input = e.currentTarget;
       const { selectionStart, selectionEnd } = input;
 
-      // 1. Backspace bosilganda
-      if (e.key === 'Backspace') {
-        // Agar butun maydon belgilangan bo'lsa, uni to'liq o'chirmasdan +998 ga qaytaradi
-        if (selectionStart === 0 && selectionEnd === identifier.length) {
-          e.preventDefault();
-          setIdentifier('+998 ');
-          return;
-        }
-
-        // Agar kursor +998 qismida (0-5 indeksda) bo'lsa, o'chirish taqiqlanadi
-        if (selectionStart !== null && selectionStart <= 5 && selectionEnd !== null && selectionEnd <= 5) {
-          e.preventDefault();
-          return;
-        }
-
-        // Agar kursor bitta nuqtada tursa
-        if (selectionStart !== null && selectionStart === selectionEnd && selectionStart > 0) {
-          const charBefore = identifier[selectionStart - 1];
-
-          // Agar kursor oldidagi belgi raqam bo'lmasa (masalan ')', ' ', '-', '(')
-          if (/\D/.test(charBefore)) {
-            e.preventDefault();
-
-            const allDigits = identifier.replace(/\D/g, '');
-            const localDigits = allDigits.startsWith('998') ? allDigits.slice(3) : allDigits;
-
-            if (localDigits.length <= 1) {
-              setIdentifier('+998 ');
-              return;
-            }
-
-            // Oxirgi bitta raqamni o'chiramiz va qayta formatlaymiz
-            const remainingDigits = localDigits.slice(0, -1);
-            const formatted = formatUzbekPhone(remainingDigits);
-            setIdentifier(formatted);
-            return;
-          }
-        }
+      // Agar biror qism belgilangan bo'lsa standart o'chirishga ruxsat
+      if (selectionStart !== null && selectionEnd !== null && selectionStart !== selectionEnd) {
+        return;
       }
 
-      // 2. Delete bosilsa va kursor +998 qismida bo'lsa (0-4)
-      if (e.key === 'Delete') {
-        if (selectionStart !== null && selectionStart < 5 && selectionEnd !== null && selectionEnd <= 5) {
+      // Agar kursor formatlash belgisi (masalan ')', ' ', '-') oldida bo'lsa
+      if (selectionStart !== null && selectionStart > 0) {
+        const charBefore = input.value[selectionStart - 1];
+        if (/\D/.test(charBefore)) {
           e.preventDefault();
-          return;
+          let digitsBefore = 0;
+          for (let i = 0; i < selectionStart; i++) {
+            if (/\d/.test(input.value[i])) {
+              digitsBefore++;
+            }
+          }
+          if (digitsBefore > 0) {
+            const newDigits = phoneDigits.slice(0, digitsBefore - 1) + phoneDigits.slice(digitsBefore);
+            setPhoneDigits(newDigits);
+          }
         }
       }
     }
   };
 
-  // General key down (e.g. for Caps Lock on password field)
+  // Umumiy klaviatura hodisasi (Caps Lock kuzatish)
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.getModifierState && e.getModifierState('CapsLock')) {
       setCapsLockActive(true);
@@ -194,42 +124,36 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  // Submit Handler
+  // Tizimga kirish
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const cleanIdentifier = identifier.trim();
-    if (!cleanIdentifier || cleanIdentifier === '+998') {
-      setError('Telefon raqam yoki loginni kiriting');
+    if (!phoneDigits || phoneDigits.length < 9) {
+      setError('Telefon raqamingizni to‘liq 9 ta raqamini kiriting (masalan: (90) 123-45-67)');
       return;
     }
 
-    if (inputMode === 'phone') {
-      const rawDigits = cleanIdentifier.replace(/\D/g, '');
-      const localDigits = rawDigits.startsWith('998') ? rawDigits.slice(3) : rawDigits;
-      if (localDigits.length < 9) {
-        setError('Telefon raqamini to‘liq kiriting (masalan: +998 90 123-45-67)');
-        return;
-      }
-    }
-
     if (!password.trim()) {
-      setError('Parolni kiriting');
+      setError('Maxfiy parolni kiriting');
       return;
     }
 
     setLoading(true);
     setError('');
 
+    // Backend barcha formatlarni qabul qiladi, to'liq xalqaro format jo'natamiz
+    const fullPhone = `+998${phoneDigits}`;
+
     try {
-      const res = await UserApiClient.login(cleanIdentifier, password);
+      const res = await UserApiClient.login(fullPhone, password);
       if (res.data?.user) {
         const user = res.data.user;
         localStorage.setItem('sadaf_user', JSON.stringify(user));
 
         if (rememberMe) {
-          localStorage.setItem('sadaf_remember_identifier', cleanIdentifier);
+          localStorage.setItem('sadaf_remember_phone', phoneDigits);
         } else {
+          localStorage.removeItem('sadaf_remember_phone');
           localStorage.removeItem('sadaf_remember_identifier');
         }
 
@@ -246,13 +170,11 @@ export const LoginPage: React.FC = () => {
         throw new Error('Foydalanuvchi ma’lumotlari topilmadi');
       }
     } catch (err: any) {
-      setError(err.message || 'Login yoki parol noto‘g‘ri. Iltimos, qayta urinib ko‘ring.');
+      setError(err.message || 'Telefon raqam yoki parol noto‘g‘ri. Iltimos, qayta urinib ko‘ring.');
     } finally {
       setLoading(false);
     }
   };
-
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F0FDFA] via-[#F8FAFC] to-[#EFF6FF] flex items-center justify-center p-4 sm:p-6 lg:p-8 font-sans relative overflow-hidden select-none">
@@ -356,12 +278,10 @@ export const LoginPage: React.FC = () => {
               <h3 className="text-2xl font-black text-slate-800 tracking-tight mt-2">
                 Tizimga xush kelibsiz! 👋
               </h3>
-              <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                Klinika ma’muriyati tomonidan berilgan login yoki telefon raqamingiz orqali kiring.
+              <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+                Klinika ma’muriyati tomonidan berilgan telefon raqamingiz va maxfiy parol orqali kiring.
               </p>
             </div>
-
-
 
             {/* Main Form */}
             <form onSubmit={handleLogin} className="space-y-4">
@@ -376,72 +296,46 @@ export const LoginPage: React.FC = () => {
                 </div>
               )}
 
-              {/* 1. Identifier (Phone or Login) */}
+              {/* 1. Phone Input with Fixed +998 Prefix */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                    {inputMode === 'phone' ? (
-                      <>
-                        <Phone className="w-3.5 h-3.5 text-teal-600" />
-                        <span>Telefon raqamingiz</span>
-                      </>
-                    ) : (
-                      <>
-                        <User className="w-3.5 h-3.5 text-teal-600" />
-                        <span>Login yoki Telefon raqam</span>
-                      </>
-                    )}
+                    <Phone className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Telefon raqamingiz</span>
                   </label>
-                  {inputMode === 'phone' && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200/60">
-                        🇺🇿 O'zbekiston (+998)
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIdentifier('');
-                          setInputMode('username');
-                          setError('');
-                        }}
-                        className="text-[11px] font-semibold text-teal-600 hover:text-teal-700 hover:underline cursor-pointer"
-                      >
-                        Loginga o'tish
-                      </button>
-                    </div>
-                  )}
+                  <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200/60">
+                    🇺🇿 O'zbekiston (+998)
+                  </span>
                 </div>
 
-                <div className="relative group">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
-                    {inputMode === 'phone' ? (
-                      <div className="flex items-center gap-1 text-slate-700 font-bold text-xs bg-slate-200/70 px-2 py-0.5 rounded-md">
-                        <span>🇺🇿</span>
-                      </div>
-                    ) : (
-                      <User className="w-4 h-4 text-slate-400 group-focus-within:text-teal-600 transition-colors" />
-                    )}
+                <div className="flex items-center w-full bg-slate-50/80 hover:bg-slate-50 focus-within:bg-white border border-slate-200 focus-within:border-teal-500 rounded-2xl text-xs sm:text-sm font-semibold text-slate-800 focus-within:ring-4 focus-within:ring-teal-500/15 transition-all shadow-sm overflow-hidden group">
+                  {/* Fixed +998 Prefix */}
+                  <div className="flex items-center gap-1.5 px-3.5 py-3 bg-slate-100/90 border-r border-slate-200 text-slate-700 font-bold select-none shrink-0">
+                    <span className="text-base leading-none">🇺🇿</span>
+                    <span className="text-slate-900 tracking-wide font-bold">+998</span>
                   </div>
 
+                  {/* Phone digits input */}
                   <input
-                    type="text"
-                    value={identifier}
-                    onChange={handleIdentifierChange}
-                    onKeyDown={handleIdentifierKeyDown}
-                    placeholder="Masalan: +998 (90) 123-45-67 yoki admin"
-                    className={`w-full ${inputMode === 'phone' ? 'pl-16' : 'pl-10'
-                      } pr-10 py-3 bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-teal-500 rounded-2xl text-xs sm:text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-teal-500/15 transition-all shadow-sm`}
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    value={formatPhoneDigits(phoneDigits)}
+                    onChange={handlePhoneChange}
+                    onKeyDown={handlePhoneKeyDown}
+                    placeholder="(90) 123-45-67"
+                    className="w-full px-3.5 py-3 bg-transparent border-0 focus:outline-none focus:ring-0 text-xs sm:text-sm font-semibold text-slate-800 placeholder-slate-400"
+                    autoFocus
                   />
 
-                  {identifier && (
+                  {phoneDigits && (
                     <button
                       type="button"
                       onClick={() => {
-                        setIdentifier('');
-                        setInputMode('smart');
+                        setPhoneDigits('');
                         setError('');
                       }}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 rounded-full transition cursor-pointer"
+                      className="p-1 mr-3 text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 rounded-full transition cursor-pointer shrink-0"
                       title="Tozalash"
                     >
                       <X className="w-4 h-4" />
@@ -476,7 +370,7 @@ export const LoginPage: React.FC = () => {
                     }}
                     onKeyDown={handleKeyDown}
                     placeholder="••••••••••••"
-                    className="w-full pl-10 pr-12 py-3 bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-teal-500 rounded-2xl text-xs sm:text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-teal-500/15 transition-all shadow-sm"
+                    className="w-full pl-10 pr-12 py-3 bg-slate-50/80 hover:bg-slate-50 focus-within:bg-white border border-slate-200 focus:border-teal-500 rounded-2xl text-xs sm:text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-teal-500/15 transition-all shadow-sm"
                   />
 
                   {/* Eye Toggle Button */}
