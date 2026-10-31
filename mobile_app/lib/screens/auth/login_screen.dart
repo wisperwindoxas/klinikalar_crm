@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/api_constants.dart';
 import '../../core/utils/formatters.dart';
 import '../../services/auth_service.dart';
 import '../../services/security_service.dart';
@@ -8,7 +7,6 @@ import '../doctor/doctor_main_screen.dart';
 import '../cashier/cashier_main_screen.dart';
 import '../manager/manager_main_screen.dart';
 import 'pin_lock_screen.dart';
-import 'pin_setup_sheet.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -21,18 +19,43 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _scrollController = ScrollController();
+  final _passwordFocusNode = FocusNode();
+
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _autoFormatPhone = true; // By default: 🇺🇿 +998 (XX) XXX-XX-XX
 
   @override
+  void initState() {
+    super.initState();
+    _passwordFocusNode.addListener(() {
+      if (_passwordFocusNode.hasFocus) {
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _phoneController.dispose();
     _passwordController.dispose();
+    _scrollController.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
   Future<void> _handleLogin() async {
+    FocusScope.of(context).unfocus();
+
     final rawPassword = _passwordController.text;
     String rawLogin;
 
@@ -64,76 +87,37 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    final result = await AuthService().login(rawLogin, rawPassword);
+    try {
+      final result = await AuthService().login(rawLogin, rawPassword);
+      if (!mounted) return;
 
-    setState(() => _isLoading = false);
-
-    if (!mounted) return;
-
-    if (result['success'] == true) {
-      final sec = SecurityService();
-      if (!sec.hasPin) {
-        _promptPinSetup();
-      } else {
+      if (result['success'] == true) {
+        final sec = SecurityService();
         sec.unlock();
         _navigateToRole();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Login yoki parol noto‘g‘ri'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message'] ?? 'Login yoki parol noto‘g‘ri'),
-          backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 7),
-          action: SnackBarAction(
-            label: 'Server IP',
-            textColor: Colors.white,
-            onPressed: _showServerConfigDialog,
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Xatolik yuz berdi: $e'),
+            backgroundColor: AppColors.error,
           ),
-        ),
-      );
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
-  }
-
-  void _promptPinSetup() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: const Row(
-          children: [
-            Icon(Icons.fingerprint_rounded, color: AppColors.primary, size: 28),
-            SizedBox(width: 10),
-            Text('Tezkor Kirish', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: const Text(
-          'Har safar login va parol kiritmaslik uchun 4 xonali PIN-kod va barmoq izi orqali kirishni yoqishni xohlaysizmi?',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _navigateToRole();
-            },
-            child: const Text('Keyinroq', style: TextStyle(color: AppColors.textMuted)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              PinSetupSheet.show(context, onPinSetSuccess: _navigateToRole);
-            },
-            child: const Text('PIN-kod o‘rnatish'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _navigateToRole() {
@@ -149,70 +133,32 @@ class _LoginScreenState extends State<LoginScreen> {
       targetScreen = const DoctorMainScreen();
     }
 
-    Navigator.of(context).pushAndRemoveUntil(
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => targetScreen),
       (route) => false,
     );
   }
 
-  void _showServerConfigDialog() {
-    final ipCtrl = TextEditingController(text: ApiConstants.baseUrl);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Server Manzili (API URL)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Agar telefoningiz Wi-Fi orqali serverga ulansa, kompyuter IP manzilini kiriting:',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: ipCtrl,
-              decoration: const InputDecoration(
-                hintText: 'http://192.168.1.7:5001/api/v1',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Bekor qilish')),
-          ElevatedButton(
-            onPressed: () async {
-              await ApiConstants.updateBaseUrl(ipCtrl.text.trim());
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Server manzili saqlandi: ${ApiConstants.baseUrl}')),
-              );
-            },
-            child: const Text('Saqlash'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          controller: _scrollController,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.fromLTRB(
+            24,
+            24,
+            24,
+            bottomInset > 0 ? bottomInset + 20 : 24,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Align(
-                alignment: Alignment.topRight,
-                child: IconButton(
-                  icon: const Icon(Icons.settings_outlined, color: AppColors.textMuted, size: 22),
-                  tooltip: 'Server IP sozlamalari',
-                  onPressed: _showServerConfigDialog,
-                ),
-              ),
+              const SizedBox(height: 12),
               // App Brand & Logo
               Center(
                 child: Container(
@@ -314,6 +260,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       controller: _phoneController,
                       keyboardType: _autoFormatPhone ? TextInputType.phone : TextInputType.text,
                       inputFormatters: _autoFormatPhone ? [const Uzbek9DigitPhoneFormatter()] : [],
+                      textInputAction: TextInputAction.next,
+                      onFieldSubmitted: (_) => _passwordFocusNode.requestFocus(),
                       onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
                         prefixIcon: _autoFormatPhone
@@ -363,7 +311,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _passwordController,
+                      focusNode: _passwordFocusNode,
                       obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _handleLogin(),
                       decoration: InputDecoration(
                         prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20, color: AppColors.textMuted),
                         hintText: '••••••••',

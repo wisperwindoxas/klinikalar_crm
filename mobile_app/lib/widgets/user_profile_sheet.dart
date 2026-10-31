@@ -73,9 +73,10 @@ class _UserProfileSheetState extends State<UserProfileSheet> {
       ),
     );
 
-    if (confirm == true && mounted) {
+    if (confirm == true) {
+      final nav = Navigator.of(context, rootNavigator: true);
       await AuthService().logout();
-      Navigator.of(context).pushAndRemoveUntil(
+      nav.pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
       );

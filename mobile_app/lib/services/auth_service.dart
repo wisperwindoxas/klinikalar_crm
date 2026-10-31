@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import 'api_service.dart';
+import 'security_service.dart';
 
 class AuthService extends ChangeNotifier {
   static final AuthService _instance = AuthService._internal();
@@ -121,6 +122,8 @@ class AuthService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('cached_user');
     await prefs.remove('auth_token');
+    await prefs.remove('active_doctor_id');
+    SecurityService().unlock();
     notifyListeners();
   }
 }

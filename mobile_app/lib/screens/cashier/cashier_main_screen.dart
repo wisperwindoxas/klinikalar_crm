@@ -1927,8 +1927,9 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
               onPressed: () async {
                 await AuthService().logout();
                 if (!mounted) return;
-                Navigator.of(context).pushReplacement(
+                Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
                 );
               },
               icon: const Icon(Icons.logout_rounded, size: 18),

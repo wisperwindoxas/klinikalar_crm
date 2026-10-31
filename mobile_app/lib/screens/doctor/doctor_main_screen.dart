@@ -920,12 +920,13 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
   Widget _buildBody() {
     switch (_currentTabIndex) {
       case 0:
+      case 2:
         return _buildHomeTab();
       case 1:
         return _buildPatientsTab();
-      case 2:
-        return _buildHistoryTab();
       case 3:
+        return _buildHistoryTab();
+      case 4:
         return _buildSettingsTab();
       default:
         return _buildHomeTab();
@@ -2002,8 +2003,9 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
                 if (confirm == true) {
                   await AuthService().logout();
                   if (!mounted) return;
-                  Navigator.of(context).pushReplacement(
+                  Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
                   );
                 }
               },
@@ -2111,11 +2113,19 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
   Widget _buildBottomNav() {
     return CurvedNotchedNavBar(
       currentIndex: _currentTabIndex,
-      onTap: (index) => setState(() => _currentTabIndex = index),
+      onTap: (index) {
+        if (index == 2) {
+          setState(() => _currentTabIndex = 0);
+          _callNextPatient();
+        } else {
+          setState(() => _currentTabIndex = index);
+        }
+      },
       selectedColor: AppColors.primary,
       items: const [
         CurvedNotchedNavItem(icon: Icons.grid_view_rounded, label: 'Navbatim'),
         CurvedNotchedNavItem(icon: Icons.people_alt_rounded, label: 'Bemorlar'),
+        CurvedNotchedNavItem(icon: Icons.campaign_rounded, label: 'Chaqirish'),
         CurvedNotchedNavItem(icon: Icons.history_edu_rounded, label: 'Tarix'),
         CurvedNotchedNavItem(icon: Icons.person_rounded, label: 'Profil'),
       ],

@@ -1502,8 +1502,9 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
               onPressed: () async {
                 await AuthService().logout();
                 if (!mounted) return;
-                Navigator.of(context).pushReplacement(
+                Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
                 );
               },
               style: OutlinedButton.styleFrom(

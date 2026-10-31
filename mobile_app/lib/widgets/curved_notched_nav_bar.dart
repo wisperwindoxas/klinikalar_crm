@@ -82,32 +82,8 @@ class CurvedNotchedNavBar extends StatelessWidget {
                     final isSelected = index == currentIndex;
 
                     if (index == centerIndex) {
-                      // Center item space: only show label at bottom, icon is in floating circle
-                      return Expanded(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => onTap(index),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8.0),
-                                child: Text(
-                                  item.label,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: isCenterSelected ? FontWeight.w700 : FontWeight.w600,
-                                    color: isCenterSelected ? selectedColor : const Color(0xFF64748B),
-                                    letterSpacing: -0.2,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
+                      // Center item space: reserved for floating circle + label directly beneath it
+                      return const Expanded(child: SizedBox());
                     }
 
                     // Regular side items
@@ -144,33 +120,53 @@ class CurvedNotchedNavBar extends StatelessWidget {
                 ),
               ),
 
-              // 3. Floating Elevated Center Circle
+              // 3. Floating Elevated Center Circle + Label
               Positioned(
-                left: notchCenter - 27.0,
-                bottom: totalHeight - 38.0, // floats ~16dp above the top edge
+                left: notchCenter - 45.0,
+                width: 90.0,
+                bottom: bottomPadding + 6.0,
                 child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () => onTap(centerIndex),
-                  child: Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      color: selectedColor,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: selectedColor.withValues(alpha: isCenterSelected ? 0.38 : 0.25),
-                          blurRadius: isCenterSelected ? 12 : 8,
-                          offset: const Offset(0, 4),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: selectedColor,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: selectedColor.withValues(alpha: isCenterSelected ? 0.40 : 0.28),
+                              blurRadius: isCenterSelected ? 12 : 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Icon(
-                        centerItem.icon,
-                        color: Colors.white,
-                        size: 27,
+                        child: Center(
+                          child: Icon(
+                            centerItem.icon,
+                            color: Colors.white,
+                            size: 26,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 3),
+                      Text(
+                        centerItem.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: isCenterSelected ? FontWeight.w700 : FontWeight.w600,
+                          color: isCenterSelected ? selectedColor : const Color(0xFF64748B),
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
