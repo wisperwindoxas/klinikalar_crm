@@ -2195,10 +2195,10 @@ export const ManagerView: React.FC = () => {
               onEditCabinet={(cab) => {
                 setEditingCabinetId(cab.id);
                 setCabinetForm({
-                  roomNumber: cab.room_number || '',
+                  roomNumber: cab.number || cab.room_number || '',
                   name: cab.name || '',
                   department: cab.department || 'Ambulatoriya',
-                  floor: cab.floor || 1
+                  floor: Number(cab.floor) || 1
                 });
                 setIsCabinetModalOpen(true);
               }}

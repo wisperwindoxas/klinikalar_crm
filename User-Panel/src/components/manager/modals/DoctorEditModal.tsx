@@ -82,7 +82,18 @@ export const DoctorEditModal: React.FC<DoctorEditModalProps> = ({
                 required
                 placeholder="Masalan: Dr. Ergashev Bobur"
                 value={doctorForm.displayName}
-                onChange={e => onFormChange({ ...doctorForm, displayName: e.target.value })}
+                onChange={e => {
+                  const newName = e.target.value;
+                  const updates: any = { displayName: newName };
+                  if (!editingDoctorId) {
+                    const clean = newName.toLowerCase().replace(/dr\.?\s*/i, '').replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+                    const suggestedLogin = clean ? `doc_${clean.slice(0, 15)}` : '';
+                    if (!doctorForm.username || doctorForm.username.startsWith('doc_')) {
+                      updates.username = suggestedLogin;
+                    }
+                  }
+                  onFormChange({ ...doctorForm, ...updates });
+                }}
                 className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
               />
             </div>
