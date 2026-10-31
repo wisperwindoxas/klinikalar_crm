@@ -8,6 +8,7 @@ import '../services/security_service.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/pin_setup_sheet.dart';
 import '../screens/auth/pin_lock_screen.dart';
+import 'app_update_sheet.dart';
 
 class UserProfileSheet extends StatefulWidget {
   final UserModel user;
@@ -451,6 +452,36 @@ class _UserProfileSheetState extends State<UserProfileSheet> {
                           icon: Icons.info_outline_rounded,
                           label: 'Dastur versiyasi',
                           value: 'klinika-admin Mobile v1.0.5',
+                          customValueWidget: InkWell(
+                            onTap: () {
+                              Navigator.pop(context);
+                              AppUpdateSheet.show(context);
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.mintLight,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.system_update_rounded, size: 13, color: AppColors.primary),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Yangilash',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),

@@ -27,24 +27,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _autoFormatPhone = true; // By default: 🇺🇿 +998 (XX) XXX-XX-XX
 
   @override
-  void initState() {
-    super.initState();
-    _passwordFocusNode.addListener(() {
-      if (_passwordFocusNode.hasFocus) {
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (_scrollController.hasClients) {
-            _scrollController.animateTo(
-              _scrollController.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOut,
-            );
-          }
-        });
-      }
-    });
-  }
-
-  @override
   void dispose() {
     _phoneController.dispose();
     _passwordController.dispose();
@@ -141,47 +123,40 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           controller: _scrollController,
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: EdgeInsets.fromLTRB(
-            24,
-            24,
-            24,
-            bottomInset > 0 ? bottomInset + 20 : 24,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               // App Brand & Logo
               Center(
                 child: Container(
-                  width: 90,
-                  height: 90,
+                  width: 72,
+                  height: 72,
                   color: Colors.transparent,
                   child: Image.asset(
                     'assets/images/logo.png',
                     fit: BoxFit.contain,
                     errorBuilder: (context, error, stackTrace) => const Icon(
                       Icons.local_hospital_rounded,
-                      size: 40,
+                      size: 36,
                       color: AppColors.medicalBlue,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 12),
               const Center(
                 child: Text(
                   'klinika-admin',
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 22,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.5,
                     color: AppColors.textPrimary,
@@ -192,13 +167,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Text(
                   'Elektron Navbat & Boshqaruv Tizimi',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w500,
                     color: AppColors.textMuted,
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 18),
 
               // Form
               Form(

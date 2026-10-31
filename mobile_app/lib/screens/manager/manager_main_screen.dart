@@ -11,6 +11,7 @@ import '../../services/security_service.dart';
 import '../../widgets/responsive_frame.dart';
 import '../../widgets/user_profile_sheet.dart';
 import '../../widgets/curved_notched_nav_bar.dart';
+import '../../widgets/app_update_sheet.dart';
 import '../auth/login_screen.dart';
 import '../auth/pin_setup_sheet.dart';
 import 'manager_doctor_sheet.dart';
@@ -1493,6 +1494,22 @@ class _ManagerMainScreenState extends State<ManagerMainScreen> {
             ),
           ),
           const SizedBox(height: 20),
+
+          // 4.5 Dastur Yangilanishi
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: OutlinedButton.icon(
+              onPressed: () => AppUpdateSheet.show(context),
+              icon: const Icon(Icons.system_update_rounded, size: 18, color: AppColors.primary),
+              label: const Text('Dastur yangilanishini tekshirish (v1.0.5)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.primaryLight),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
 
           // 5. Tizimdan Chiqish
           SizedBox(

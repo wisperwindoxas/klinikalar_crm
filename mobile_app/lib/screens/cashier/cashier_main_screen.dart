@@ -9,6 +9,7 @@ import '../../widgets/responsive_frame.dart';
 import '../../services/security_service.dart';
 import '../../widgets/user_profile_sheet.dart';
 import '../../widgets/curved_notched_nav_bar.dart';
+import '../../widgets/app_update_sheet.dart';
 import '../auth/login_screen.dart';
 import '../auth/pin_setup_sheet.dart';
 import '../manager/manager_patient_detail_sheet.dart';
@@ -926,10 +927,21 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
               icon: const Icon(Icons.more_vert_rounded, color: AppColors.textSecondary),
               tooltip: 'Ko‘proq',
               onSelected: (val) {
+                if (val == 'update') AppUpdateSheet.show(context);
                 if (val == 'profile') UserProfileSheet.show(context);
                 if (val == 'logout') _logoutConfirm();
               },
               itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'update',
+                  child: Row(
+                    children: [
+                      Icon(Icons.system_update_rounded, size: 18, color: AppColors.primary),
+                      SizedBox(width: 8),
+                      Text('Dasturni yangilash'),
+                    ],
+                  ),
+                ),
                 const PopupMenuItem(
                   value: 'profile',
                   child: Row(

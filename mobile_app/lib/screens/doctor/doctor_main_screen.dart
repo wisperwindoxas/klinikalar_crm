@@ -12,6 +12,7 @@ import '../../widgets/responsive_frame.dart';
 import '../../services/security_service.dart';
 import '../../widgets/user_profile_sheet.dart';
 import '../../widgets/curved_notched_nav_bar.dart';
+import '../../widgets/app_update_sheet.dart';
 import '../auth/login_screen.dart';
 import '../auth/pin_setup_sheet.dart';
 import '../manager/manager_patient_detail_sheet.dart';
@@ -1755,6 +1756,14 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
           const Text('ILOVA MA\'LUMOTLARI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted, letterSpacing: 0.5)),
           const SizedBox(height: 8),
           _buildSettingsCard([
+            _buildSettingsRow(
+              Icons.system_update_rounded,
+              'Dastur yangilanishi',
+              'Yangi versiyani tekshirish va o‘rnatish',
+              trailingBadge: 'v1.0.5',
+              badgeColor: AppColors.primary,
+              onTap: () => AppUpdateSheet.show(context),
+            ),
             _buildSettingsRow(
               Icons.sync_rounded,
               'Ma\'lumotlarni yangilash',
