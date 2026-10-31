@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/constants/api_constants.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/patient_model.dart';
@@ -140,52 +139,9 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
         SnackBar(
           content: Text('Ma’lumotlarni yuklashda xatolik: $e'),
           backgroundColor: AppColors.error,
-          action: SnackBarAction(
-            label: 'Server IP',
-            textColor: Colors.white,
-            onPressed: _showServerConfigDialog,
-          ),
         ),
       );
     }
-  }
-
-  void _showServerConfigDialog() {
-    final ipCtrl = TextEditingController(text: ApiConstants.baseUrl);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Server Manzili (API URL)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Agar telefoningiz Wi-Fi orqali serverga ulansa, kompyuter IP manzilini kiriting:',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: ipCtrl,
-              decoration: const InputDecoration(
-                hintText: 'http://192.168.100.20:5001/api/v1',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Bekor qilish')),
-          ElevatedButton(
-            onPressed: () async {
-              await ApiConstants.updateBaseUrl(ipCtrl.text.trim());
-              Navigator.pop(ctx);
-              _fetchData();
-            },
-            child: const Text('Saqlash va Yangilash'),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _logoutConfirm() async {
@@ -970,7 +926,6 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
               icon: const Icon(Icons.more_vert_rounded, color: AppColors.textSecondary),
               tooltip: 'Ko‘proq',
               onSelected: (val) {
-                if (val == 'server') _showServerConfigDialog();
                 if (val == 'profile') UserProfileSheet.show(context);
                 if (val == 'logout') _logoutConfirm();
               },
@@ -982,16 +937,6 @@ class _CashierMainScreenState extends State<CashierMainScreen> {
                       Icon(Icons.person_outline_rounded, size: 18, color: AppColors.primary),
                       SizedBox(width: 8),
                       Text('Profil & Klinika'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'server',
-                  child: Row(
-                    children: [
-                      Icon(Icons.settings_outlined, size: 18, color: AppColors.textSecondary),
-                      SizedBox(width: 8),
-                      Text('Server IP sozlamalari'),
                     ],
                   ),
                 ),

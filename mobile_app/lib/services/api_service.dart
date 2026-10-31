@@ -67,12 +67,12 @@ class ApiService {
     } on TimeoutException {
       return {
         'success': false,
-        'message': 'Serverdan javob kelmadi (Timeout). Wi-Fi aloqasini tekshiring: ${ApiConstants.baseUrl}',
+        'message': 'Serverdan javob kelmadi (Timeout). Internet aloqasini tekshiring.',
       };
     } catch (e) {
       return {
         'success': false,
-        'message': 'Serverga ulanishda xatolik: $e\n(Server: ${ApiConstants.baseUrl})',
+        'message': 'Serverga ulanishda xatolik yuz berdi. Internet aloqasini tekshiring.',
       };
     }
   }

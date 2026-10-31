@@ -430,9 +430,9 @@ class _UserProfileSheetState extends State<UserProfileSheet> {
                         ),
                         const Divider(height: 1, indent: 46),
                         _buildInfoTile(
-                          icon: Icons.dns_outlined,
-                          label: 'Server holati',
-                          value: 'Faol ulanish • 5001-port',
+                          icon: Icons.wifi_rounded,
+                          label: 'Tarmoq holati',
+                          value: 'Ulangan (Online)',
                           customValueWidget: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -450,7 +450,7 @@ class _UserProfileSheetState extends State<UserProfileSheet> {
                         _buildInfoTile(
                           icon: Icons.info_outline_rounded,
                           label: 'Dastur versiyasi',
-                          value: 'klinika-admin Mobile v1.0.0',
+                          value: 'klinika-admin Mobile v1.0.5',
                         ),
                       ],
                     ),

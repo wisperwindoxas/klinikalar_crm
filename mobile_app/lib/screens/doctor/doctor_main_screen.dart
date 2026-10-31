@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../core/constants/api_constants.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/doctor_model.dart';
@@ -599,139 +598,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
     );
   }
 
-  // 6. Shifokorni almashtirish modali
-  void _showDoctorSwitcherSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        String filter = '';
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final filtered = _allDoctors.where((d) {
-              if (filter.isEmpty) return true;
-              final q = filter.toLowerCase();
-              return d.fullName.toLowerCase().contains(q) ||
-                  d.specialty.toLowerCase().contains(q) ||
-                  d.roomNumber.contains(q);
-            }).toList();
 
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.75,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Shifokorni tanlash',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    onChanged: (val) => setModalState(() => filter = val),
-                    decoration: InputDecoration(
-                      hintText: 'Shifokor ismi yoki mutaxassislik...',
-                      prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: ListView.separated(
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final doc = filtered[index];
-                        final isSelected = _selectedDoctor?.id == doc.id;
-                        return InkWell(
-                          onTap: () async {
-                            final prefs = await SharedPreferences.getInstance();
-                            await prefs.setString('active_doctor_id', doc.id);
-                            setState(() {
-                              _selectedDoctor = doc;
-                            });
-                            Navigator.pop(ctx);
-                            _fetchData();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('${doc.fullName} profiliga o‘tildi'), backgroundColor: AppColors.primary),
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(14),
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: isSelected ? AppColors.mintLight.withOpacity(0.5) : Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: isSelected ? AppColors.primary : AppColors.border,
-                                width: isSelected ? 1.5 : 1,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                _buildDoctorAvatar(doc.fullName, radius: 20),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        doc.fullName,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${doc.specialty} • ${doc.roomNumber}-kabinet',
-                                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (isSelected)
-                                  const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 22)
-                                else
-                                  const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textMuted, size: 14),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -824,59 +691,47 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: InkWell(
-                onTap: _showDoctorSwitcherSheet,
-                borderRadius: BorderRadius.circular(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            docName,
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    docName,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: _isDoctorActive ? AppColors.success : AppColors.warning,
+                          shape: BoxShape.circle,
                         ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.arrow_drop_down_rounded, size: 20, color: AppColors.primary),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: _isDoctorActive ? AppColors.success : AppColors.warning,
-                            shape: BoxShape.circle,
-                          ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _isDoctorActive ? 'Faol qabul' : 'Tanaffusda',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: _isDoctorActive ? AppColors.success : AppColors.warning,
+                          fontWeight: FontWeight.w600,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _isDoctorActive ? 'Faol qabul' : 'Tanaffusda',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: _isDoctorActive ? AppColors.success : AppColors.warning,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      ),
+                      const Text(' • ', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                      Flexible(
+                        child: Text(
+                          '$room-xona ($docSpecialty)',
+                          style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const Text(' • ', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                        Flexible(
-                          child: Text(
-                            '$room-xona ($docSpecialty)',
-                            style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w500),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
@@ -1875,42 +1730,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
           ),
           const SizedBox(height: 16),
 
-          // 2. Doctor Switcher Tile (Quick Switch)
-          InkWell(
-            onTap: _showDoctorSwitcherSheet,
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFBFDBFE)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(color: Color(0xFF3B82F6), shape: BoxShape.circle),
-                    child: const Icon(Icons.swap_horiz_rounded, size: 20, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Shifokor profilini almashtirish', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF))),
-                        Text('Boshqa shifokor navbatlarini boshqarish', style: TextStyle(fontSize: 11, color: Color(0xFF3B82F6))),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF3B82F6)),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // 3. Kabinet & Mutaxassislik Section
+          // 2. Kabinet & Mutaxassislik Section
           const Text('KABINET VA MUTAXASSISLIK', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted, letterSpacing: 0.5)),
           const SizedBox(height: 8),
           _buildSettingsCard([
@@ -1921,7 +1741,7 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
           ]),
           const SizedBox(height: 20),
 
-          // 4. TV & Ovoz sozlamalari
+          // 3. TV & Ovoz sozlamalari
           const Text('TV MONITOR VA OVOZ SOZLAMALARI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted, letterSpacing: 0.5)),
           const SizedBox(height: 8),
           _buildSettingsCard([
@@ -1931,21 +1751,14 @@ class _DoctorMainScreenState extends State<DoctorMainScreen> {
           ]),
           const SizedBox(height: 20),
 
-          // 5. Server va Tizim
-          const Text('SERVER VA ALOQA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted, letterSpacing: 0.5)),
+          // 4. Ma'lumotlarni yangilash
+          const Text('ILOVA MA\'LUMOTLARI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted, letterSpacing: 0.5)),
           const SizedBox(height: 8),
           _buildSettingsCard([
             _buildSettingsRow(
-              Icons.dns_outlined,
-              'Server manzili',
-              ApiConstants.baseUrl.replaceAll('/api/v1', ''),
-              trailingBadge: 'Bog‘langan',
-              badgeColor: AppColors.success,
-            ),
-            _buildSettingsRow(
               Icons.sync_rounded,
-              'Tizimni yangilash',
-              'Ma\'lumotlarni qayta yuklash',
+              'Ma\'lumotlarni yangilash',
+              'Navbat va bemorlar ro‘yxatini qayta yuklash',
               onTap: () async {
                 await _fetchData();
                 ScaffoldMessenger.of(context).showSnackBar(
