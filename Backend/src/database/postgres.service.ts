@@ -2547,6 +2547,75 @@ export class PostgresService {
     return { deleted: true, deactivated: false, message: `Tarif muvaffaqiyatli o'chirildi.` };
   }
 
+  // --- SUPER ADMIN: CLINICS MANAGEMENT ---
+  public async getSuperAdminClinics() {
+    const res = await this.query(`
+      SELECT 
+        COALESCE(cs.clinic_id, cs.id) as id,
+        COALESCE(cs.clinic_id, cs.id) as code,
+        cs.clinic_name as name,
+        LOWER(REGEXP_REPLACE(cs.clinic_name, '[^a-zA-Z0-9]+', '-', 'g')) as slug,
+        COALESCE(sub.status, 'ACTIVE') as status,
+        cs.phone,
+        '' as email,
+        cs.address,
+        COALESCE(sub.plan_code, 'STANDARD') as "planCode",
+        COALESCE(sub.end_date::text, '') as "subscriptionEnd",
+        (SELECT COUNT(*)::int FROM branches b WHERE b.clinic_name = cs.clinic_name) as "branchCount",
+        (SELECT COUNT(*)::int FROM doctors d WHERE d.clinic_id = COALESCE(cs.clinic_id, cs.id)) as "doctorCount",
+        (SELECT COUNT(*)::int FROM patients p WHERE p.clinic_id = COALESCE(cs.clinic_id, cs.id)) as "patientCount",
+        cs.created_at as "createdAt"
+      FROM clinic_settings cs
+      LEFT JOIN clinic_subscriptions sub ON (sub.clinic_id = cs.clinic_id OR sub.clinic_id = cs.id)
+      WHERE cs.id != 'default'
+      ORDER BY cs.created_at DESC
+    `);
+    return res.rows;
+  }
+
+  public async deleteClinic(clinicId: string) {
+    // 1. Delete dependent transactional records referencing users of this clinic:
+    await this.query(`
+      DELETE FROM queue_call_events 
+      WHERE performed_by IN (SELECT id FROM users WHERE clinic_id = $1)
+         OR ticket_id IN (SELECT id FROM queue_tickets WHERE clinic_id = $1)
+    `, [clinicId]).catch(() => {});
+
+    await this.query(`
+      DELETE FROM payment_transactions 
+      WHERE created_by IN (SELECT id FROM users WHERE clinic_id = $1)
+         OR payment_id IN (SELECT id FROM payments WHERE clinic_id = $1)
+    `, [clinicId]).catch(() => {});
+
+    await this.query(`DELETE FROM appointments WHERE clinic_id = $1`, [clinicId]).catch(() => {});
+    await this.query(`DELETE FROM cash_shifts WHERE clinic_id = $1`, [clinicId]).catch(() => {});
+    await this.query(`DELETE FROM payments WHERE clinic_id = $1`, [clinicId]).catch(() => {});
+    await this.query(`DELETE FROM queue_tickets WHERE clinic_id = $1`, [clinicId]).catch(() => {});
+
+    // 2. Delete doctors, patients, cabinets, specialties
+    await this.query(`DELETE FROM doctors WHERE clinic_id = $1`, [clinicId]).catch(() => {});
+    await this.query(`DELETE FROM patients WHERE clinic_id = $1`, [clinicId]).catch(() => {});
+    await this.query(`DELETE FROM cabinets WHERE clinic_id = $1`, [clinicId]).catch(() => {});
+    await this.query(`DELETE FROM specialties WHERE clinic_id = $1`, [clinicId]).catch(() => {});
+
+    // 3. Delete subscriptions & custom plans
+    await this.query(`DELETE FROM clinic_subscriptions WHERE clinic_id = $1`, [clinicId]).catch(() => {});
+    await this.query(`DELETE FROM plans WHERE clinic_id = $1`, [clinicId]).catch(() => {});
+
+    // 4. Delete all users belonging to this clinic (never delete super admin)
+    try {
+      await this.query(`DELETE FROM users WHERE clinic_id = $1 AND role_id != 'role_super_admin'`, [clinicId]);
+    } catch (_) {
+      await this.query(`UPDATE users SET is_active = false WHERE clinic_id = $1 AND role_id != 'role_super_admin'`, [clinicId]).catch(() => {});
+    }
+
+    // 5. Delete clinic settings & audit logs
+    await this.query(`DELETE FROM clinic_settings WHERE clinic_id = $1 OR id = $1`, [clinicId]).catch(() => {});
+    await this.query(`DELETE FROM audit_logs WHERE clinic_id = $1`, [clinicId]).catch(() => {});
+
+    return { success: true };
+  }
+
   public async getSuperAdminPayments(limit = 100) {
     const res = await this.query(`
       SELECT p.id, p.receipt_number, p.amount, p.currency, p.method, p.status, p.notes, p.created_at,

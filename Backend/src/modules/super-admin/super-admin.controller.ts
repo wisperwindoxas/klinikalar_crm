@@ -23,36 +23,8 @@ export class SuperAdminController {
 
   public static async getClinics(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const db = DatabaseService.getInstance();
-      const tenants = db.getTenants();
-      const clinics = db.getClinics();
-
-      const result = tenants.map(t => {
-        const clinic = clinics.find(c => c.tenantId === t.id);
-        const sub = db.getSubscriptionByTenant(t.id);
-        const doctors = db.getDoctors(t.id);
-        const branches = db.getBranches(t.id);
-        const patients = db.getPatients(t.id);
-
-        return {
-          id: t.id,
-          code: t.code,
-          name: t.name,
-          slug: t.slug,
-          status: t.status,
-          phone: clinic?.phone || '',
-          email: clinic?.email || '',
-          address: clinic?.address || '',
-          planCode: sub?.planCode || PlanCode.STARTER,
-          subscriptionEnd: sub?.endDate || '',
-          branchCount: branches.length,
-          doctorCount: doctors.length,
-          patientCount: patients.length,
-          createdAt: t.createdAt
-        };
-      });
-
-      res.json({ success: true, data: result });
+      const data = await SuperAdminController.pg.getSuperAdminClinics();
+      res.json({ success: true, data });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
     }
@@ -65,20 +37,33 @@ export class SuperAdminController {
       const db = DatabaseService.getInstance();
       const tenant = db.getTenants().find(t => t.id === id);
 
-      if (!tenant) {
-        res.status(404).json({ success: false, message: 'Klinika topilmadi.' });
-        return;
+      if (tenant) {
+        tenant.status = status as ClinicStatus;
+        tenant.updatedAt = new Date().toISOString();
+        db.updateTenant(tenant);
+
+        const sub = db.getSubscriptionByTenant(id);
+        if (sub) {
+          sub.status = status as ClinicStatus;
+          db.updateSubscription(sub);
+        }
       }
 
-      const oldStatus = tenant.status;
-      tenant.status = status as ClinicStatus;
-      tenant.updatedAt = new Date().toISOString();
-      db.updateTenant(tenant);
+      await SuperAdminController.pg.query(
+        `UPDATE clinic_subscriptions SET status = $1, updated_at = NOW() WHERE clinic_id = $2`,
+        [status, id]
+      ).catch(() => {});
 
-      const sub = db.getSubscriptionByTenant(id);
-      if (sub) {
-        sub.status = status as ClinicStatus;
-        db.updateSubscription(sub);
+      if (status === 'BLOCKED' || status === 'INACTIVE') {
+        await SuperAdminController.pg.query(
+          `UPDATE users SET is_active = false WHERE clinic_id = $1 AND role_id != 'role_super_admin'`,
+          [id]
+        ).catch(() => {});
+      } else if (status === 'ACTIVE' || status === 'TRIAL') {
+        await SuperAdminController.pg.query(
+          `UPDATE users SET is_active = true WHERE clinic_id = $1 AND role_id != 'role_super_admin'`,
+          [id]
+        ).catch(() => {});
       }
 
       db.addAuditLog({
@@ -90,14 +75,14 @@ export class SuperAdminController {
         action: 'UPDATE_CLINIC_STATUS',
         entityType: 'TENANT',
         entityId: id,
-        oldValues: { status: oldStatus },
+        oldValues: { status: tenant?.status },
         newValues: { status },
         ipAddress: req.ip || '127.0.0.1',
         userAgent: req.headers['user-agent'] || 'Unknown',
         createdAt: new Date().toISOString()
       });
 
-      res.json({ success: true, message: `Klinika holati o'zgartirildi: ${status}`, data: tenant });
+      res.json({ success: true, message: `Klinika holati o'zgartirildi: ${status}` });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
     }
@@ -413,17 +398,26 @@ export class SuperAdminController {
     try {
       const id = String(req.params.id);
       const db = DatabaseService.getInstance();
-      const tenant = db.getTenants().find(t => t.id === id);
+      
+      let deletedClinicName = 'Klinika';
+      try {
+        const pgClinic = await SuperAdminController.pg.query(
+          `SELECT clinic_name FROM clinic_settings WHERE clinic_id = $1 OR id = $1 LIMIT 1`,
+          [id]
+        );
+        if (pgClinic.rows.length > 0 && pgClinic.rows[0].clinic_name) {
+          deletedClinicName = pgClinic.rows[0].clinic_name;
+        } else {
+          const tenant = db.getTenants().find(t => t.id === id);
+          if (tenant) deletedClinicName = tenant.name;
+        }
+      } catch (_) {}
 
-      if (!tenant) {
-        res.status(404).json({ success: false, message: 'Klinika topilmadi.' });
-        return;
-      }
+      // 1. Delete all users, settings, queues, appointments, payments, etc. from PostgreSQL
+      await SuperAdminController.pg.deleteClinic(id);
 
-      const deletedClinicName = tenant.name;
+      // 2. Delete from in-memory DatabaseService / JSON
       db.deleteClinicAndTenant(id);
-
-      await SuperAdminController.pg.query(`DELETE FROM clinic_subscriptions WHERE clinic_id = $1`, [id]).catch(() => {});
 
       db.addAuditLog({
         id: uuidv4(),
@@ -441,7 +435,10 @@ export class SuperAdminController {
         createdAt: new Date().toISOString()
       });
 
-      res.json({ success: true, message: `"${deletedClinicName}" klinikasi butunlay o'chirildi.` });
+      res.json({
+        success: true,
+        message: `"${deletedClinicName}" klinikasi va unga biriktirilgan barcha foydalanuvchilar hamda ma'lumotlar butunlay o'chirildi.`
+      });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
     }

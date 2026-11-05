@@ -47,6 +47,21 @@ export const authenticateJwt = async (req: AuthenticatedRequest, res: Response, 
           role = (pgUser.role_code || payload.role || UserRole.MANAGER) as UserRole;
           tenantId = pgUser.clinic_id || tenantId;
           branchId = pgUser.branch_id || branchId;
+
+          // Check if clinic still exists for non-superadmin
+          if (role !== UserRole.SUPER_ADMIN && role !== ('role_super_admin' as any) && tenantId) {
+            const clinicExists = await pg.query(
+              `SELECT id FROM clinic_settings WHERE clinic_id = $1 OR id = $1 LIMIT 1`,
+              [tenantId]
+            );
+            if (clinicExists.rows.length === 0) {
+              res.status(401).json({
+                success: false,
+                message: "Klinika tizimdan o'chirilgan. Sessiyangiz yakunlandi."
+              });
+              return;
+            }
+          }
         } else if (!payload.userId) {
           res.status(401).json({ success: false, message: 'User account not found.' });
           return;
@@ -58,9 +73,18 @@ export const authenticateJwt = async (req: AuthenticatedRequest, res: Response, 
           return;
         }
       }
-    } else if (user.status !== 'ACTIVE') {
-      res.status(401).json({ success: false, message: 'User account is inactive or not found.' });
-      return;
+    } else {
+      if (user.status !== 'ACTIVE') {
+        res.status(401).json({ success: false, message: 'User account is inactive or not found.' });
+        return;
+      }
+      if (role !== UserRole.SUPER_ADMIN && tenantId) {
+        const tenant = db.getTenants().find(t => t.id === tenantId);
+        if (!tenant) {
+          res.status(401).json({ success: false, message: "Klinika tizimdan o'chirilgan." });
+          return;
+        }
+      }
     }
 
     req.user = {

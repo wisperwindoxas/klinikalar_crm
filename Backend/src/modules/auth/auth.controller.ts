@@ -81,6 +81,37 @@ export class AuthController {
         const role = pgUser.role_code || 'MANAGER';
         const userTenantId = pgUser.clinic_id || 'tenant_sadaf_01';
         const userBranchId = pgUser.branch_id || 'branch_sadaf_main';
+
+        // Check if the clinic still exists and is not deleted/blocked for non-superadmin!
+        if (role !== 'SUPER_ADMIN' && role !== 'role_super_admin') {
+          const clinicCheck = await pg.query(
+            `SELECT cs.id, cs.clinic_name, sub.status as sub_status
+             FROM clinic_settings cs
+             LEFT JOIN clinic_subscriptions sub ON sub.clinic_id = cs.clinic_id OR sub.clinic_id = cs.id
+             WHERE cs.clinic_id = $1 OR cs.id = $1
+             LIMIT 1`,
+            [userTenantId]
+          );
+
+          if (clinicCheck.rows.length === 0) {
+            // Clinic was deleted! Deactivate this orphan user immediately
+            await pg.query('UPDATE users SET is_active = false WHERE id = $1', [pgUser.id]).catch(() => {});
+            res.status(403).json({
+              success: false,
+              message: "Ushbu klinika tizimdan o'chirilgan yoki mavjud emas. Tizim ma'muriyatiga murojaat qiling."
+            });
+            return;
+          }
+
+          const clinicRow = clinicCheck.rows[0];
+          if (clinicRow.sub_status === 'BLOCKED') {
+            res.status(403).json({
+              success: false,
+              message: "Ushbu klinika faoliyati Super Admin tomonidan to'xtatilgan (bloklangan)."
+            });
+            return;
+          }
+        }
         
         // Clinic name from query or fallback
         let clinicName = pgUser.clinic_name || '';
@@ -155,6 +186,11 @@ export class AuthController {
       let clinic = null;
       let subscription = null;
       if (user.tenantId) {
+        const tenant = db.getTenants().find(t => t.id === user.tenantId);
+        if (user.role !== UserRole.SUPER_ADMIN && !tenant) {
+          res.status(403).json({ success: false, message: "Ushbu klinika tizimdan o'chirilgan yoki mavjud emas." });
+          return;
+        }
         clinic = db.getClinicByTenant(user.tenantId);
         subscription = db.getSubscriptionByTenant(user.tenantId);
       }
