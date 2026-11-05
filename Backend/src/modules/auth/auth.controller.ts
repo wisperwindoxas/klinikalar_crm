@@ -395,8 +395,8 @@ export class AuthController {
         ];
         for (const sp of specs) {
           await pg.query(
-            `INSERT INTO specialties (id, clinic_id, name, code, is_active)
-             VALUES ($1, $2, $3, $4, true)
+            `INSERT INTO specialties (id, clinic_id, name, prefix, code, is_active)
+             VALUES ($1, $2, $3, $4, $4, true)
              ON CONFLICT DO NOTHING`,
             [`spec_${uuidv4().substring(0, 8)}`, tenantId, sp.name, sp.code]
           );

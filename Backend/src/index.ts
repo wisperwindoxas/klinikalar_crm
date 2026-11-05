@@ -52,14 +52,15 @@ const apiRouter = express.Router();
 // Role Groups for Authorization Matrix
 const STAFF_ROLES = [
   UserRole.SUPER_ADMIN,
+  UserRole.OWNER,
   UserRole.MANAGER,
   UserRole.CASHIER,
   UserRole.DOCTOR,
   UserRole.RECEPTIONIST,
   UserRole.OPERATOR
 ];
-const ADMIN_ROLES = [UserRole.SUPER_ADMIN, UserRole.MANAGER];
-const CASHIER_ROLES = [UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.CASHIER];
+const ADMIN_ROLES = [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER];
+const CASHIER_ROLES = [UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER];
 
 // 1. Auth Endpoints
 apiRouter.post('/auth/login', authRateLimiter, AuthController.login);
