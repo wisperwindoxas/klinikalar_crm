@@ -1968,8 +1968,21 @@ export class PostgresService {
   }
 
   // --- SUPER ADMIN: PLANS & SUBSCRIPTIONS ---
-  public async getPlans() {
-    const res = await this.query(`SELECT * FROM plans ORDER BY is_active DESC, price ASC`);
+  public async getPlans(clinicId?: string) {
+    let sql = `
+      SELECT p.*,
+             COALESCE(p.clinic_name, cs.clinic_name) as target_clinic_name,
+             (SELECT COUNT(*)::int FROM clinic_subscriptions sub WHERE sub.plan_code = p.code AND sub.status = 'ACTIVE') as active_subscribers_count
+      FROM plans p
+      LEFT JOIN clinic_settings cs ON cs.clinic_id = p.clinic_id OR cs.id = p.clinic_id
+    `;
+    const params: any[] = [];
+    if (clinicId) {
+      params.push(clinicId);
+      sql += ` WHERE p.clinic_id IS NULL OR p.clinic_id = $1`;
+    }
+    sql += ` ORDER BY p.is_custom DESC, p.is_active DESC, p.price ASC`;
+    const res = await this.query(sql, params);
     return res.rows;
   }
 
@@ -2389,21 +2402,67 @@ export class PostgresService {
     features?: string[];
     limits?: any;
     trial_days?: number;
+    clinic_id?: string;
+    clinic_name?: string;
+    is_custom?: boolean;
+    notes?: string;
+    applyToClinic?: boolean;
   }) {
     const id = `plan_${data.code.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`;
     const price = Number(data.price || 0);
     const yearlyPrice = price * 10;
     const featuresJson = JSON.stringify(data.features || []);
     const limitsJson = JSON.stringify(data.limits || {});
+    const isCustom = Boolean(data.is_custom || data.clinic_id);
+
     const res = await this.query(`
-      INSERT INTO plans (id, code, name, price, monthly_price, yearly_price, billing_cycle, features, limits, trial_days, is_active, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $4, $5, $6, $7::jsonb, $8::jsonb, $9, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO plans (
+        id, code, name, price, monthly_price, yearly_price, billing_cycle, features, limits, trial_days,
+        is_active, clinic_id, clinic_name, is_custom, notes, created_at, updated_at
+      )
+      VALUES ($1, $2, $3, $4, $4, $5, $6, $7::jsonb, $8::jsonb, $9, true, $10, $11, $12, $13, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING *
-    `, [id, data.code.toUpperCase(), data.name, price, yearlyPrice, data.billing_cycle || 'MONTHLY', featuresJson, limitsJson, data.trial_days || 14]);
-    return res.rows[0];
+    `, [
+      id,
+      data.code.toUpperCase(),
+      data.name,
+      price,
+      yearlyPrice,
+      data.billing_cycle || 'MONTHLY',
+      featuresJson,
+      limitsJson,
+      data.trial_days || 14,
+      data.clinic_id || null,
+      data.clinic_name || null,
+      isCustom,
+      data.notes || null
+    ]);
+
+    const createdPlan = res.rows[0];
+
+    if (data.applyToClinic && data.clinic_id) {
+      await this.assignPlanToClinic(data.code.toUpperCase(), {
+        clinicId: data.clinic_id,
+        clinicName: data.clinic_name,
+        price: price
+      });
+    }
+
+    return createdPlan;
   }
 
-  public async updatePlan(code: string, data: { name?: string; price?: number; billing_cycle?: string; features?: string[]; is_active?: boolean }) {
+  public async updatePlan(code: string, data: {
+    name?: string;
+    price?: number;
+    billing_cycle?: string;
+    features?: string[];
+    is_active?: boolean;
+    clinic_id?: string;
+    clinic_name?: string;
+    is_custom?: boolean;
+    notes?: string;
+    applyToClinic?: boolean;
+  }) {
     const featuresJson = data.features ? JSON.stringify(data.features) : null;
     const price = data.price !== undefined ? Number(data.price) : null;
     const yearlyPrice = price !== null ? price * 10 : null;
@@ -2416,11 +2475,65 @@ export class PostgresService {
           billing_cycle = COALESCE($4, billing_cycle),
           features = CASE WHEN $5::text IS NOT NULL THEN $5::jsonb ELSE features END,
           is_active = COALESCE($6, is_active),
+          clinic_id = CASE WHEN $7::text IS NOT NULL THEN $7 ELSE clinic_id END,
+          clinic_name = CASE WHEN $8::text IS NOT NULL THEN $8 ELSE clinic_name END,
+          is_custom = COALESCE($9, is_custom),
+          notes = CASE WHEN $10::text IS NOT NULL THEN $10 ELSE notes END,
           updated_at = CURRENT_TIMESTAMP
-      WHERE code = $7
+      WHERE code = $11
       RETURNING *
-    `, [data.name, price, yearlyPrice, data.billing_cycle, featuresJson, data.is_active, code]);
+    `, [data.name, price, yearlyPrice, data.billing_cycle, featuresJson, data.is_active, data.clinic_id, data.clinic_name, data.is_custom, data.notes, code]);
+
+    if (data.applyToClinic && data.clinic_id) {
+      await this.assignPlanToClinic(code, {
+        clinicId: data.clinic_id,
+        clinicName: data.clinic_name,
+        price: price !== null ? price : undefined
+      });
+    }
+
     return res.rows[0];
+  }
+
+  public async assignPlanToClinic(planCode: string, options: { clinicId: string; clinicName?: string; price?: number; months?: number }) {
+    const clinicId = options.clinicId;
+    let clinicName = options.clinicName;
+    if (!clinicName) {
+      const csRes = await this.query(`SELECT clinic_name FROM clinic_settings WHERE clinic_id = $1 OR id = $1 LIMIT 1`, [clinicId]);
+      if (csRes.rows.length > 0 && csRes.rows[0].clinic_name) {
+        clinicName = csRes.rows[0].clinic_name;
+      } else {
+        clinicName = 'Klinika';
+      }
+    }
+
+    const sub = await this.query(`SELECT * FROM clinic_subscriptions WHERE clinic_id = $1 LIMIT 1`, [clinicId]);
+    const months = options.months || 12;
+
+    if (sub.rows.length > 0) {
+      const existingSub = sub.rows[0];
+      const res = await this.query(`
+        UPDATE clinic_subscriptions
+        SET plan_code = $1,
+            clinic_name = COALESCE($2, clinic_name),
+            status = 'ACTIVE',
+            price_paid = COALESCE($3, price_paid),
+            end_date = GREATEST(end_date, CURRENT_DATE) + ($4 || ' months')::interval,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $5
+        RETURNING *
+      `, [planCode, clinicName, options.price, months, existingSub.id]);
+      return res.rows[0];
+    } else {
+      const subId = `sub_${Date.now()}`;
+      const res = await this.query(`
+        INSERT INTO clinic_subscriptions (
+          id, clinic_id, clinic_name, plan_code, status, start_date, end_date, price_paid, sms_balance, sms_enabled, auto_renew, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, 'ACTIVE', CURRENT_DATE, CURRENT_DATE + ($5 || ' months')::interval, $6, 500, true, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        RETURNING *
+      `, [subId, clinicId, clinicName, planCode, months, options.price || 0]);
+      return res.rows[0];
+    }
   }
 
   public async deletePlan(code: string) {

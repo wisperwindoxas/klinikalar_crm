@@ -1000,6 +1000,21 @@ export class SuperAdminController {
     }
   }
 
+  public static async assignPlanToClinic(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const code = String(req.params.code);
+      const { clinicId, clinicName, price, months } = req.body;
+      if (!clinicId) {
+        res.status(400).json({ success: false, message: 'Klinika ID majburiy.' });
+        return;
+      }
+      const data = await SuperAdminController.pg.assignPlanToClinic(code, { clinicId, clinicName, price, months });
+      res.json({ success: true, message: 'Tarif tanlangan klinikaga muvaffaqiyatli biriktirildi.', data });
+    } catch (e: any) {
+      res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
   public static async updatePlan(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const code = String(req.params.code);

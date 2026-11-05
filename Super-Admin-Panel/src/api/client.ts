@@ -449,6 +449,13 @@ export class ApiClient {
     });
   }
 
+  public static async assignPlanToClinic(code: string, payload: { clinicId: string; clinicName?: string; price?: number; months?: number }) {
+    return this.request(`/super-admin/plans/${code}/assign`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
   public static async deletePlan(code: string) {
     return this.request(`/super-admin/plans/${code}`, {
       method: 'DELETE'

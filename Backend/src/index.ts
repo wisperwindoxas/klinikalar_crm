@@ -95,6 +95,7 @@ apiRouter.patch('/super-admin/subscriptions/:id/sms', ...superAdminAuth, SuperAd
 apiRouter.post('/super-admin/subscriptions/:id/change-plan', ...superAdminAuth, SuperAdminController.changeSubscriptionPlan);
 apiRouter.get('/super-admin/plans', ...superAdminAuth, SuperAdminController.getPlans);
 apiRouter.post('/super-admin/plans', ...superAdminAuth, SuperAdminController.createPlan);
+apiRouter.post('/super-admin/plans/:code/assign', ...superAdminAuth, SuperAdminController.assignPlanToClinic);
 apiRouter.put('/super-admin/plans/:code', ...superAdminAuth, SuperAdminController.updatePlan);
 apiRouter.delete('/super-admin/plans/:code', ...superAdminAuth, SuperAdminController.deletePlan);
 
