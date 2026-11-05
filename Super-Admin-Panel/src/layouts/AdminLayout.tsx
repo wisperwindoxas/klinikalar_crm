@@ -75,16 +75,19 @@ export const AdminLayout: React.FC = () => {
   return (
     <div className="flex min-h-screen bg-[#F1F5F9] p-3.5 gap-3.5">
       {/* 1. SIDEBAR */}
-      <aside className="w-64 bg-white border border-slate-200/90 shadow-sm rounded-2xl flex flex-col flex-shrink-0 sticky top-3.5 h-[calc(100vh-1.75rem)] overflow-hidden">
+      <aside className="w-72 bg-white border border-slate-200/90 shadow-sm rounded-2xl flex flex-col flex-shrink-0 sticky top-3.5 h-[calc(100vh-1.75rem)] overflow-hidden">
         {/* Brand */}
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 flex items-center justify-center text-white font-black text-sm shadow-sm shadow-teal-500/30">
-              <ShieldCheck className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 flex items-center justify-center text-white shadow-sm shadow-teal-500/30">
+              <ShieldCheck className="w-6 h-6 stroke-[2.4]" />
             </div>
             <div>
-              <div className="text-sm font-black text-slate-900 tracking-tight leading-none">SADAF</div>
-              <div className="text-[10px] text-teal-600 font-bold tracking-wider uppercase mt-0.5">SUPER ADMIN</div>
+              <div className="text-base font-black text-slate-900 tracking-tight leading-none flex items-center gap-0.5">
+                <span>klinika</span>
+                <span className="text-teal-600">-admin</span>
+              </div>
+              <div className="text-[10px] text-teal-600 font-extrabold tracking-wider uppercase mt-1">SUPER ADMIN</div>
             </div>
           </div>
           <span className="text-[10px] font-bold bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full border border-teal-200">
@@ -93,7 +96,7 @@ export const AdminLayout: React.FC = () => {
         </div>
 
         {/* Navigation items (Full height scroll, no bottom profile card) */}
-        <nav className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
+        <nav className="flex-1 overflow-y-auto p-3 space-y-1.5 custom-scrollbar">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -103,9 +106,9 @@ export const AdminLayout: React.FC = () => {
                 key={item.path}
                 to={item.path}
                 onClick={() => handleSelectEffect(item.path)}
-                className={`relative group flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 overflow-hidden ${
+                className={`relative group flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-200 overflow-hidden ${
                   isActive
-                    ? 'text-teal-900 font-bold shadow-xs'
+                    ? 'text-teal-950 font-bold shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
@@ -124,10 +127,10 @@ export const AdminLayout: React.FC = () => {
                   whileTap={{ scale: 0.9 }}
                 >
                   <Icon
-                    className={`w-4 h-4 transition-colors duration-200 ${
-                      isActive ? 'text-teal-700' : 'text-slate-400 group-hover:text-slate-700'
+                    className={`w-5 h-5 transition-colors duration-200 ${
+                      isActive ? 'text-teal-700' : 'text-slate-500 group-hover:text-slate-800'
                     }`}
-                    strokeWidth={isActive ? 2.6 : 2.2}
+                    strokeWidth={isActive ? 2.8 : 2.5}
                   />
                 </motion.div>
 

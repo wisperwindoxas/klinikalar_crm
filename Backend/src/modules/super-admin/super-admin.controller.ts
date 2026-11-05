@@ -722,6 +722,37 @@ export class SuperAdminController {
     }
   }
 
+  public static async createSubscription(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const data = await SuperAdminController.pg.createSubscription(req.body);
+      WebSocketGateway.getInstance().emitSubscriptionUpdated(data?.clinic_id || 'tenant_sadaf_01', data);
+      res.status(201).json({ success: true, message: 'Obuna muvaffaqiyatli biriktirildi.', data });
+    } catch (e: any) {
+      res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  public static async updateSubscriptionDates(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const data = await SuperAdminController.pg.updateSubscriptionDates(id, req.body);
+      WebSocketGateway.getInstance().emitSubscriptionUpdated(data?.clinic_id || 'tenant_sadaf_01', data);
+      res.json({ success: true, message: 'Obuna sanalari va parametrlari muvaffaqiyatli saqlandi.', data });
+    } catch (e: any) {
+      res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  public static async deleteSubscription(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      await SuperAdminController.pg.deleteSubscription(id);
+      res.json({ success: true, message: 'Obuna muvaffaqiyatli o\'chirildi.' });
+    } catch (e: any) {
+      res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
   public static async getPlans(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const data = await SuperAdminController.pg.getPlans();
@@ -1078,12 +1109,31 @@ export class SuperAdminController {
     }
   }
 
-  // --- PLANS UPDATE ---
+  // --- PLANS MANAGEMENT ---
+  public static async createPlan(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const data = await SuperAdminController.pg.createPlan(req.body);
+      res.status(201).json({ success: true, message: 'Yangi tarif muvaffaqiyatli yaratildi.', data });
+    } catch (e: any) {
+      res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
   public static async updatePlan(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const code = String(req.params.code);
       const data = await SuperAdminController.pg.updatePlan(code, req.body);
       res.json({ success: true, message: 'Tarif parametrlari muvaffaqiyatli yangilandi.', data });
+    } catch (e: any) {
+      res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  public static async deletePlan(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const code = String(req.params.code);
+      const result = await SuperAdminController.pg.deletePlan(code);
+      res.json({ success: true, message: result.message, data: result });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });
     }

@@ -1969,7 +1969,7 @@ export class PostgresService {
 
   // --- SUPER ADMIN: PLANS & SUBSCRIPTIONS ---
   public async getPlans() {
-    const res = await this.query(`SELECT * FROM plans WHERE is_active = true ORDER BY price ASC`);
+    const res = await this.query(`SELECT * FROM plans ORDER BY is_active DESC, price ASC`);
     return res.rows;
   }
 
@@ -1978,10 +1978,70 @@ export class PostgresService {
       SELECT cs.*, p.name as plan_name, p.price as plan_price, p.billing_cycle, p.features,
              (cs.end_date - CURRENT_DATE)::int as days_remaining
       FROM clinic_subscriptions cs
-      JOIN plans p ON cs.plan_code = p.code
+      LEFT JOIN plans p ON cs.plan_code = p.code
       ORDER BY cs.created_at DESC
     `);
     return res.rows;
+  }
+
+  public async createSubscription(data: {
+    clinicId: string;
+    clinicName: string;
+    planCode: string;
+    startDate: string;
+    endDate: string;
+    pricePaid?: number;
+    status?: string;
+    smsBalance?: number;
+  }) {
+    const id = `sub_${Date.now()}`;
+    const res = await this.query(`
+      INSERT INTO clinic_subscriptions (
+        id, clinic_id, clinic_name, plan_code, status, start_date, end_date, price_paid, sms_balance, sms_enabled, auto_renew, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6::date, $7::date, $8, $9, true, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING *
+    `, [
+      id,
+      data.clinicId,
+      data.clinicName,
+      data.planCode,
+      data.status || 'ACTIVE',
+      data.startDate,
+      data.endDate,
+      data.pricePaid || 0,
+      data.smsBalance || 500
+    ]);
+    return res.rows[0];
+  }
+
+  public async updateSubscriptionDates(id: string, data: {
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+    planCode?: string;
+    pricePaid?: number;
+    smsBalance?: number;
+    clinicName?: string;
+  }) {
+    const res = await this.query(`
+      UPDATE clinic_subscriptions
+      SET start_date = COALESCE($1::date, start_date),
+          end_date = COALESCE($2::date, end_date),
+          status = COALESCE($3, status),
+          plan_code = COALESCE($4, plan_code),
+          price_paid = COALESCE($5, price_paid),
+          sms_balance = COALESCE($6, sms_balance),
+          clinic_name = COALESCE($7, clinic_name),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $8
+      RETURNING *
+    `, [data.startDate, data.endDate, data.status, data.planCode, data.pricePaid, data.smsBalance, data.clinicName, id]);
+    return res.rows[0];
+  }
+
+  public async deleteSubscription(id: string) {
+    await this.query(`DELETE FROM clinic_subscriptions WHERE id = $1`, [id]);
+    return { success: true };
   }
 
   public async extendSubscription(id: string, months: number) {
@@ -2321,19 +2381,57 @@ export class PostgresService {
     return res.rows[0];
   }
 
+  public async createPlan(data: {
+    code: string;
+    name: string;
+    price: number;
+    billing_cycle?: string;
+    features?: string[];
+    limits?: any;
+    trial_days?: number;
+  }) {
+    const id = `plan_${data.code.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`;
+    const price = Number(data.price || 0);
+    const yearlyPrice = price * 10;
+    const featuresJson = JSON.stringify(data.features || []);
+    const limitsJson = JSON.stringify(data.limits || {});
+    const res = await this.query(`
+      INSERT INTO plans (id, code, name, price, monthly_price, yearly_price, billing_cycle, features, limits, trial_days, is_active, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $4, $5, $6, $7::jsonb, $8::jsonb, $9, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING *
+    `, [id, data.code.toUpperCase(), data.name, price, yearlyPrice, data.billing_cycle || 'MONTHLY', featuresJson, limitsJson, data.trial_days || 14]);
+    return res.rows[0];
+  }
+
   public async updatePlan(code: string, data: { name?: string; price?: number; billing_cycle?: string; features?: string[]; is_active?: boolean }) {
+    const featuresJson = data.features ? JSON.stringify(data.features) : null;
+    const price = data.price !== undefined ? Number(data.price) : null;
+    const yearlyPrice = price !== null ? price * 10 : null;
     const res = await this.query(`
       UPDATE plans
       SET name = COALESCE($1, name),
           price = COALESCE($2, price),
-          billing_cycle = COALESCE($3, billing_cycle),
-          features = COALESCE($4, features),
-          is_active = COALESCE($5, is_active),
+          monthly_price = COALESCE($2, monthly_price),
+          yearly_price = COALESCE($3, yearly_price),
+          billing_cycle = COALESCE($4, billing_cycle),
+          features = CASE WHEN $5::text IS NOT NULL THEN $5::jsonb ELSE features END,
+          is_active = COALESCE($6, is_active),
           updated_at = CURRENT_TIMESTAMP
-      WHERE code = $6
+      WHERE code = $7
       RETURNING *
-    `, [data.name, data.price, data.billing_cycle, data.features, data.is_active, code]);
+    `, [data.name, price, yearlyPrice, data.billing_cycle, featuresJson, data.is_active, code]);
     return res.rows[0];
+  }
+
+  public async deletePlan(code: string) {
+    // Check if any clinic_subscriptions reference this plan
+    const subCheck = await this.query(`SELECT COUNT(*)::int as count FROM clinic_subscriptions WHERE plan_code = $1`, [code]);
+    if (subCheck.rows[0]?.count > 0) {
+      await this.query(`UPDATE plans SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE code = $1`, [code]);
+      return { deleted: false, deactivated: true, message: `Tarif klinikalar obunasiga biriktirilganligi sababli arxiv (nofaol) holatiga o'tkazildi.` };
+    }
+    await this.query(`DELETE FROM plans WHERE code = $1`, [code]);
+    return { deleted: true, deactivated: false, message: `Tarif muvaffaqiyatli o'chirildi.` };
   }
 
   public async getSuperAdminPayments(limit = 100) {

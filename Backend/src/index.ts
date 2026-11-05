@@ -85,12 +85,18 @@ apiRouter.get('/super-admin/audit-logs', ...superAdminAuth, SuperAdminController
 
 // Real Subscriptions & Plans
 apiRouter.get('/super-admin/subscriptions', ...superAdminAuth, SuperAdminController.getSubscriptions);
+apiRouter.post('/super-admin/subscriptions', ...superAdminAuth, SuperAdminController.createSubscription);
+apiRouter.put('/super-admin/subscriptions/:id', ...superAdminAuth, SuperAdminController.updateSubscriptionDates);
+apiRouter.patch('/super-admin/subscriptions/:id/dates', ...superAdminAuth, SuperAdminController.updateSubscriptionDates);
+apiRouter.delete('/super-admin/subscriptions/:id', ...superAdminAuth, SuperAdminController.deleteSubscription);
 apiRouter.post('/super-admin/subscriptions/:id/extend', ...superAdminAuth, SuperAdminController.extendSubscription);
 apiRouter.patch('/super-admin/subscriptions/:id/status', ...superAdminAuth, SuperAdminController.updateSubscriptionStatus);
 apiRouter.patch('/super-admin/subscriptions/:id/sms', ...superAdminAuth, SuperAdminController.updateSubscriptionSms);
 apiRouter.post('/super-admin/subscriptions/:id/change-plan', ...superAdminAuth, SuperAdminController.changeSubscriptionPlan);
 apiRouter.get('/super-admin/plans', ...superAdminAuth, SuperAdminController.getPlans);
+apiRouter.post('/super-admin/plans', ...superAdminAuth, SuperAdminController.createPlan);
 apiRouter.put('/super-admin/plans/:code', ...superAdminAuth, SuperAdminController.updatePlan);
+apiRouter.delete('/super-admin/plans/:code', ...superAdminAuth, SuperAdminController.deletePlan);
 
 // Real Users (Global)
 apiRouter.get('/super-admin/users', ...superAdminAuth, SuperAdminController.getUsers);

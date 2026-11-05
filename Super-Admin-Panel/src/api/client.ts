@@ -211,6 +211,26 @@ export class ApiClient {
     return this.request('/super-admin/subscriptions');
   }
 
+  public static async createSubscription(data: any) {
+    return this.request('/super-admin/subscriptions', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  public static async updateSubscriptionDates(id: string, data: any) {
+    return this.request(`/super-admin/subscriptions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  public static async deleteSubscription(id: string) {
+    return this.request(`/super-admin/subscriptions/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
   public static async extendSubscription(id: string, months: number) {
     return this.request(`/super-admin/subscriptions/${id}/extend`, {
       method: 'POST',
@@ -415,10 +435,23 @@ export class ApiClient {
   }
 
   // Plans Management
+  public static async createPlan(payload: any) {
+    return this.request('/super-admin/plans', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
   public static async updatePlan(code: string, payload: any) {
     return this.request(`/super-admin/plans/${code}`, {
       method: 'PUT',
       body: JSON.stringify(payload)
+    });
+  }
+
+  public static async deletePlan(code: string) {
+    return this.request(`/super-admin/plans/${code}`, {
+      method: 'DELETE'
     });
   }
 
