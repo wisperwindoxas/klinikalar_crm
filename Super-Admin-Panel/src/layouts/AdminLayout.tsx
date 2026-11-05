@@ -108,7 +108,7 @@ export const AdminLayout: React.FC = () => {
                 onClick={() => handleSelectEffect(item.path)}
                 className={`relative group flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-200 overflow-hidden ${
                   isActive
-                    ? 'text-teal-950 font-bold shadow-xs'
+                    ? 'text-white font-bold shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
@@ -128,7 +128,7 @@ export const AdminLayout: React.FC = () => {
                 >
                   <Icon
                     className={`w-5 h-5 transition-colors duration-200 ${
-                      isActive ? 'text-teal-700' : 'text-slate-500 group-hover:text-slate-800'
+                      isActive ? 'text-white drop-shadow-xs' : 'text-slate-500 group-hover:text-slate-800'
                     }`}
                     strokeWidth={isActive ? 2.8 : 2.5}
                   />
