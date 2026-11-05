@@ -140,8 +140,9 @@ apiRouter.get('/super-admin/payments', ...superAdminAuth, SuperAdminController.g
 // Real Reports & Analytics
 apiRouter.get('/super-admin/reports', ...superAdminAuth, SuperAdminController.getReports);
 
-// Real System Status
+// Real System Status & Logs
 apiRouter.get('/super-admin/system-status', ...superAdminAuth, SuperAdminController.getSystemStatus);
+apiRouter.get('/super-admin/system-logs', ...superAdminAuth, SuperAdminController.getSystemLogs);
 
 // Real SMS Gateway & Management
 apiRouter.get('/super-admin/sms/settings', authenticateJwt, requireRoles(ADMIN_ROLES), SuperAdminController.getSmsSettings);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Building2, User, Phone, Mail, Lock, MapPin, CheckCircle2, ChevronDown } from 'lucide-react';
 import { ApiClient } from '../api/client';
 import { UZBEKISTAN_REGIONS, getDistrictsByRegion, formatAddress } from '../data/uzbekistanRegions';
@@ -19,8 +19,19 @@ export const AddClinicModal: React.FC<AddClinicModalProps> = ({ isOpen, onClose,
   const [selectedDistrict, setSelectedDistrict] = useState('');
   const [streetAddress, setStreetAddress] = useState('');
   const [planCode, setPlanCode] = useState('STANDARD');
+  const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    ApiClient.getPlans().then(res => {
+      if (res.data && res.data.length > 0) {
+        setPlans(res.data);
+        const defaultPlan = res.data.find((p: any) => p.code === 'STANDARD') || res.data[0];
+        setPlanCode(defaultPlan.code);
+      }
+    }).catch(() => {});
+  }, []);
 
   if (!isOpen) return null;
 
@@ -230,24 +241,26 @@ export const AddClinicModal: React.FC<AddClinicModalProps> = ({ isOpen, onClose,
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Tanlangan tarif</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { code: 'STARTER', label: 'STARTER', desc: '14 kun sinov' },
-                { code: 'STANDARD', label: 'STANDARD', desc: 'Eng ommabop' },
-                { code: 'PREMIUM', label: 'PREMIUM', desc: 'To‘liq imkoniyat' }
-              ].map(plan => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {(plans.length > 0 ? plans : [
+                { code: 'STARTER', name: 'STARTER', price: 350000 },
+                { code: 'STANDARD', name: 'STANDARD', price: 800000 },
+                { code: 'PRO', name: 'PRO', price: 1200000 }
+              ]).map(plan => (
                 <button
                   type="button"
                   key={plan.code}
                   onClick={() => setPlanCode(plan.code)}
                   className={`py-2 px-2 text-center rounded-xl border transition cursor-pointer ${
                     planCode === plan.code
-                      ? 'bg-blue-50 border-medical-blue text-medical-blue-dark ring-2 ring-medical-blue/20'
-                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                      ? 'bg-teal-50 border-teal-600 text-teal-900 ring-2 ring-teal-500/20 font-bold'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 font-medium'
                   }`}
                 >
-                  <div className="text-xs font-bold">{plan.label}</div>
-                  <div className="text-[10px] text-slate-500">{plan.desc}</div>
+                  <div className="text-xs font-bold">{plan.name || plan.code}</div>
+                  <div className="text-[10px] text-slate-500 font-medium mt-0.5">
+                    {Number(plan.price || 0) > 0 ? `${Number(plan.price).toLocaleString()} so'm` : plan.code}
+                  </div>
                 </button>
               ))}
             </div>

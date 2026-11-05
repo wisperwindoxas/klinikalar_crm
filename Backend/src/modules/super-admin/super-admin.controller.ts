@@ -1160,10 +1160,20 @@ export class SuperAdminController {
     }
   }
 
-  // --- SYSTEM STATUS ---
+  // --- SYSTEM STATUS & LOGS ---
   public static async getSystemStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const data = await SuperAdminController.pg.getSuperAdminSystemStatus();
+      res.json({ success: true, data });
+    } catch (e: any) {
+      res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  public static async getSystemLogs(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const limit = Number(req.query.limit) || 150;
+      const data = await SuperAdminController.pg.getAuditLogs(limit);
       res.json({ success: true, data });
     } catch (e: any) {
       res.status(500).json({ success: false, message: e.message });

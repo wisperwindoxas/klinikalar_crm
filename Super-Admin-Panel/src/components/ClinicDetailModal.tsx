@@ -48,6 +48,7 @@ export const ClinicDetailModal: React.FC<ClinicDetailModalProps> = ({
   });
 
   // Clinic edit form
+  const [availablePlans, setAvailablePlans] = useState<any[]>([]);
   const [clinicForm, setClinicForm] = useState({
     name: '',
     phone: '',
@@ -73,10 +74,16 @@ export const ClinicDetailModal: React.FC<ClinicDetailModalProps> = ({
     if (!clinicId) return;
     setLoading(true);
     try {
-      const res = await ApiClient.getClinicDetails(clinicId, {
-        startDate: start || undefined,
-        endDate: end || undefined
-      });
+      const [res, planRes] = await Promise.all([
+        ApiClient.getClinicDetails(clinicId, {
+          startDate: start || undefined,
+          endDate: end || undefined
+        }),
+        ApiClient.getPlans().catch(() => ({ data: [] }))
+      ]);
+      if (planRes.data && planRes.data.length > 0) {
+        setAvailablePlans(planRes.data);
+      }
       if (res.data) {
         setData(res.data);
         const c = res.data.clinic;
@@ -745,11 +752,21 @@ export const ClinicDetailModal: React.FC<ClinicDetailModalProps> = ({
                     onChange={e => handleChangePlan(e.target.value)}
                     className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-teal-800 focus:outline-none cursor-pointer"
                   >
-                    <option value="STARTER">Tarif: STARTER</option>
-                    <option value="STANDARD">Tarif: STANDARD</option>
-                    <option value="PRO">Tarif: PRO</option>
-                    <option value="BUSINESS">Tarif: BUSINESS</option>
-                    <option value="ENTERPRISE">Tarif: ENTERPRISE</option>
+                    {availablePlans.length > 0 ? (
+                      availablePlans.map(p => (
+                        <option key={p.code} value={p.code}>
+                          Tarif: {p.name || p.code}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="STARTER">Tarif: STARTER</option>
+                        <option value="STANDARD">Tarif: STANDARD</option>
+                        <option value="PRO">Tarif: PRO</option>
+                        <option value="BUSINESS">Tarif: BUSINESS</option>
+                        <option value="ENTERPRISE">Tarif: ENTERPRISE</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>

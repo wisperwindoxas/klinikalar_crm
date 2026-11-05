@@ -465,9 +465,13 @@ export class ApiClient {
     return this.request('/super-admin/reports');
   }
 
-  // Real System Status
+  // Real System Status & Logs
   public static async getSystemStatus() {
     return this.request('/super-admin/system-status');
+  }
+
+  public static async getSystemLogs(limit = 150) {
+    return this.request(`/super-admin/system-logs?limit=${limit}`);
   }
 }
 

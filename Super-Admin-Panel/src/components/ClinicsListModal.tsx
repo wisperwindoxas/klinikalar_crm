@@ -11,6 +11,7 @@ interface ClinicsListModalProps {
 
 export const ClinicsListModal: React.FC<ClinicsListModalProps> = ({ isOpen, onClose, onUpdate }) => {
   const [clinics, setClinics] = useState<any[]>([]);
+  const [plans, setPlans] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
@@ -25,8 +26,14 @@ export const ClinicsListModal: React.FC<ClinicsListModalProps> = ({ isOpen, onCl
   const loadClinics = async () => {
     setLoading(true);
     try {
-      const res = await ApiClient.getClinics();
+      const [res, planRes] = await Promise.all([
+        ApiClient.getClinics(),
+        ApiClient.getPlans().catch(() => ({ data: [] }))
+      ]);
       setClinics(res.data || []);
+      if (planRes.data && planRes.data.length > 0) {
+        setPlans(planRes.data);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -139,11 +146,21 @@ export const ClinicsListModal: React.FC<ClinicsListModalProps> = ({ isOpen, onCl
                       onChange={e => handlePlanChange(c.id, e.target.value)}
                       className="text-[11px] font-bold py-1 px-2 rounded-lg border border-slate-200 bg-white text-teal-800 focus:outline-none cursor-pointer"
                     >
-                      <option value="STARTER">STARTER</option>
-                      <option value="STANDARD">STANDARD</option>
-                      <option value="PRO">PRO</option>
-                      <option value="BUSINESS">BUSINESS</option>
-                      <option value="ENTERPRISE">ENTERPRISE</option>
+                      {plans.length > 0 ? (
+                        plans.map(p => (
+                          <option key={p.code} value={p.code}>
+                            {p.name || p.code}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="STARTER">STARTER</option>
+                          <option value="STANDARD">STANDARD</option>
+                          <option value="PRO">PRO</option>
+                          <option value="BUSINESS">BUSINESS</option>
+                          <option value="ENTERPRISE">ENTERPRISE</option>
+                        </>
+                      )}
                     </select>
                   </td>
                   <td className="py-3 px-3">

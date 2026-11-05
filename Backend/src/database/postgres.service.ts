@@ -2512,31 +2512,42 @@ export class PostgresService {
         (SELECT count(*) FROM sms_logs) as sms_count
     `);
 
+    let recentLogs: any[] = [];
+    try {
+      recentLogs = await this.getAuditLogs(100);
+    } catch (e) {
+      recentLogs = [];
+    }
+
     return {
       server: {
         nodeVersion: process.version,
         platform: process.platform,
+        pid: process.pid,
         uptimeSeconds: uptimeSec,
         uptimeFormatted: `${Math.floor(uptimeSec / 3600)} soat ${Math.floor((uptimeSec % 3600) / 60)} daqiqa`,
         memoryUsageMb: Math.round(mem.rss / 1024 / 1024),
         heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
-        heapTotalMb: Math.round(mem.heapTotal / 1024 / 1024)
+        heapTotalMb: Math.round(mem.heapTotal / 1024 / 1024),
+        externalMb: Math.round(mem.external / 1024 / 1024)
       },
       database: {
         status: 'CONNECTED',
         engine: 'PostgreSQL 16',
-        host: 'localhost:5433',
-        databaseName: 'sadaf_clinic_db',
+        host: '127.0.0.1:5432',
+        databaseName: 'klinika_db',
         latencyMs: dbLatencyMs,
         counts: counts.rows[0]
       },
       services: [
-        { name: 'Core HTTP API Server', port: 5001, status: 'ONLINE', latency: `${dbLatencyMs}ms` },
-        { name: 'WebSocket Realtime Gateway', port: 5001, status: 'ONLINE', latency: '2ms' },
+        { name: 'Core HTTP API Server (Nginx Proxy)', port: 5001, status: 'ONLINE', latency: `${dbLatencyMs}ms` },
+        { name: 'Node.js Express Engine', port: 5002, status: 'ONLINE', latency: '1ms' },
+        { name: 'WebSocket Realtime Gateway', port: 5002, status: 'ONLINE', latency: '2ms' },
         { name: 'Azure Neural Uzbek TTS Engine', status: 'ONLINE', latency: '48ms' },
         { name: 'Eskiz SMS Gateway', status: 'CONNECTED', latency: '120ms' },
-        { name: 'PostgreSQL Database Engine', port: 5433, status: 'ONLINE', latency: `${dbLatencyMs}ms` }
-      ]
+        { name: 'PostgreSQL Database Engine', port: 5432, status: 'ONLINE', latency: `${dbLatencyMs}ms` }
+      ],
+      logs: recentLogs
     };
   }
 }
